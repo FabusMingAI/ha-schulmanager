@@ -1,0 +1,52 @@
+# Schulmanager-Dashboard – Beispiel. Kindernamen (anna/max) und Schulkennungen anpassen.
+# Neu anlegen: Einstellungen → Dashboards → Dashboard hinzufügen → „Neu von Grund auf“
+# → ⋮ → Rohkonfigurations-Editor → diesen Inhalt einfügen.
+# Die Karte „custom:schulmanager-card“ wird von der Integration automatisch geladen.
+title: Schule
+views:
+  - title: Übersicht
+    path: uebersicht
+    icon: mdi:school
+    type: sections
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: custom:schulmanager-card
+            child: anna
+            grid_options: {columns: 12}
+          - type: button
+            name: Eltern-Portal öffnen
+            icon: mdi:open-in-new
+            grid_options: {columns: 12, rows: 1}
+            tap_action: {action: url, url_path: "https://bspgym.eltern-portal.org"}
+      - type: grid
+        cards:
+          - type: custom:schulmanager-card
+            child: max
+            grid_options: {columns: 12}
+          - type: button
+            name: Eltern-Portal öffnen
+            icon: mdi:open-in-new
+            grid_options: {columns: 12, rows: 1}
+            tap_action: {action: url, url_path: "https://musterrs.eltern-portal.org"}
+      - type: grid
+        column_span: 2
+        cards:
+          - type: calendar
+            initial_view: listWeek
+            entities: [calendar.schule_anna_kalender, calendar.schule_max_kalender]
+          - type: entities
+            title: Schulmanager
+            entities:
+              - sensor.schulmanager_letzter_abruf
+              - type: button
+                name: Portale jetzt abrufen
+                icon: mdi:refresh
+                action_name: Abrufen
+                tap_action: {action: perform-action, perform_action: schulmanager.refresh}
+              - type: button
+                name: Tagesübersicht jetzt senden
+                icon: mdi:cellphone-message
+                action_name: Senden
+                tap_action: {action: perform-action, perform_action: schulmanager.send_digest}

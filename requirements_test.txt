@@ -1,0 +1,3 @@
+pytest-homeassistant-custom-component
+pyelternportal==0.0.25
+pypdf>=4.0.0

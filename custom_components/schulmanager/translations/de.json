@@ -1,0 +1,272 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Eltern-Portal hinzufügen",
+        "description": "Schulkennung ist der Teil vor .eltern-portal.org (z. B. bspgym oder musterrs). Du kannst auch einfach den Link aus der Benachrichtigungs-E-Mail einfügen.\n\nBereits hinzugefügt: {added}",
+        "data": {
+          "school": "Schulkennung oder Portal-Link",
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        }
+      },
+      "more": {
+        "title": "Weitere Schule?",
+        "description": "Hinzugefügt:\n{added}",
+        "menu_options": {
+          "user": "Weitere Schule hinzufügen",
+          "finish": "Fertig – Schulmanager anlegen"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Neu anmelden",
+        "description": "Die Anmeldung bei einem Eltern-Portal ist fehlgeschlagen. Bitte das Passwort neu eingeben.",
+        "data": {
+          "school": "Schule",
+          "username": "E-Mail-Adresse (optional)",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-Mail-Adresse oder Passwort falsch.",
+      "invalid_school": "Ungültige Schulkennung (1–11 Buchstaben/Ziffern).",
+      "cannot_connect": "Portal nicht erreichbar oder existiert nicht.",
+      "already_added": "Diese Schule ist schon eingetragen.",
+      "unknown": "Unerwarteter Fehler – siehe Protokoll."
+    },
+    "abort": {
+      "already_configured": "Der Schulmanager ist bereits eingerichtet. Weitere Schulen fügst du über „Konfigurieren“ hinzu.",
+      "reauth_successful": "Anmeldung aktualisiert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Schulmanager",
+        "menu_options": {
+          "settings": "Einstellungen (KI, Erinnerungen, Ansagen)",
+          "add_portal": "Schule hinzufügen",
+          "remove_portal": "Schule entfernen"
+        }
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "data": {
+          "ai_task_entity": "KI-Dienst für die Auswertung (AI-Task-Entität)",
+          "notify_services": "Push-Benachrichtigungen an (notify-Dienste, z. B. mobile_app_…)",
+          "digest_enabled": "Morgens Tagesübersicht schicken",
+          "digest_time": "Uhrzeit Tagesübersicht",
+          "reminder_time": "Uhrzeit für Frist-Erinnerungen",
+          "reminder_days": "Erinnern … Tage vor Frist (kommagetrennt)",
+          "tts_targets": "Sprachansagen auf (Assist-Satelliten / Lautsprecher)",
+          "tts_engine": "TTS-Dienst (nur für Lautsprecher nötig)",
+          "tts_start": "Ansagen frühestens um",
+          "tts_end": "Ansagen spätestens um",
+          "scan_interval": "Portal abrufen alle",
+          "auto_download": "Anhänge/PDFs automatisch ablegen",
+          "analyze_days": "Beim ersten Import auswerten: die letzten",
+          "lookback_days": "Mitteilungen aus dem Portal lesen: die letzten"
+        },
+        "data_description": {
+          "ai_task_entity": "Liest Aufgaben, Fristen, Beträge und Termine aus Briefen und PDFs. Ohne KI greift eine einfache Regel-Erkennung.",
+          "reminder_days": "Beispiel 3,1,0 = drei Tage vorher, am Vortag und am Tag selbst. Überfällige Aufgaben werden täglich erinnert.",
+          "auto_download": "Hinweis: Das Eltern-Portal wertet das Herunterladen eines Elternbriefs als Empfangsbestätigung."
+        }
+      },
+      "add_portal": {
+        "title": "Schule hinzufügen",
+        "data": {
+          "school": "Schulkennung oder Portal-Link",
+          "username": "E-Mail-Adresse",
+          "password": "Passwort"
+        }
+      },
+      "remove_portal": {
+        "title": "Schule entfernen",
+        "description": "Aufgaben und Mitteilungen dieser Schule werden aus dem Schulmanager gelöscht. Abgelegte Dateien bleiben im Medienordner.",
+        "data": {
+          "school": "Schule"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-Mail-Adresse oder Passwort falsch.",
+      "invalid_school": "Ungültige Schulkennung.",
+      "cannot_connect": "Portal nicht erreichbar oder existiert nicht.",
+      "already_added": "Diese Schule ist schon eingetragen.",
+      "unknown": "Unerwarteter Fehler – siehe Protokoll."
+    },
+    "abort": {
+      "portal_added": "Schule hinzugefügt. Der Schulmanager lädt neu.",
+      "portal_removed": "Schule entfernt.",
+      "last_portal": "Die letzte Schule kann nicht entfernt werden – lösche stattdessen die Integration."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ampel": {
+        "name": "Status",
+        "state": {
+          "gruen": "Alles erledigt",
+          "gelb": "Etwas offen",
+          "rot": "Dringend"
+        }
+      },
+      "offene_aufgaben": {
+        "name": "Offene Aufgaben"
+      },
+      "ueberfaellig": {
+        "name": "Überfällig"
+      },
+      "naechste_frist": {
+        "name": "Nächste Frist"
+      },
+      "offene_zahlungen": {
+        "name": "Offene Zahlungen"
+      },
+      "ungelesen": {
+        "name": "Ungelesene Mitteilungen"
+      },
+      "letzter_abruf": {
+        "name": "Letzter Abruf"
+      }
+    },
+    "todo": {
+      "aufgaben": {
+        "name": "Aufgaben"
+      }
+    },
+    "calendar": {
+      "kalender": {
+        "name": "Kalender"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Portale abrufen",
+      "description": "Alle Eltern-Portale sofort abrufen."
+    },
+    "mark_read": {
+      "name": "Als gelesen markieren",
+      "description": "Eine Mitteilung, alle eines Kindes oder alle als gelesen markieren.",
+      "fields": {
+        "item_id": {
+          "name": "Mitteilungs-ID",
+          "description": "ID aus den Sensor-Attributen; leer = alle."
+        },
+        "child": {
+          "name": "Kind",
+          "description": "z. B. anna oder max"
+        },
+        "read": {
+          "name": "Gelesen",
+          "description": "Aus = wieder als ungelesen markieren."
+        }
+      }
+    },
+    "complete_task": {
+      "name": "Aufgabe erledigen",
+      "description": "Aufgabe als erledigt (oder wieder offen) markieren.",
+      "fields": {
+        "task_id": {
+          "name": "Aufgaben-ID",
+          "description": "ID der Aufgabe."
+        },
+        "done": {
+          "name": "Erledigt",
+          "description": "Aus = wieder öffnen."
+        }
+      }
+    },
+    "add_task": {
+      "name": "Aufgabe anlegen",
+      "description": "Eigene Aufgabe für ein Kind anlegen.",
+      "fields": {
+        "child": {
+          "name": "Kind",
+          "description": "z. B. anna"
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Was ist zu tun?"
+        },
+        "due": {
+          "name": "Fällig am",
+          "description": "Frist"
+        },
+        "amount": {
+          "name": "Betrag",
+          "description": "Bei Zahlungen"
+        },
+        "details": {
+          "name": "Details",
+          "description": "Notizen"
+        },
+        "type": {
+          "name": "Art",
+          "description": "Art der Aufgabe"
+        }
+      }
+    },
+    "reanalyze": {
+      "name": "Neu auswerten",
+      "description": "Eine Mitteilung erneut von der KI auswerten lassen.",
+      "fields": {
+        "item_id": {
+          "name": "Mitteilungs-ID",
+          "description": "ID aus den Sensor-Attributen."
+        }
+      }
+    },
+    "send_digest": {
+      "name": "Tagesübersicht senden",
+      "description": "Die Tagesübersicht jetzt schicken."
+    },
+    "send_reminders": {
+      "name": "Erinnerungen prüfen",
+      "description": "Fällige Erinnerungen jetzt verschicken."
+    },
+    "get_overview": {
+      "name": "Übersicht abfragen",
+      "description": "Offene Aufgaben und ungelesene Mitteilungen als Antwort liefern (für Skripte und Sprachassistenten).",
+      "fields": {
+        "child": {
+          "name": "Kind",
+          "description": "Optional nur ein Kind."
+        }
+      }
+    },
+    "update_task": {
+      "name": "Aufgabe bearbeiten",
+      "description": "Status (offen / in Arbeit / erledigt), Kommentar, Frist oder Titel einer Aufgabe ändern.",
+      "fields": {
+        "task_id": {
+          "name": "Aufgaben-ID",
+          "description": "ID der Aufgabe."
+        },
+        "status": {
+          "name": "Status",
+          "description": "offen, in_arbeit oder erledigt"
+        },
+        "comment": {
+          "name": "Kommentar",
+          "description": "Eigene Notiz zur Aufgabe."
+        },
+        "due": {
+          "name": "Fällig am",
+          "description": "Neue Frist."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Neuer Titel."
+        },
+        "details": {
+          "name": "Details",
+          "description": "Details zur Aufgabe."
+        }
+      }
+    }
+  }
+}

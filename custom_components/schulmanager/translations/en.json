@@ -1,0 +1,272 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Eltern-Portal",
+        "description": "The school code is the part before .eltern-portal.org (e.g. bspgym or musterrs). You can also paste the link from a notification e-mail.\n\nAlready added: {added}",
+        "data": {
+          "school": "School code or portal link",
+          "username": "E-mail address",
+          "password": "Password"
+        }
+      },
+      "more": {
+        "title": "Add another school?",
+        "description": "Added:\n{added}",
+        "menu_options": {
+          "user": "Add another school",
+          "finish": "Done – create Schulmanager"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Signing in to an Eltern-Portal failed. Please enter the password again.",
+        "data": {
+          "school": "School",
+          "username": "E-mail address (optional)",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Wrong e-mail address or password.",
+      "invalid_school": "Invalid school code (1–11 letters/digits).",
+      "cannot_connect": "Portal not reachable or does not exist.",
+      "already_added": "This school has already been added.",
+      "unknown": "Unexpected error – see the log."
+    },
+    "abort": {
+      "already_configured": "Schulmanager is already set up. Add more schools via “Configure”.",
+      "reauth_successful": "Credentials updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Schulmanager",
+        "menu_options": {
+          "settings": "Settings (AI, reminders, announcements)",
+          "add_portal": "Add school",
+          "remove_portal": "Remove school"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "ai_task_entity": "AI service for analysis (AI Task entity)",
+          "notify_services": "Push notifications to (notify services, e.g. mobile_app_…)",
+          "digest_enabled": "Send daily summary in the morning",
+          "digest_time": "Daily summary time",
+          "reminder_time": "Deadline reminder time",
+          "reminder_days": "Remind … days before deadline (comma-separated)",
+          "tts_targets": "Voice announcements on (Assist satellites / speakers)",
+          "tts_engine": "TTS service (only needed for speakers)",
+          "tts_start": "Announcements not before",
+          "tts_end": "Announcements not after",
+          "scan_interval": "Poll portals every",
+          "auto_download": "Store attachments/PDFs automatically",
+          "analyze_days": "On first import, analyse the last",
+          "lookback_days": "Read portal messages from the last"
+        },
+        "data_description": {
+          "ai_task_entity": "Extracts tasks, deadlines, amounts and dates from letters and PDFs. Without AI a simple rule-based detection is used.",
+          "reminder_days": "Example 3,1,0 = three days before, the day before and on the day. Overdue tasks are reminded daily.",
+          "auto_download": "Note: Eltern-Portal treats downloading a parent letter as acknowledging receipt."
+        }
+      },
+      "add_portal": {
+        "title": "Add school",
+        "data": {
+          "school": "School code or portal link",
+          "username": "E-mail address",
+          "password": "Password"
+        }
+      },
+      "remove_portal": {
+        "title": "Remove school",
+        "description": "Tasks and messages of this school are removed from Schulmanager. Stored files stay in the media folder.",
+        "data": {
+          "school": "School"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Wrong e-mail address or password.",
+      "invalid_school": "Invalid school code.",
+      "cannot_connect": "Portal not reachable or does not exist.",
+      "already_added": "This school has already been added.",
+      "unknown": "Unexpected error – see the log."
+    },
+    "abort": {
+      "portal_added": "School added. Schulmanager is reloading.",
+      "portal_removed": "School removed.",
+      "last_portal": "The last school cannot be removed – delete the integration instead."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "ampel": {
+        "name": "Status",
+        "state": {
+          "gruen": "All done",
+          "gelb": "Something open",
+          "rot": "Urgent"
+        }
+      },
+      "offene_aufgaben": {
+        "name": "Open tasks"
+      },
+      "ueberfaellig": {
+        "name": "Overdue"
+      },
+      "naechste_frist": {
+        "name": "Next deadline"
+      },
+      "offene_zahlungen": {
+        "name": "Open payments"
+      },
+      "ungelesen": {
+        "name": "Unread messages"
+      },
+      "letzter_abruf": {
+        "name": "Last update"
+      }
+    },
+    "todo": {
+      "aufgaben": {
+        "name": "Tasks"
+      }
+    },
+    "calendar": {
+      "kalender": {
+        "name": "Calendar"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh portals",
+      "description": "Fetch all Eltern-Portals now."
+    },
+    "mark_read": {
+      "name": "Mark as read",
+      "description": "Mark one message, all messages of a child, or everything as read.",
+      "fields": {
+        "item_id": {
+          "name": "Message ID",
+          "description": "ID from the sensor attributes; empty = all."
+        },
+        "child": {
+          "name": "Child",
+          "description": "e.g. anna or max"
+        },
+        "read": {
+          "name": "Read",
+          "description": "Off = mark as unread again."
+        }
+      }
+    },
+    "complete_task": {
+      "name": "Complete task",
+      "description": "Mark a task as done (or open again).",
+      "fields": {
+        "task_id": {
+          "name": "Task ID",
+          "description": "ID of the task."
+        },
+        "done": {
+          "name": "Done",
+          "description": "Off = reopen."
+        }
+      }
+    },
+    "add_task": {
+      "name": "Add task",
+      "description": "Create your own task for a child.",
+      "fields": {
+        "child": {
+          "name": "Child",
+          "description": "e.g. anna"
+        },
+        "title": {
+          "name": "Title",
+          "description": "What needs to be done?"
+        },
+        "due": {
+          "name": "Due date",
+          "description": "Deadline"
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "For payments"
+        },
+        "details": {
+          "name": "Details",
+          "description": "Notes"
+        },
+        "type": {
+          "name": "Type",
+          "description": "Type of task"
+        }
+      }
+    },
+    "reanalyze": {
+      "name": "Re-analyse",
+      "description": "Let the AI analyse a message again.",
+      "fields": {
+        "item_id": {
+          "name": "Message ID",
+          "description": "ID from the sensor attributes."
+        }
+      }
+    },
+    "send_digest": {
+      "name": "Send daily summary",
+      "description": "Send the daily summary now."
+    },
+    "send_reminders": {
+      "name": "Check reminders",
+      "description": "Send due reminders now."
+    },
+    "get_overview": {
+      "name": "Get overview",
+      "description": "Return open tasks and unread messages as a response (for scripts and voice assistants).",
+      "fields": {
+        "child": {
+          "name": "Child",
+          "description": "Optionally only one child."
+        }
+      }
+    },
+    "update_task": {
+      "name": "Edit task",
+      "description": "Change status (open / in progress / done), comment, deadline or title of a task.",
+      "fields": {
+        "task_id": {
+          "name": "Task ID",
+          "description": "ID of the task."
+        },
+        "status": {
+          "name": "Status",
+          "description": "offen (open), in_arbeit (in progress) or erledigt (done)"
+        },
+        "comment": {
+          "name": "Comment",
+          "description": "Your own note on the task."
+        },
+        "due": {
+          "name": "Due date",
+          "description": "New deadline."
+        },
+        "title": {
+          "name": "Title",
+          "description": "New title."
+        },
+        "details": {
+          "name": "Details",
+          "description": "Task details."
+        }
+      }
+    }
+  }
+}

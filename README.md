@@ -1,5 +1,3 @@
-# <p align="left"><img src="docs/images/icon@2x.png" width="128" alt="Schulmanager icon"></p>
-
 # Schulmanager for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)

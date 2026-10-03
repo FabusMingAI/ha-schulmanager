@@ -58,7 +58,7 @@ Den Ordner `custom_components/schulmanager` nach `/config/custom_components/schu
    - **KI-Dienst**: eure AI-Task-Entität. Ohne KI greift nur die einfache Regel-Erkennung.
    - **Push an**: z. B. `mobile_app_<handy_1>` und `mobile_app_<handy_2>`
    - **Sprachansagen auf**: Assist-Satelliten (Ansage direkt) oder Lautsprecher (dafür zusätzlich einen TTS-Dienst wählen)
-4. **Dashboard**: Einstellungen → Dashboards → Neu → ⋮ → Rohkonfigurations-Editor → [`dashboard/schulmanager_dashboard.yaml`](dashboard/schulmanager_dashboard.yaml) einfügen und `anna` / `max` durch die Vornamen eurer Kinder in Kleinbuchstaben ersetzen.
+4. **Dashboard**: Der Schulmanager legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (Kalender und Status aller Kinder) und **einem Reiter pro Kind**, ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
 
 Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur die der letzten 21 Tage (und alle noch unbestätigten Briefe) werden ausgewertet und als ungelesen markiert, der Rest landet als gelesen im Archiv. Es gibt einmalig eine kurze Einrichtungs-Push statt einer Flut.
 

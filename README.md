@@ -53,7 +53,7 @@ Copy `custom_components/schulmanager` to `/config/custom_components/schulmanager
 1. **Settings → Devices & services → Add integration → Schulmanager**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.
 3. **Configure → Settings**: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, and optionally speakers or Assist satellites for announcements.
-4. **Dashboard**: create a new dashboard, open the raw configuration editor and paste [`dashboard/schulmanager_dashboard.yaml`](dashboard/schulmanager_dashboard.yaml). Replace `anna` / `max` with your children's first names in lower case. The card is loaded by the integration – no extra resource needed.
+4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (calendar and status of all children) plus **one tab per child**, ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
 
 On the first run the last 120 days are imported; only the last 21 days (and all unconfirmed letters) are analysed and marked unread, older items go to the archive as read.
 

@@ -25,7 +25,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 - **Traffic light per child** – red / yellow / green for dashboards and automations.
 - **Dashboard card included** (`custom:schulmanager-card`) – tap a task to see the letter, the PDF and the payment details.
 
-<p align="center"><img src="docs/images/task-dialog.png" width="320" alt="Task details"></p>
+<p align="left"><img src="docs/images/task-dialog.png" width="320" alt="Task details"></p>
 
 > The user interface texts of the card, notifications and the AI output are in German, because Eltern-Portal is a German service. Configuration dialogs are available in English and German.
 

@@ -1,10 +1,10 @@
 /* Schulmanager-Karte für Home Assistant – Aufgaben und Mitteilungen pro Kind.
  * Wird von der Integration automatisch geladen. Verwendung im Dashboard:
  *   type: custom:schulmanager-card
- *   child: anna        # optional, ohne Angabe: alle Kinder
+ *   child: anna          # optional, ohne Angabe: alle Kinder
  */
 (() => {
-  const VERSION = "0.2.1";
+  const VERSION = "0.3.1";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -165,7 +165,10 @@
           clearTimeout(this._deb);
           this._deb = setTimeout(() => this._load(true), 400);
         }, { type: "schulmanager/subscribe" })
-        .catch(() => null);
+        .catch(() => {
+          this._unsub = null;
+          return null;
+        });
     }
 
     async _ws(msg) {
@@ -182,8 +185,16 @@
         if (this._config.child) msg.child = this._config.child;
         this._data = await this._ws(msg);
         this._error = null;
+        this._retries = 0;
       } catch (e) {
         this._error = e.message || String(e);
+        // z. B. während Home Assistant noch startet: automatisch erneut versuchen
+        clearTimeout(this._retry);
+        const wait = Math.min(30000, 3000 * ((this._retries = (this._retries || 0) + 1)));
+        this._retry = setTimeout(() => {
+          this._load(refreshDialog);
+          this._subscribe();
+        }, wait);
       }
       this._render();
       if (refreshDialog && this._dialog && !this._editing) this._reopen();
@@ -195,7 +206,7 @@
       const keepDialog = root.querySelector(".ov");
       let html = `<style>${STYLE}</style><ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
-      if (this._error) html += `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch – die Daten erscheinen gleich automatisch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else if (!this._data.children.length) html += `<div class="empty">Keine Kinder gefunden.</div>`;
       else for (const c of this._data.children) html += this._childHtml(c);

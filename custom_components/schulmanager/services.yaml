@@ -90,3 +90,4 @@ get_overview:
     child:
       selector:
         text:
+rebuild_dashboard:

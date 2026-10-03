@@ -200,6 +200,7 @@ class SchulManager:
             "appointments": stored.get("appointments", {}),
             "children": stored.get("children", {}),
             "initialized": stored.get("initialized", []),
+            "dashboard": stored.get("dashboard", {}),
         }
 
     async def async_start(self) -> None:

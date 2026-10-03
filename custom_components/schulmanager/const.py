@@ -32,6 +32,7 @@ CONF_SCAN_INTERVAL: Final = "scan_interval"
 CONF_AUTO_DOWNLOAD: Final = "auto_download"
 CONF_LOOKBACK_DAYS: Final = "lookback_days"
 CONF_ANALYZE_DAYS: Final = "analyze_days"
+CONF_DASHBOARD: Final = "dashboard"
 
 DEFAULT_DIGEST_ENABLED: Final = True
 DEFAULT_DIGEST_TIME: Final = "06:45:00"
@@ -104,3 +105,14 @@ FILE_URL_BASE: Final = f"/api/{DOMAIN}/datei"
 CARD_URL: Final = f"/{DOMAIN}_static/schulmanager-card.js"
 LOCAL_CARD_FILE: Final = "schulmanager-card.js"
 LOCAL_CARD_URL: Final = f"/local/{DOMAIN}/{LOCAL_CARD_FILE}"
+
+# Dashboard „Schule“
+DASHBOARD_URL: Final = "dashboard-schule"
+DASHBOARD_TITLE: Final = "Schule"
+DASHBOARD_ICON: Final = "mdi:school"
+DASHBOARD_TABS: Final = "tabs"
+DASHBOARD_SINGLE: Final = "single"
+DASHBOARD_OFF: Final = "off"
+DASHBOARD_MODES: Final = [DASHBOARD_TABS, DASHBOARD_SINGLE, DASHBOARD_OFF]
+DEFAULT_DASHBOARD: Final = DASHBOARD_TABS
+LOCAL_ICON_URL: Final = f"/local/{DOMAIN}/icon.png"

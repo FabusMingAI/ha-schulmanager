@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 import hashlib
 import os
@@ -16,15 +17,17 @@ from homeassistant.components.http.auth import async_sign_path
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
     HomeAssistant,
+    callback,
     ServiceCall,
     ServiceResponse,
     SupportsResponse,
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 
-from . import websocket
+from . import dashboard, websocket
 from .const import (
     CARD_URL,
     DOMAIN,
@@ -33,6 +36,7 @@ from .const import (
     FILE_URL_BASE,
     LOGGER,
     PLATFORMS,
+    SIGNAL_UPDATED,
     TASK_STATUSES,
     TASK_TYPES,
 )
@@ -169,6 +173,11 @@ def _publish_card(hass: HomeAssistant, card: str) -> str | None:
     if not same:
         with open(target, "wb") as fh:
             fh.write(data)
+    icon = os.path.join(os.path.dirname(__file__), "brand", "icon.png")
+    icon_target = os.path.join(target_dir, "icon.png")
+    if os.path.isfile(icon) and not os.path.isfile(icon_target):
+        with open(icon, "rb") as src, open(icon_target, "wb") as dst:
+            dst.write(src.read())
     return hashlib.sha1(data).hexdigest()[:10]
 
 
@@ -221,7 +230,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: SchulConfigEntry) -> boo
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await manager.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+    _setup_dashboard(hass, entry, manager)
     return True
+
+
+def _setup_dashboard(hass: HomeAssistant, entry: SchulConfigEntry, manager: SchulManager) -> None:
+    """Dashboard nach dem Start und bei neuen/entfernten Kindern aktualisieren."""
+    known: set[str] = set()
+
+    async def _apply() -> None:
+        await asyncio.sleep(2)  # neue Entitäten zuerst registrieren lassen
+        known.clear()
+        known.update(manager.children)
+        await dashboard.async_apply(hass, manager)
+
+    @callback
+    def _updated() -> None:
+        if set(manager.children) != known:
+            entry.async_create_background_task(hass, _apply(), "schulmanager_dashboard")
+
+    entry.async_on_unload(
+        async_dispatcher_connect(hass, f"{SIGNAL_UPDATED}_{entry.entry_id}", _updated)
+    )
+    entry.async_create_background_task(hass, _apply(), "schulmanager_dashboard")
 
 
 async def _async_reload(hass: HomeAssistant, entry: SchulConfigEntry) -> None:
@@ -277,6 +308,9 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def reanalyze(call: ServiceCall) -> None:
         await get_manager(hass).async_reanalyze(call.data[ATTR_ITEM])
+
+    async def rebuild_dashboard(call: ServiceCall) -> None:
+        await dashboard.async_apply(hass, get_manager(hass), force=True)
 
     async def send_digest(call: ServiceCall) -> None:
         await get_manager(hass).async_send_digest(force=True)
@@ -381,6 +415,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN, "reanalyze", reanalyze, schema=vol.Schema({vol.Required(ATTR_ITEM): cv.string})
     )
     hass.services.async_register(DOMAIN, "send_digest", send_digest)
+    hass.services.async_register(DOMAIN, "rebuild_dashboard", rebuild_dashboard)
     hass.services.async_register(
         DOMAIN, "send_reminders", send_reminders, supports_response=SupportsResponse.OPTIONAL
     )

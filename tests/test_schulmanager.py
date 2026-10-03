@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import asyncio
 import io
 import json
 from unittest.mock import patch
@@ -570,3 +571,60 @@ async def test_card_registered_as_lovelace_resource(hass: HomeAssistant) -> None
 
     await _async_register_resource(hass, _card_path())
     assert len(res.async_items()) == 1
+
+
+async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_dir) -> None:
+    """Dashboard „Schule“: Reiter je Kind, Umschalten, Schutz eigener Änderungen."""
+    import os
+
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.schulmanager import dashboard as dash_mod
+
+    os.makedirs(hass.config.path("www"), exist_ok=True)
+    assert await async_setup_component(hass, "lovelace", {})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "demo", "school_name": "Demo", "username": "", "password": ""}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await asyncio.sleep(2.2)  # Dashboard wird kurz nach dem Start erzeugt
+    for _ in range(5):
+        await hass.async_block_till_done()
+    m = entry.runtime_data
+    dashes = hass.data["lovelace"].dashboards
+    assert "dashboard-schule" in dashes
+    cfg = await dashes["dashboard-schule"].async_load(False)
+    titles = [v["title"] for v in cfg["views"]]
+    assert titles[0] == "Übersicht" and len(titles) == 1 + len(m.children), titles
+    overview = json.dumps(cfg["views"][0])
+    assert "calendar.schule_erika_kalender" in overview and "Schulmanager" in overview
+    assert cfg["views"][1]["sections"][0]["cards"][0] == {
+        "type": "custom:schulmanager-card", "child": "erika", "grid_options": {"columns": 12}
+    }
+    assert os.path.isfile(hass.config.path("www", "schulmanager", "icon.png"))
+
+    # eigene Änderung bleibt erhalten
+    cfg["views"].append({"title": "Eigene Ansicht", "cards": []})
+    await dashes["dashboard-schule"].async_save(cfg)
+    assert not await dash_mod.async_apply(hass, m)
+    assert len((await dashes["dashboard-schule"].async_load(False))["views"]) == len(titles) + 1
+
+    # bewusste Wahl „Eine Seite“ in den Einstellungen überschreibt
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "dashboard": "single"})
+    await asyncio.sleep(2.2)  # Dashboard wird kurz nach dem Start erzeugt
+    for _ in range(5):
+        await hass.async_block_till_done()
+    m = entry.runtime_data
+    cfg = await dashes["dashboard-schule"].async_load(False)
+    assert len(cfg["views"]) == 1 and "schulmanager-card" in json.dumps(cfg)
+
+    # „Nicht verwalten“ fasst nichts an
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "dashboard": "off"})
+    await asyncio.sleep(2.2)  # Dashboard wird kurz nach dem Start erzeugt
+    for _ in range(5):
+        await hass.async_block_till_done()
+    assert not await dash_mod.async_apply(hass, entry.runtime_data, force=True)
+    await hass.config_entries.async_unload(entry.entry_id)

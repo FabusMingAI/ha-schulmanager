@@ -66,12 +66,14 @@
           "scan_interval": "Poll portals every",
           "auto_download": "Store attachments/PDFs automatically",
           "analyze_days": "On first import, analyse the last",
-          "lookback_days": "Read portal messages from the last"
+          "lookback_days": "Read portal messages from the last",
+          "dashboard": "“Schule” dashboard"
         },
         "data_description": {
           "ai_task_entity": "Extracts tasks, deadlines, amounts and dates from letters and PDFs. Without AI a simple rule-based detection is used.",
           "reminder_days": "Example 3,1,0 = three days before, the day before and on the day. Overdue tasks are reminded daily.",
-          "auto_download": "Note: Eltern-Portal treats downloading a parent letter as acknowledging receipt."
+          "auto_download": "Note: Eltern-Portal treats downloading a parent letter as acknowledging receipt.",
+          "dashboard": "Tabs: “Overview” with calendar and Schulmanager plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it."
         }
       },
       "add_portal": {
@@ -266,6 +268,19 @@
           "name": "Details",
           "description": "Task details."
         }
+      }
+    },
+    "rebuild_dashboard": {
+      "name": "Rebuild dashboard",
+      "description": "Rebuild the “Schule” dashboard for the selected layout – overwrites your own changes."
+    }
+  },
+  "selector": {
+    "dashboard_mode": {
+      "options": {
+        "tabs": "Tabs (overview + one per child)",
+        "single": "Single page",
+        "off": "Do not manage"
       }
     }
   }

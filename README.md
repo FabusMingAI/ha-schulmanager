@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/images/icon@2x.png" width="128" alt="Schulmanager icon"></p>
+<p align="left"><img src="docs/images/icon@2x.png" width="128" alt="Schulmanager icon"></p>
 
 # Schulmanager for Home Assistant
 

@@ -549,3 +549,24 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
     resp = await client.get("/schulmanager_static/schulmanager-card.js")
     assert resp.status == 200 and "schulmanager-card" in await resp.text()
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_card_registered_as_lovelace_resource(hass: HomeAssistant) -> None:
+    """Die Karte liegt unter /local und steht in den Dashboard-Ressourcen."""
+    import os
+
+    from homeassistant.setup import async_setup_component
+
+    os.makedirs(hass.config.path("www"), exist_ok=True)
+    assert await async_setup_component(hass, "lovelace", {})
+    assert await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
+    res = hass.data["lovelace"].resources
+    urls = [i["url"] for i in res.async_items()]
+    assert len(urls) == 1 and urls[0].startswith("/local/schulmanager/schulmanager-card.js?v="), urls
+    assert os.path.isfile(hass.config.path("www", "schulmanager", "schulmanager-card.js"))
+    # zweiter Start: kein Duplikat
+    from custom_components.schulmanager import _async_register_resource, _card_path
+
+    await _async_register_resource(hass, _card_path())
+    assert len(res.async_items()) == 1

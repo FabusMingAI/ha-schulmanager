@@ -1,0 +1,92 @@
+refresh:
+mark_read:
+  fields:
+    item_id:
+      selector:
+        text:
+    child:
+      example: anna
+      selector:
+        text:
+    read:
+      default: true
+      selector:
+        boolean:
+complete_task:
+  fields:
+    task_id:
+      required: true
+      selector:
+        text:
+    done:
+      default: true
+      selector:
+        boolean:
+add_task:
+  fields:
+    child:
+      required: true
+      example: max
+      selector:
+        text:
+    title:
+      required: true
+      selector:
+        text:
+    due:
+      selector:
+        date:
+    amount:
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 0.01
+          unit_of_measurement: "€"
+          mode: box
+    details:
+      selector:
+        text:
+          multiline: true
+    type:
+      default: aufgabe
+      selector:
+        select:
+          options: [aufgabe, zahlung, rueckmeldung, unterschrift, mitbringen, termin, lesen]
+update_task:
+  fields:
+    task_id:
+      required: true
+      selector:
+        text:
+    status:
+      selector:
+        select:
+          options: [offen, in_arbeit, erledigt]
+    comment:
+      selector:
+        text:
+          multiline: true
+    due:
+      selector:
+        date:
+    title:
+      selector:
+        text:
+    details:
+      selector:
+        text:
+          multiline: true
+reanalyze:
+  fields:
+    item_id:
+      required: true
+      selector:
+        text:
+send_digest:
+send_reminders:
+get_overview:
+  fields:
+    child:
+      selector:
+        text:

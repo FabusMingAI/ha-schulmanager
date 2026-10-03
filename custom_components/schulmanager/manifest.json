@@ -5,6 +5,7 @@
     "ai_task",
     "assist_satellite",
     "frontend",
+    "lovelace",
     "media_source",
     "mobile_app",
     "notify",
@@ -29,5 +30,5 @@
     "pyelternportal==0.0.25",
     "pypdf>=4.0.0"
   ],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import hashlib
 import os
 from typing import Any
 
@@ -27,6 +28,8 @@ from . import websocket
 from .const import (
     CARD_URL,
     DOMAIN,
+    LOCAL_CARD_FILE,
+    LOCAL_CARD_URL,
     FILE_URL_BASE,
     LOGGER,
     PLATFORMS,
@@ -131,14 +134,77 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(SchulFileView())
     card = await hass.async_add_executor_job(_card_path)
     hass.http.register_view(SchulCardView(card))
-    version = str(int(await hass.async_add_executor_job(os.path.getmtime, card)))
-    try:
-        frontend.add_extra_js_url(hass, f"{CARD_URL}?v={version}")
-    except Exception:  # noqa: BLE001 - z.B. ohne Frontend (Tests)
-        LOGGER.debug("Karte konnte nicht automatisch geladen werden")
     websocket.async_register(hass)
     _register_services(hass)
+    if not await _async_register_resource(hass, card):
+        # Fallback (z. B. Dashboards im YAML-Modus): Karte als Zusatzmodul laden
+        version = str(int(await hass.async_add_executor_job(os.path.getmtime, card)))
+        try:
+            frontend.add_extra_js_url(hass, f"{CARD_URL}?v={version}")
+        except Exception:  # noqa: BLE001 - z.B. ohne Frontend (Tests)
+            LOGGER.debug("Karte konnte nicht automatisch geladen werden")
     return True
+
+
+def _publish_card(hass: HomeAssistant, card: str) -> str | None:
+    """Karte nach /config/www/schulmanager kopieren und Versions-Hash liefern.
+
+    /local wird von Home Assistant ab der ersten Sekunde ausgeliefert. So ist die
+    Karte auch dann ladbar, wenn ein Client die Seite öffnet, während Home
+    Assistant noch startet und der Schulmanager noch nicht eingerichtet ist.
+    """
+    www = hass.config.path("www")
+    if not os.path.isdir(www):
+        return None  # /local ist ohne www-Ordner beim Start nicht registriert
+    with open(card, "rb") as fh:
+        data = fh.read()
+    target_dir = os.path.join(www, "schulmanager")
+    os.makedirs(target_dir, exist_ok=True)
+    target = os.path.join(target_dir, LOCAL_CARD_FILE)
+    try:
+        with open(target, "rb") as fh:
+            same = fh.read() == data
+    except OSError:
+        same = False
+    if not same:
+        with open(target, "wb") as fh:
+            fh.write(data)
+    return hashlib.sha1(data).hexdigest()[:10]
+
+
+async def _async_register_resource(hass: HomeAssistant, card: str) -> bool:
+    """Karte als Lovelace-Ressource eintragen (Speichermodus)."""
+    try:
+        version = await hass.async_add_executor_job(_publish_card, hass, card)
+        if not version:
+            return False
+        lovelace = hass.data.get("lovelace")
+        resources = getattr(lovelace, "resources", None)
+        if resources is None or not hasattr(resources, "async_create_item"):
+            return False  # Ressourcen im YAML-Modus
+        if not getattr(resources, "loaded", True):
+            await resources.async_load()
+            resources.loaded = True
+        url = f"{LOCAL_CARD_URL}?v={version}"
+        mine = [
+            item
+            for item in resources.async_items()
+            if str(item.get("url", "")).split("?")[0] in (LOCAL_CARD_URL, CARD_URL)
+        ]
+        if mine:
+            first, *rest = mine
+            if first.get("url") != url or first.get("res_type") != "module":
+                await resources.async_update_item(
+                    first["id"], {"res_type": "module", "url": url}
+                )
+            for item in rest:
+                await resources.async_delete_item(item["id"])
+        else:
+            await resources.async_create_item({"res_type": "module", "url": url})
+        return True
+    except Exception:  # noqa: BLE001
+        LOGGER.warning("Karte konnte nicht als Dashboard-Ressource eingetragen werden", exc_info=True)
+        return False
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SchulConfigEntry) -> bool:

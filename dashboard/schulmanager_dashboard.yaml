@@ -33,9 +33,8 @@ views:
       - type: grid
         column_span: 2
         cards:
-          - type: calendar
-            initial_view: listWeek
-            entities: [calendar.schule_anna_kalender, calendar.schule_max_kalender]
+          - type: custom:schulmanager-termine
+          - type: custom:schulmanager-stundenplan
           - type: entities
             title: Schulmanager
             entities:

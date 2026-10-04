@@ -138,6 +138,9 @@
       },
       "stundenplan": {
         "name": "Timetable"
+      },
+      "krankmeldungen": {
+        "name": "Sick notes"
       }
     },
     "todo": {

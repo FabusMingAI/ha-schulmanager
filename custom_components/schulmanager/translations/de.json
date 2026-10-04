@@ -138,6 +138,9 @@
       },
       "stundenplan": {
         "name": "Stundenplan"
+      },
+      "krankmeldungen": {
+        "name": "Krankmeldungen"
       }
     },
     "todo": {

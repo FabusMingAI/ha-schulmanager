@@ -23,6 +23,8 @@ from .const import (
     CONF_ANALYZE_DAYS,
     CONF_AUTO_DOWNLOAD,
     CONF_APPOINTMENT_KINDS,
+    CONF_OWN_CLASS_ONLY,
+    CONF_SUMMARY_LANGUAGES,
     CONF_DASHBOARD,
     CONF_DIGEST_ENABLED,
     CONF_DIGEST_TIME,
@@ -42,6 +44,10 @@ from .const import (
     DEFAULT_AUTO_DOWNLOAD,
     APPOINTMENT_KINDS,
     DEFAULT_APPOINTMENT_KINDS,
+    DEFAULT_OWN_CLASS_ONLY,
+    DEFAULT_SUMMARY_LANGUAGES,
+    MAX_SUMMARY_LANGUAGES,
+    SUMMARY_LANGUAGES,
     DEFAULT_DASHBOARD,
     DEFAULT_DIGEST_ENABLED,
     DEFAULT_DIGEST_TIME,
@@ -216,9 +222,15 @@ class SchulmanagerOptionsFlow(OptionsFlow):
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
-        o = self.config_entry.options
+            langs = [x for x in SUMMARY_LANGUAGES if x in (user_input.get(CONF_SUMMARY_LANGUAGES) or [])]
+            if len(langs) > MAX_SUMMARY_LANGUAGES:
+                errors[CONF_SUMMARY_LANGUAGES] = "too_many_languages"
+            else:
+                user_input[CONF_SUMMARY_LANGUAGES] = langs or list(DEFAULT_SUMMARY_LANGUAGES)
+                return self.async_create_entry(data=user_input)
+        o = {**self.config_entry.options, **(user_input or {})}
         notify_services = sorted(
             s
             for s in self.hass.services.async_services_for_domain("notify")
@@ -276,6 +288,17 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                         mode=selector.SelectSelectorMode.LIST,
                     )
                 ),
+                vol.Optional(
+                    CONF_SUMMARY_LANGUAGES, **opt(CONF_SUMMARY_LANGUAGES, DEFAULT_SUMMARY_LANGUAGES)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=SUMMARY_LANGUAGES,
+                        translation_key="summary_languages",
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Optional(CONF_OWN_CLASS_ONLY, **opt(CONF_OWN_CLASS_ONLY, DEFAULT_OWN_CLASS_ONLY)): bool,
                 vol.Optional(CONF_DASHBOARD, **opt(CONF_DASHBOARD, DEFAULT_DASHBOARD)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=DASHBOARD_MODES,
@@ -285,7 +308,7 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="settings", data_schema=schema)
+        return self.async_show_form(step_id="settings", data_schema=schema, errors=errors)
 
     async def async_step_add_portal(
         self, user_input: dict[str, Any] | None = None

@@ -38,10 +38,12 @@ The integration loads three cards automatically and places them in the "Schule" 
 
 Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt** (done) per child.
 
-<p align="left"><img src="docs/images/task-dialog.png" width="320" alt="Task details"></p>
+<p align="left"><img src="docs/images/task-dialog.png" width="320" alt="Task details"> <img src="docs/images/item-dialog.png" width="320" alt="Message details with status and summary tabs"></p>
 
 - **Tap a task** to open its details: status **open / in progress / done**, change the due date, add your own **comment**, payment details with "copy" for IBAN and payment reference, plus the **source** with AI summary, original text, PDF and a link to Eltern-Portal.
-- **Tap a message** to see its text, the PDF and the tasks created from it; it is marked as read.
+- **Tap a message** to see its text, the PDF and the tasks created from it; it is marked as read. Messages also have the status **open / in progress / done**: done messages move to the **Erledigt** tab (and count as read), messages in progress show ⏳.
+- The **AI summary** has one tab per language chosen in the settings (German, English, Spanish, Catalan).
+- **PDFs:** "Drucken" opens the browser's print dialog, "Vollbild" shows the PDF full screen (on phones without full-screen support it opens in a new tab).
 - "In progress" still counts as open: the task stays in the traffic light and reminders and shows up in the to-do list with ⏳.
 
 ### Appointments & deadlines – `custom:schulmanager-termine`
@@ -89,8 +91,8 @@ Copy `custom_components/schulmanager` to `/config/custom_components/schulmanager
 
 1. **Settings → Devices & services → Add integration → Schulmanager**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.
-3. **Configure → Settings**: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, and **which portal appointments to show** (default: exams and tests; optionally also school appointments).
-4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
+3. **Configure → Settings**: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, **which portal appointments to show** (default: exams and tests; optionally also school appointments), **only appointments of the child's class** (default on: hides entries such as "Schullandheim 5b+5c" or "Jgst. 10" that name only other classes or grades) and the **languages of the AI summary** (checkboxes for German, English, Spanish, Catalan, up to 4; default German and English; the first one is used for push notifications).
+4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, plus a "⚙️ Einstellungen" link to the integration settings in the header) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
 
 On the first run the last 120 days are imported; only the last 21 days (and all unconfirmed letters) are analysed and marked unread, older items go to the archive as read.
 
@@ -117,6 +119,7 @@ Entity IDs follow your Home Assistant language (shown here for German).
 | `schulmanager.refresh` | Fetch all portals now |
 | `schulmanager.mark_read` | Mark a message, a child or everything as read |
 | `schulmanager.complete_task` / `schulmanager.update_task` | Change status, comment, due date or title |
+| `schulmanager.update_item` | `item_id` and `status` (`offen`, `in_arbeit`, `erledigt`) of a message |
 | `schulmanager.add_task` | Add your own task |
 | `schulmanager.reanalyze` | Let the AI analyse a message again |
 | `schulmanager.send_digest` / `schulmanager.send_reminders` | Send summary or reminders now |

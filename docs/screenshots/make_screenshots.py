@@ -25,6 +25,7 @@ SHOTS = [
     ("stundenplan-woche.png", "stundenplan", 700, "week"),
     ("termine.png", "termine", 400, "hover"),
     ("task-dialog.png", "task", 390, "dialog"),
+    ("item-dialog.png", "item", 390, "dialog"),
 ]
 
 
@@ -56,7 +57,7 @@ def main() -> None:
                 page.add_style_tag(content=css)
             if action == "dialog":  # Dialog füllt das Fenster wie am Handy
                 page.set_viewport_size({"width": width, "height": 844})
-            card_el = page.locator("schulmanager-card" if card == "task" else f"schulmanager-{card}")
+            card_el = page.locator("schulmanager-card" if card in ("task", "item") else f"schulmanager-{card}")
             card_el.locator("ha-card").wait_for()
             page.wait_for_function("() => !window.cardEl.shadowRoot.textContent.includes('Lade')")
             if action == "day":
@@ -66,7 +67,7 @@ def main() -> None:
             elif action == "hover":
                 card_el.locator('[data-ev="anna:e5"]').hover()
             elif action == "dialog":
-                page.evaluate("window.cardEl._openTask('t9')")
+                page.evaluate("window.cardEl._openItem('i9')" if card == "item" else "window.cardEl._openTask('t9')")
                 card_el.locator(".ov").wait_for()
             page.evaluate("document.fonts.ready")
             page.wait_for_timeout(300)

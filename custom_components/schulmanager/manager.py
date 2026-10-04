@@ -27,7 +27,14 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
-from .analyzer import AnalyzeError, analyze_rules, async_analyze_ai, fmt_eur
+from .analyzer import (
+    AnalyzeError,
+    analyze_rules,
+    async_analyze_ai,
+    fmt_eur,
+    summary_languages,
+)
+from .classes import concerns_class
 from .const import (
     ACTION_DONE,
     ACTION_READ,
@@ -36,7 +43,10 @@ from .const import (
     APPT_EXAM,
     APPT_TEST,
     CONF_APPOINTMENT_KINDS,
+    CONF_OWN_CLASS_ONLY,
+    CONF_SUMMARY_LANGUAGES,
     DEFAULT_APPOINTMENT_KINDS,
+    DEFAULT_OWN_CLASS_ONLY,
     AMPEL_RED,
     AMPEL_YELLOW,
     CONF_AI_ENTITY,
@@ -652,7 +662,9 @@ class SchulManager:
                     for f in item["files"]
                 ]
             try:
-                result = await async_analyze_ai(self.hass, ai_entity, ctx, attachments)
+                result = await async_analyze_ai(
+                    self.hass, ai_entity, ctx, attachments, self.summary_languages
+                )
                 method = "ki"
             except AnalyzeError as err:
                 error = str(err)
@@ -664,6 +676,7 @@ class SchulManager:
             "status": "fertig",
             "method": method,
             "summary": result["summary"],
+            "summaries": result.get("summaries") or {},
             "category": result["category"],
             "urgency": result["urgency"],
             "error": error,
@@ -729,6 +742,25 @@ class SchulManager:
                 count += 1
         self._changed()
         return count
+
+    @property
+    def summary_languages(self) -> list[str]:
+        return summary_languages(self.opt(CONF_SUMMARY_LANGUAGES))
+
+    def set_item_status(self, uid: str, status: str) -> None:
+        """Status einer Mitteilung: offen, in Arbeit oder erledigt (erledigt = gelesen)."""
+        item = self.items.get(uid)
+        if item is None:
+            raise HomeAssistantError(f"Unbekannte Mitteilung: {uid}")
+        if status not in (STATUS_OPEN, STATUS_PROGRESS, STATUS_DONE):
+            raise HomeAssistantError(f"Unbekannter Status: {status}")
+        item["status"] = status
+        if status == STATUS_DONE:
+            item["read"] = True
+            item["done_at"] = dt_util.now().isoformat()
+        else:
+            item.pop("done_at", None)
+        self._changed()
 
     def complete_task(self, tid: str, done: bool = True) -> None:
         if tid not in self.tasks:
@@ -848,11 +880,19 @@ class SchulManager:
         out: list[dict[str, Any]] = []
         tz = dt_util.get_default_time_zone()
         kinds = set(self.opt(CONF_APPOINTMENT_KINDS, DEFAULT_APPOINTMENT_KINDS) or [])
+        classname = self.children.get(child, {}).get("classname")
+        own_only = self.opt(CONF_OWN_CLASS_ONLY, DEFAULT_OWN_CLASS_ONLY)
+
+        def other_class(text: str | None) -> bool:
+            return bool(own_only) and concerns_class(text, classname) is False
+
         for a in self.data["appointments"].get(child, []):
             if not a.get("start"):
                 continue
             kind = a.get("kind") or appointment_kind(None, a.get("title"))
             if kind not in kinds:
+                continue
+            if other_class(f"{a.get('title') or ''} {a.get('detail') or ''}"):
                 continue
             category = {APPT_EXAM: "schulaufgabe", APPT_TEST: "test"}.get(kind, "portal")
             icon, label = EVENT_CATEGORIES[category]
@@ -876,6 +916,8 @@ class SchulManager:
             )
         for ev in self.data["events"].values():
             if ev.get("child") != child:
+                continue
+            if other_class(ev.get("title")):
                 continue
             item = self.items.get(ev.get("item_uid"), {})
             day = date.fromisoformat(ev["date"])

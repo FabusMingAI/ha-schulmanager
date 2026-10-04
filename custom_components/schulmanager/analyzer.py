@@ -14,7 +14,13 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import LOGGER, TASK_TYPES
+from .const import (
+    DEFAULT_SUMMARY_LANGUAGES,
+    LANGUAGE_PROMPT_NAMES,
+    LOGGER,
+    SUMMARY_LANGUAGES,
+    TASK_TYPES,
+)
 
 MAX_TEXT = 14000
 
@@ -26,7 +32,8 @@ Art: {kind}. Absender: {sender}. Datum der Mitteilung: {sent}.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau diesem Format:
 {{
-  "zusammenfassung": "1-2 kurze Sätze auf Deutsch, was die Eltern wissen müssen",
+  "zusammenfassung": "1-2 kurze Sätze auf {main_language}, was die Eltern wissen müssen",
+  "zusammenfassungen": {{{summaries_format}}},
   "kategorie": "info | aktion | zahlung | termin | rueckmeldung | leistung | organisation",
   "dringlichkeit": "niedrig | mittel | hoch",
   "aufgaben": [
@@ -53,6 +60,10 @@ anmelden, antworten, etwas besorgen/mitgeben). Reine Informationen erzeugen kein
 - Fälligkeiten immer als absolutes Datum; Jahr aus dem Kontext ergänzen \
 (Schuljahr läuft von September bis Juli).
 - Veranstaltungen, Elternabende, Ausflüge, Schulaufgaben usw. als "termine".
+- "zusammenfassungen" enthält dieselbe Zusammenfassung in jeder angegebenen Sprache \
+(Sprachcode als Schlüssel), jeweils natürlich formuliert, nicht wörtlich übersetzt.
+- Betrifft ein Termin oder eine Aufgabe ausdrücklich nur andere Klassen oder \
+Jahrgangsstufen (nicht Klasse {classname}), lass ihn weg.
 - Erfinde nichts. Wenn nichts zu tun ist, ist "aufgaben" eine leere Liste.
 
 --- BETREFF ---
@@ -106,8 +117,15 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(text[start : end + 1])
 
 
-def normalize(raw: dict[str, Any]) -> dict[str, Any]:
+def summary_languages(value: Any) -> list[str]:
+    """Gewählte Sprachen in fester Reihenfolge; ohne Auswahl Deutsch und Englisch."""
+    chosen = [lang for lang in SUMMARY_LANGUAGES if lang in (value or [])]
+    return chosen or list(DEFAULT_SUMMARY_LANGUAGES)
+
+
+def normalize(raw: dict[str, Any], languages: list[str] | None = None) -> dict[str, Any]:
     """KI-Antwort in ein sauberes Format bringen."""
+    languages = summary_languages(languages)
     tasks = []
     for t in raw.get("aufgaben") or []:
         if not isinstance(t, dict) or not t.get("titel"):
@@ -153,8 +171,21 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
     urgency = str(raw.get("dringlichkeit") or "mittel").lower()
     if urgency not in ("niedrig", "mittel", "hoch"):
         urgency = "mittel"
+    summaries: dict[str, str] = {}
+    raw_summaries = raw.get("zusammenfassungen")
+    if isinstance(raw_summaries, dict):
+        for lang in languages:
+            text = raw_summaries.get(lang)
+            if isinstance(text, str) and text.strip():
+                summaries[lang] = text.strip()[:600]
+    summary = str(raw.get("zusammenfassung") or "").strip()[:600]
+    if not summary and summaries:
+        summary = summaries[next(iter(summaries))]
+    if summary and languages[0] not in summaries:
+        summaries = {languages[0]: summary, **summaries}
     return {
-        "summary": str(raw.get("zusammenfassung") or "").strip()[:600],
+        "summary": summaries.get(languages[0]) or summary,
+        "summaries": summaries,
         "category": str(raw.get("kategorie") or "info").lower(),
         "urgency": urgency,
         "tasks": tasks,
@@ -167,8 +198,10 @@ async def async_analyze_ai(
     ai_entity: str,
     ctx: dict[str, Any],
     attachments: list[dict[str, str]] | None = None,
+    languages: list[str] | None = None,
 ) -> dict[str, Any]:
     """Mitteilung mit dem KI-Dienst von Home Assistant auswerten."""
+    languages = summary_languages(languages)
     today = date.today()
     body = ctx.get("body") or ""
     if len(body) > MAX_TEXT:
@@ -184,6 +217,10 @@ async def async_analyze_ai(
         sent=ctx.get("sent") or "?",
         title=ctx.get("title") or "",
         body=body or "(Inhalt steht im angehängten Dokument)",
+        main_language=LANGUAGE_PROMPT_NAMES[languages[0]],
+        summaries_format=", ".join(
+            f'"{lang}": "Zusammenfassung auf {LANGUAGE_PROMPT_NAMES[lang]}"' for lang in languages
+        ),
     )
     data: dict[str, Any] = {
         "task_name": f"Schulmanager: {ctx.get('title', '')[:60]}",
@@ -211,7 +248,7 @@ async def async_analyze_ai(
         except (ValueError, json.JSONDecodeError) as err:
             LOGGER.debug("Unverständliche KI-Antwort: %s", result)
             raise AnalyzeError(f"KI-Antwort nicht lesbar: {err}") from err
-    return normalize(raw)
+    return normalize(raw, languages)
 
 
 class AnalyzeError(Exception):
@@ -297,6 +334,7 @@ def analyze_rules(ctx: dict[str, Any]) -> dict[str, Any]:
         summary = summary[:217] + "…"
     return {
         "summary": summary,
+        "summaries": {},
         "category": "aktion" if tasks else "info",
         "urgency": "mittel" if tasks else "niedrig",
         "tasks": tasks,

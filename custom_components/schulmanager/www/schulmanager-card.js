@@ -7,7 +7,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.7.3";
+  const VERSION = "0.8.0";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -37,6 +37,9 @@
     ["erledigt", "Erledigt", "mdi:check-circle"],
   ];
   const AMPEL = { rot: "Dringend", gelb: "Etwas offen", gruen: "Alles erledigt" };
+  const LANG_ORDER = ["de", "en", "es", "ca"];
+  const LANG_NAMES = { de: "Deutsch", en: "English", es: "Español", ca: "Català" };
+  const isPdf = (f) => (f.content_type || "").includes("pdf") || String(f.name || "").toLowerCase().endsWith(".pdf");
 
   const STYLE = `
     :host { display:block; }
@@ -109,6 +112,13 @@
     .src { border:1px solid var(--divider-color); border-radius:10px; padding:12px; }
     .src h3 { margin:0 0 4px; font-size:1.05em; font-weight:500; }
     .summary { background: var(--secondary-background-color); border-radius:8px; padding:8px 10px; margin:8px 0; }
+    .ltabs { display:flex; gap:4px; margin:8px 0 -4px; flex-wrap:wrap; }
+    .ltab { border:none; background:none; cursor:pointer; font: inherit; font-size:.85em; padding:4px 10px; border-radius:8px 8px 0 0; color: var(--secondary-text-color); }
+    .ltab.on { background: var(--secondary-background-color); color: var(--primary-text-color); font-weight:600; }
+    .ltabs + .summary { border-top-left-radius:0; }
+    .pv.fs iframe { height: 100vh; border-radius:0; margin:0; }
+    .row .stx { font-size:.8em; color: var(--warning-color,#e08a00); margin-left:4px; }
+    .grp { padding: 10px 16px 2px; font-size:.8em; text-transform:uppercase; letter-spacing:.04em; color: var(--secondary-text-color); }
     pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size:.92em; margin: 6px 0 0; max-height: 50vh; overflow:auto; }
     iframe { width:100%; height: 65vh; border:1px solid var(--divider-color); border-radius:8px; margin-top:8px; background:#fff; }
     details summary { cursor:pointer; color: var(--primary-color); margin-top:8px; }
@@ -314,6 +324,8 @@
       const tab = this._tab[c.key] || "aufgaben";
       const open = c.tasks.filter((t) => t.status !== "erledigt");
       const done = c.tasks.filter((t) => t.status === "erledigt");
+      const activeItems = c.items.filter((i) => i.status !== "erledigt");
+      const doneItems = c.items.filter((i) => i.status === "erledigt");
       const chips = [];
       if (c.overdue) chips.push(`<span class="chip red">${c.overdue} überfällig</span>`);
       if (open.length) chips.push(`<span class="chip">${open.length} offen</span>`);
@@ -321,8 +333,11 @@
       if (c.unread) chips.push(`<span class="chip">📬 ${c.unread} ungelesen</span>`);
       let body = "";
       if (tab === "aufgaben") body = this._taskList(open, "Keine offenen Aufgaben 🎉");
-      else if (tab === "erledigt") body = this._taskList(done, "Noch nichts erledigt.");
-      else body = this._itemList(c.items);
+      else if (tab === "erledigt") {
+        body = !done.length && !doneItems.length ? `<div class="empty">Noch nichts erledigt.</div>` : "";
+        if (done.length) body += `${doneItems.length ? `<div class="grp">Aufgaben</div>` : ""}${this._taskList(done, "")}`;
+        if (doneItems.length) body += `<div class="grp">Mitteilungen</div>${this._itemList(doneItems)}`;
+      } else body = this._itemList(activeItems);
       return `
         <div class="child">
           <div class="head">
@@ -364,9 +379,9 @@
       if (!items.length) return `<div class="empty">Keine Mitteilungen.</div>`;
       return items
         .map(
-          (i) => `<div class="row ${i.read ? "" : "unread"}" data-item="${esc(i.uid)}">
+          (i) => `<div class="row ${i.read ? "" : "unread"} ${i.status === "erledigt" ? "done" : ""}" data-item="${esc(i.uid)}">
             <span class="ud ${i.read ? "read" : ""}"></span>
-            <div class="main"><div class="t">${i.urgency === "hoch" ? "🔴 " : ""}${esc(i.title)}${i.files ? " 📎" : ""}</div>
+            <div class="main"><div class="t">${i.urgency === "hoch" && i.status !== "erledigt" ? "🔴 " : ""}${esc(i.title)}${i.files ? " 📎" : ""}${i.status === "in_arbeit" ? `<span class="stx">⏳ In Arbeit</span>` : ""}</div>
             <div class="s">${esc(i.kind_label)}${i.sender ? " · " + esc(i.sender) : ""}${i.summary ? " · " + esc(i.summary) : ""}</div></div>
             <div class="due">${fmtShort(i.sent)}${i.tasks_open ? `<br>${i.tasks_open} Aufg.` : ""}</div></div>`
         )
@@ -426,28 +441,100 @@
           box.innerHTML = `<iframe src="${esc(el.dataset.preview)}" title="Vorschau"></iframe>`;
         })
       );
+      ov.querySelectorAll("[data-lang]").forEach((el) =>
+        el.addEventListener("click", () => {
+          this._lang = el.dataset.lang;
+          ov.querySelectorAll("[data-lang]").forEach((t) => t.classList.toggle("on", t === el));
+          ov.querySelectorAll("[data-langbox]").forEach((b) => (b.hidden = b.dataset.langbox !== this._lang));
+        })
+      );
+      ov.querySelectorAll("[data-fs]").forEach((el) =>
+        el.addEventListener("click", () => this._fullscreen(ov, el.dataset.fs))
+      );
+      ov.querySelectorAll("[data-print]").forEach((el) =>
+        el.addEventListener("click", () => this._print(el.dataset.print))
+      );
       if (bind) bind(ov);
     }
 
     _sourceHtml(item, opts = {}) {
       if (!item) return "";
       const files = item.files || [];
-      const pdf = files.find((f) => (f.content_type || "").includes("pdf") || f.name.toLowerCase().endsWith(".pdf"));
+      const pdf = files.find(isPdf);
       const text = (item.body || "").trim();
       const fileText = (item.text || "").trim();
       return `<div class="src">
           <div class="lbl">${esc(item.kind_label)} · ${fmtDate(item.sent)}${item.sender ? " · " + esc(item.sender) : ""}</div>
           <h3>${esc(item.title)}</h3>
-          ${item.summary ? `<div class="summary">🤖 ${esc(item.summary)}</div>` : ""}
+          ${this._summaryHtml(item)}
           <div class="btns">
-            ${files.map((f) => `<a class="btn" href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join("")}
-            ${pdf ? `<button class="btn" data-preview="${esc(pdf.url)}">👁 PDF hier anzeigen</button>` : ""}
+            ${files.map((f) => `<a class="btn" href="${esc(f.url)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>${isPdf(f) ? `<button class="btn" data-print="${esc(f.url)}" title="${esc(f.name)} drucken">🖨 Drucken</button>` : ""}`).join("")}
+            ${pdf ? `<button class="btn" data-preview="${esc(pdf.url)}">👁 PDF hier anzeigen</button><button class="btn" data-fs="${esc(pdf.url)}">⛶ Vollbild</button>` : ""}
             ${item.url ? `<a class="btn" href="${esc(item.url)}" target="_blank" rel="noopener">↗ Im Eltern-Portal</a>` : ""}
           </div>
           <div class="pv">${opts.preview && pdf ? `<iframe src="${esc(pdf.url)}" title="Vorschau"></iframe>` : ""}</div>
           ${text ? `<details ${opts.openText ? "open" : ""}><summary>Text der Mitteilung</summary><pre>${esc(text)}</pre></details>` : ""}
           ${fileText ? `<details><summary>Text aus der PDF</summary><pre>${esc(fileText)}</pre></details>` : ""}
         </div>`;
+    }
+
+    // PDF im Vollbild; ohne Vollbild-Unterstützung (z. B. iPhone) in neuem Tab öffnen
+    _fullscreen(ov, url) {
+      const box = ov.querySelector(".pv");
+      let frame = box.querySelector("iframe");
+      if (!frame) {
+        box.innerHTML = `<iframe src="${esc(url)}" title="Vorschau"></iframe>`;
+        frame = box.querySelector("iframe");
+      }
+      const req = box.requestFullscreen || box.webkitRequestFullscreen;
+      if (!req) {
+        window.open(url, "_blank", "noopener");
+        return;
+      }
+      const leave = () => {
+        if (!(document.fullscreenElement || document.webkitFullscreenElement)) {
+          box.classList.remove("fs");
+          document.removeEventListener("fullscreenchange", leave);
+          document.removeEventListener("webkitfullscreenchange", leave);
+        }
+      };
+      box.classList.add("fs");
+      document.addEventListener("fullscreenchange", leave);
+      document.addEventListener("webkitfullscreenchange", leave);
+      Promise.resolve(req.call(box)).catch(() => {
+        box.classList.remove("fs");
+        window.open(url, "_blank", "noopener");
+      });
+    }
+
+    // PDF drucken: unsichtbar laden und den Druckdialog des Browsers öffnen
+    _print(url) {
+      const old = document.getElementById("schulmanager-print");
+      if (old) old.remove();
+      const frame = document.createElement("iframe");
+      frame.id = "schulmanager-print";
+      frame.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;";
+      frame.src = url;
+      frame.onload = () => {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        } catch (e) {
+          window.open(url, "_blank", "noopener");
+        }
+      };
+      document.body.appendChild(frame);
+    }
+
+    // KI-Zusammenfassung mit einem Reiter je Sprache (Einstellung „Sprachen der KI-Zusammenfassung“)
+    _summaryHtml(item) {
+      const langs = Object.keys(item.summaries || {}).sort((a, b) => LANG_ORDER.indexOf(a) - LANG_ORDER.indexOf(b));
+      if (!langs.length) return item.summary ? `<div class="summary">🤖 ${esc(item.summary)}</div>` : "";
+      this._lang = this._lang && langs.includes(this._lang) ? this._lang : langs[0];
+      const tabs = langs.length > 1
+        ? `<div class="ltabs">${langs.map((l) => `<button class="ltab ${l === this._lang ? "on" : ""}" data-lang="${esc(l)}">${esc(LANG_NAMES[l] || l)}</button>`).join("")}</div>`
+        : "";
+      return `${tabs}${langs.map((l) => `<div class="summary" data-langbox="${esc(l)}" ${l === this._lang ? "" : "hidden"}>🤖 ${esc(item.summaries[l])}</div>`).join("")}`;
     }
 
     async _openTask(id, silent) {
@@ -521,7 +608,12 @@
         this._call("mark_read", { item_id: uid });
         i.read = true;
       }
+      const status = i.status || "offen";
       const body = `
+        <div class="sec"><div class="lbl">Status</div>
+          <div class="seg">${STATUS.map(
+            ([k, label, icon]) => `<button class="${k} ${status === k ? "on" : ""}" data-istatus="${k}"><ha-icon icon="${icon}"></ha-icon>${label}</button>`
+          ).join("")}</div></div>
         ${this._sourceHtml(i, { openText: true })}
         <div class="sec"><div class="lbl">Aufgaben aus dieser Mitteilung</div>
           ${i.tasks.length ? this._taskList(i.tasks, "") : `<div class="sub">Keine – reine Information.</div>`}</div>
@@ -529,7 +621,16 @@
           <button class="btn mark">${i.read ? "Als ungelesen markieren" : "Als gelesen markieren"}</button>
           <button class="btn re">🤖 Neu auswerten</button>
         </div>`;
-      this._showDialog(`${i.urgency === "hoch" ? "🔴 " : ""}${esc(i.title)}`, body, (ov) => {
+      this._showDialog(`${i.urgency === "hoch" && status !== "erledigt" ? "🔴 " : ""}${esc(i.title)}`, body, (ov) => {
+        ov.querySelectorAll("[data-istatus]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            const next = b.dataset.istatus;
+            await this._call("update_item", { item_id: uid, status: next });
+            // erledigt: Mitteilung wandert in den Reiter „Erledigt“, Dialog schließen
+            if (next === "erledigt") this._closeDialog();
+            else this._openItem(uid, true);
+          })
+        );
         ov.querySelector(".mark").addEventListener("click", async () => {
           await this._call("mark_read", { item_id: uid, read: !i.read });
           this._openItem(uid, true);

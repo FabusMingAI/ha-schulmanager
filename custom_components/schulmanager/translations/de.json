@@ -68,14 +68,18 @@
           "analyze_days": "Beim ersten Import auswerten: die letzten",
           "lookback_days": "Mitteilungen aus dem Portal lesen: die letzten",
           "dashboard": "Dashboard „Schule“",
-          "appointment_kinds": "Termine aus dem Portal anzeigen"
+          "appointment_kinds": "Termine aus dem Portal anzeigen",
+          "own_class_only": "Nur Termine der eigenen Klasse",
+          "summary_languages": "Sprachen der KI-Zusammenfassung"
         },
         "data_description": {
           "ai_task_entity": "Liest Aufgaben, Fristen, Beträge und Termine aus Briefen und PDFs. Ohne KI greift eine einfache Regel-Erkennung.",
           "reminder_days": "Beispiel 3,1,0 = drei Tage vorher, am Vortag und am Tag selbst. Überfällige Aufgaben werden täglich erinnert.",
           "auto_download": "Hinweis: Das Eltern-Portal wertet das Herunterladen eines Elternbriefs als Empfangsbestätigung.",
           "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast.",
-          "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests."
+          "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests.",
+          "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar.",
+          "summary_languages": "Bis zu 4 Sprachen; jede wird in der Zusammenfassung ein eigener Reiter. Die erste gewählte Sprache gilt für Push-Nachrichten. Gilt für neu ausgewertete Mitteilungen; ältere lassen sich mit „Neu auswerten“ nachziehen."
         }
       },
       "add_portal": {
@@ -99,7 +103,8 @@
       "invalid_school": "Ungültige Schulkennung.",
       "cannot_connect": "Portal nicht erreichbar oder existiert nicht.",
       "already_added": "Diese Schule ist schon eingetragen.",
-      "unknown": "Unerwarteter Fehler – siehe Protokoll."
+      "unknown": "Unerwarteter Fehler – siehe Protokoll.",
+      "too_many_languages": "Bitte höchstens 4 Sprachen wählen."
     },
     "abort": {
       "portal_added": "Schule hinzugefügt. Der Schulmanager lädt neu.",
@@ -251,6 +256,24 @@
         }
       }
     },
+    "rebuild_dashboard": {
+      "name": "Dashboard neu erzeugen",
+      "description": "Dashboard „Schule“ nach der gewählten Ansicht neu erzeugen – überschreibt eigene Änderungen."
+    },
+    "update_item": {
+      "name": "Mitteilung bearbeiten",
+      "description": "Status einer Mitteilung setzen: offen, in Arbeit oder erledigt. Erledigte Mitteilungen gelten als gelesen und erscheinen unter „Erledigt“.",
+      "fields": {
+        "item_id": {
+          "name": "Mitteilungs-ID",
+          "description": "ID der Mitteilung."
+        },
+        "status": {
+          "name": "Status",
+          "description": "offen, in_arbeit oder erledigt"
+        }
+      }
+    },
     "update_task": {
       "name": "Aufgabe bearbeiten",
       "description": "Status (offen / in Arbeit / erledigt), Kommentar, Frist oder Titel einer Aufgabe ändern.",
@@ -280,10 +303,6 @@
           "description": "Details zur Aufgabe."
         }
       }
-    },
-    "rebuild_dashboard": {
-      "name": "Dashboard neu erzeugen",
-      "description": "Dashboard „Schule“ nach der gewählten Ansicht neu erzeugen – überschreibt eigene Änderungen."
     }
   },
   "selector": {
@@ -299,6 +318,14 @@
         "schulaufgabe": "Schulaufgaben der Klasse",
         "test": "Tests / Kurzarbeiten / kl. Leistungsnachweise / Stegreifaufgaben",
         "schule": "Termine der Schule (Ferien, Sekretariat, Veranstaltungen …)"
+      }
+    },
+    "summary_languages": {
+      "options": {
+        "de": "Deutsch",
+        "en": "English",
+        "es": "Español",
+        "ca": "Català"
       }
     }
   }

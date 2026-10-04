@@ -143,10 +143,29 @@
     },
   };
 
+  // Mitteilung für den Detail-Dialog (card=item): Status, Zusammenfassung in mehreren Sprachen, PDF
+  const ITEM = {
+    uid: "i9", kind_label: "Elternbrief", sent: "2026-09-29", sender: "", title: "Skilager der 7. Klassen",
+    status: "in_arbeit", read: true, urgency: "mittel",
+    summary: "Skilager 18.–23.01. in den Alpen. Anzahlung 120 € bis 09.10., Einverständniserklärung bis 07.10. unterschrieben zurück.",
+    summaries: {
+      de: "Skilager 18.–23.01. in den Alpen. Anzahlung 120 € bis 09.10., Einverständniserklärung bis 07.10. unterschrieben zurück.",
+      en: "Ski camp 18–23 Jan in the Alps. Pay the 120 € deposit by 9 Oct and return the signed consent form by 7 Oct.",
+      es: "Campamento de esquí del 18 al 23 de enero en los Alpes. Pagar 120 € de anticipo antes del 9/10 y devolver firmada la autorización antes del 7/10.",
+      ca: "Campament d'esquí del 18 al 23 de gener als Alps. Pagar 120 € de bestreta abans del 9/10 i retornar signada l'autorització abans del 7/10.",
+    },
+    files: [{ name: "2026-09-29 Elternbrief - Skilager.pdf", url: "#", content_type: "application/pdf" }],
+    url: "#", body: "", text: "",
+    tasks: [
+      { id: "t9", title: "Skilager anzahlen", icon: "💶", status: "in_arbeit", due: "2026-10-09", days: 4, amount_text: "120,00 €" },
+      { id: "t8", title: "Einverständniserklärung unterschreiben", icon: "✍️", status: "offen", due: "2026-10-07", days: 2 },
+    ],
+  };
+
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
     callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, last_update: null, errors: {} }
-      : msg.type === "schulmanager/task" ? TASK : {},
+      : msg.type === "schulmanager/task" ? TASK : msg.type === "schulmanager/item" ? ITEM : {},
     callService: async () => {},
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },
   };
@@ -154,7 +173,7 @@
   const s = document.createElement("script");
   s.src = "../../custom_components/schulmanager/www/schulmanager-card.js";
   s.onload = () => {
-    const el = document.createElement(card === "task" ? "schulmanager-card" : "schulmanager-" + card);
+    const el = document.createElement(card === "task" || card === "item" ? "schulmanager-card" : "schulmanager-" + card);
     el.setConfig(q.get("view") ? { view: q.get("view") } : {});
     document.getElementById("wrap").appendChild(el);
     el.hass = window.hass;

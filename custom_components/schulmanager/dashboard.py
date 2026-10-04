@@ -57,6 +57,9 @@ def _child_entities(hass: HomeAssistant, manager: SchulManager, key: str) -> dic
     }
 
 
+SETTINGS_PATH = f"/config/integrations/integration/{DOMAIN}"
+
+
 def _header(names: list[str]) -> dict[str, Any]:
     subtitle = " & ".join(names) if names else "Eltern-Portal"
     return {
@@ -66,7 +69,8 @@ def _header(names: list[str]) -> dict[str, Any]:
             "text_only": True,
             "content": (
                 f'# <img src="{LOCAL_ICON_URL}" width="44" height="44"> Schulmanager\n'
-                f"{subtitle} · Eltern-Portal, Aufgaben und Fristen"
+                f"{subtitle} · Eltern-Portal, Aufgaben und Fristen · "
+                f"[⚙️ Einstellungen]({SETTINGS_PATH})"
             ),
         },
     }

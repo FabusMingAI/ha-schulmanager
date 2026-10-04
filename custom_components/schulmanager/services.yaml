@@ -53,6 +53,17 @@ add_task:
       selector:
         select:
           options: [aufgabe, zahlung, rueckmeldung, unterschrift, mitbringen, termin, lesen]
+update_item:
+  fields:
+    item_id:
+      required: true
+      selector:
+        text:
+    status:
+      required: true
+      selector:
+        select:
+          options: [offen, in_arbeit, erledigt]
 update_task:
   fields:
     task_id:

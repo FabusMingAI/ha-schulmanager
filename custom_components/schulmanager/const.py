@@ -34,6 +34,8 @@ CONF_LOOKBACK_DAYS: Final = "lookback_days"
 CONF_ANALYZE_DAYS: Final = "analyze_days"
 CONF_DASHBOARD: Final = "dashboard"
 CONF_APPOINTMENT_KINDS: Final = "appointment_kinds"
+CONF_OWN_CLASS_ONLY: Final = "own_class_only"
+CONF_SUMMARY_LANGUAGES: Final = "summary_languages"
 
 DEFAULT_DIGEST_ENABLED: Final = True
 DEFAULT_DIGEST_TIME: Final = "06:45:00"
@@ -52,6 +54,14 @@ APPT_EXAM: Final = "schulaufgabe"  # Schulaufgabe der Klasse (event-important)
 APPT_TEST: Final = "test"  # Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe (event-warning)
 APPOINTMENT_KINDS: Final = [APPT_EXAM, APPT_TEST, APPT_SCHOOL]
 DEFAULT_APPOINTMENT_KINDS: Final = [APPT_EXAM, APPT_TEST]
+DEFAULT_OWN_CLASS_ONLY: Final = True
+
+# Sprachen der KI-Zusammenfassung (Reihenfolge = Reihenfolge der Reiter)
+SUMMARY_LANGUAGES: Final = ["de", "en", "es", "ca"]
+DEFAULT_SUMMARY_LANGUAGES: Final = ["de", "en"]
+MAX_SUMMARY_LANGUAGES: Final = 4
+LANGUAGE_NAMES: Final = {"de": "Deutsch", "en": "English", "es": "Español", "ca": "Català"}
+LANGUAGE_PROMPT_NAMES: Final = {"de": "Deutsch", "en": "Englisch", "es": "Spanisch", "ca": "Katalanisch"}
 
 # --- Datenmodell ---
 KIND_LETTER: Final = "elternbrief"

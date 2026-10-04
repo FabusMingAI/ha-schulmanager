@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0 – 2026-10-04
+
+- New: messages have a status **open / in progress / done** like tasks (dialog in the card, action `schulmanager.update_item`). Done messages count as read and move to the "Erledigt" tab. / Neu: Mitteilungen mit Status Offen / In Arbeit / Erledigt; erledigte wandern in den Reiter „Erledigt“.
+- New: PDF **full screen** ("Vollbild") and **print** ("Drucken") buttons in the message and task dialogs. / Neu: PDF im Vollbild und Drucken.
+- New: **AI summary in several languages** – choose up to 4 of German, English, Spanish and Catalan in the settings (default German and English); the card shows one tab per language. / Neu: KI-Zusammenfassung in bis zu 4 Sprachen mit Reitern.
+- New: setting **"Only appointments of the child's class"** (default on) hides portal and AI appointments that name only other classes or grades, e.g. "Schullandheim 5b+5c" or "Jgst. 10". The AI is also told to skip them. / Neu: Termine anderer Klassen werden ausgeblendet.
+- Dashboard "Schule": "⚙️ Einstellungen" link to the integration settings in the overview header. / Link zu den Einstellungen auf der Übersicht.
+
 ## 0.7.3 – 2026-10-04
 
 - Dashboard "Schule": all timetables (overview, child tabs, single page) start in the week view. / Alle Stundenpläne im Dashboard „Schule“ starten in der Wochenansicht.

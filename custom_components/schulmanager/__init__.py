@@ -306,6 +306,9 @@ def _register_services(hass: HomeAssistant) -> None:
             changes["due"] = due.isoformat() if due else None
         get_manager(hass).update_task(call.data[ATTR_TASK], **changes)
 
+    async def update_item(call: ServiceCall) -> None:
+        get_manager(hass).set_item_status(call.data[ATTR_ITEM], call.data["status"])
+
     async def reanalyze(call: ServiceCall) -> None:
         await get_manager(hass).async_reanalyze(call.data[ATTR_ITEM])
 
@@ -409,6 +412,14 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("details"): vol.Any(None, cv.string),
                 vol.Optional("due"): vol.Any(None, cv.date),
             }
+        ),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "update_item",
+        update_item,
+        schema=vol.Schema(
+            {vol.Required(ATTR_ITEM): cv.string, vol.Required("status"): vol.In(TASK_STATUSES)}
         ),
     )
     hass.services.async_register(

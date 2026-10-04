@@ -19,6 +19,7 @@ from .const import (
     TASK_TYPE_ICONS as _ICONS,
     TASK_TYPE_LABELS,
     KIND_LABELS,
+    LANGUAGE_NAMES,
     SIGNAL_UPDATED,
     STATUS_DONE,
     STATUS_LABELS,
@@ -119,9 +120,13 @@ def _item_light(m, i: dict[str, Any]) -> dict[str, Any]:
         "sent": i.get("sent"),
         "sender": i.get("sender"),
         "summary": a.get("summary"),
+        "summaries": a.get("summaries") or {},
         "urgency": a.get("urgency"),
         "analysis": a.get("status"),
         "read": bool(i.get("read")),
+        "status": i.get("status") or "offen",
+        "status_label": STATUS_LABELS.get(i.get("status") or "offen", "Offen"),
+        "done_at": i.get("done_at"),
         "files": len(i.get("files", [])),
         "tasks_open": sum(
             1
@@ -221,6 +226,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
             "last_update": m.last_update.isoformat() if m.last_update else None,
             "errors": m.last_errors,
             "legend": _legend(),
+            "languages": [[code, LANGUAGE_NAMES[code]] for code in m.summary_languages],
             "today": today.isoformat(),
         },
     )

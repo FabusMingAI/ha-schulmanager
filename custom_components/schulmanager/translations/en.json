@@ -68,14 +68,18 @@
           "analyze_days": "On first import, analyse the last",
           "lookback_days": "Read portal messages from the last",
           "dashboard": "“Schule” dashboard",
-          "appointment_kinds": "Portal appointments to show"
+          "appointment_kinds": "Portal appointments to show",
+          "own_class_only": "Only appointments of the child's class",
+          "summary_languages": "Languages of the AI summary"
         },
         "data_description": {
           "ai_task_entity": "Extracts tasks, deadlines, amounts and dates from letters and PDFs. Without AI a simple rule-based detection is used.",
           "reminder_days": "Example 3,1,0 = three days before, the day before and on the day. Overdue tasks are reminded daily.",
           "auto_download": "Note: Eltern-Portal treats downloading a parent letter as acknowledging receipt.",
           "dashboard": "Tabs: “Overview” with calendar and Schulmanager plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it.",
-          "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests."
+          "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests.",
+          "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible.",
+          "summary_languages": "Up to 4 languages; each becomes its own tab in the summary. The first chosen language is used for push notifications. Applies to newly analysed messages; older ones can be updated with \"Neu auswerten\" (re-analyse)."
         }
       },
       "add_portal": {
@@ -99,7 +103,8 @@
       "invalid_school": "Invalid school code.",
       "cannot_connect": "Portal not reachable or does not exist.",
       "already_added": "This school has already been added.",
-      "unknown": "Unexpected error – see the log."
+      "unknown": "Unexpected error – see the log.",
+      "too_many_languages": "Please choose at most 4 languages."
     },
     "abort": {
       "portal_added": "School added. Schulmanager is reloading.",
@@ -251,6 +256,24 @@
         }
       }
     },
+    "rebuild_dashboard": {
+      "name": "Rebuild dashboard",
+      "description": "Rebuild the “Schule” dashboard for the selected layout – overwrites your own changes."
+    },
+    "update_item": {
+      "name": "Edit message",
+      "description": "Set the status of a message: open, in progress or done. Done messages count as read and move to \"Done\".",
+      "fields": {
+        "item_id": {
+          "name": "Message ID",
+          "description": "ID of the message."
+        },
+        "status": {
+          "name": "Status",
+          "description": "offen (open), in_arbeit (in progress) or erledigt (done)"
+        }
+      }
+    },
     "update_task": {
       "name": "Edit task",
       "description": "Change status (open / in progress / done), comment, deadline or title of a task.",
@@ -280,10 +303,6 @@
           "description": "Task details."
         }
       }
-    },
-    "rebuild_dashboard": {
-      "name": "Rebuild dashboard",
-      "description": "Rebuild the “Schule” dashboard for the selected layout – overwrites your own changes."
     }
   },
   "selector": {
@@ -299,6 +318,14 @@
         "schulaufgabe": "Exams (Schulaufgaben) of the class",
         "test": "Tests / short tests / pop quizzes",
         "schule": "School appointments (holidays, office hours, events …)"
+      }
+    },
+    "summary_languages": {
+      "options": {
+        "de": "Deutsch",
+        "en": "English",
+        "es": "Español",
+        "ca": "Català"
       }
     }
   }

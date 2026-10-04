@@ -920,3 +920,159 @@ async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> 
         ev = {e["uid"]: e for e in m.child_events("anna")}
         assert "a3" in ev and ev["a3"]["category"] == "portal" and "a2" not in ev
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+def test_concerns_class() -> None:
+    """Termine anderer Klassen/Jahrgangsstufen erkennen (Beispiele aus echten Portalen, anonymisiert)."""
+    from custom_components.schulmanager.classes import concerns_class
+
+    nine_d = {
+        "Grundwissenstest Chemie Jgst. 10": False,
+        "1. Wandertag": None,
+        "kLN in Französisch (9_F_9D_Ab) (Ab)": True,
+        "kLN in Evang. Religionslehre (9_Ev_9ABCDEF_Xy) (Xy)": True,
+        "SA in Englisch (9_E_9ABC_Xy)": False,
+        "Schullandheim 5b+5c": False,
+        "Projekt Bauernhof 8A": False,
+        "Wissenschaftswoche 11. Klassen": False,
+        "18:00 - 20:00<br />Elternsprechabend 5. Klassen": False,
+        "17:00 - 20:00<br />Elternsprechabend 6-13": True,
+        "Berufsinformationsmesse für die Jgst. 11 und 12": False,
+        "Theater 09:00 - 13:15<br>9Uhr: Jahrgangsstufe 6 – 10:30: Jahrgangsstufe 9": True,
+        "Wandertag Klasse 9d – Schloss": True,
+        "SA in Deutsch (Mü)": None,
+        "3D-Druck AG": None,
+    }
+    for text, expected in nine_d.items():
+        assert concerns_class(text, "9D") is expected, text
+    six_a = {
+        "Klassenelternabend der Klassen 6 bis 11": True,
+        "Modell Europaparlament Jgst. 10": False,
+        "Tage der Orientierung 8a+8b": False,
+        "Bundesjugendspiele Geräteturnen (6. Klassen)": True,
+        "Berufsinformationsabend 11-13": False,
+        "Klassenfotos für den Jahresbericht": None,
+    }
+    for text, expected in six_a.items():
+        assert concerns_class(text, "6A") is expected, text
+    assert concerns_class("Schullandheim 5b", None) is None
+    assert concerns_class("Q11 Kursfahrt Jgst. 11", "11") is True
+
+
+def test_normalize_summaries() -> None:
+    """KI-Zusammenfassung in mehreren Sprachen; erste gewählte Sprache ist die Haupt-Zusammenfassung."""
+    from custom_components.schulmanager.analyzer import normalize, summary_languages
+
+    assert summary_languages(None) == ["de", "en"]
+    assert summary_languages(["ca", "de"]) == ["de", "ca"]
+    raw = {
+        "zusammenfassung": "Wandertag am Freitag.",
+        "zusammenfassungen": {"de": "Wandertag am Freitag.", "en": "Hiking day on Friday.", "es": "Excursión el viernes.", "fr": "x"},
+    }
+    out = normalize(raw, ["de", "en", "es"])
+    assert out["summary"] == "Wandertag am Freitag."
+    assert out["summaries"] == {"de": "Wandertag am Freitag.", "en": "Hiking day on Friday.", "es": "Excursión el viernes."}
+    # ohne Übersetzungen: Haupt-Zusammenfassung landet unter der ersten Sprache
+    out = normalize({"zusammenfassung": "Nur Deutsch."}, ["de", "en"])
+    assert out["summaries"] == {"de": "Nur Deutsch."}
+    out = normalize({"zusammenfassungen": {"en": "Only English."}}, ["en", "ca"])
+    assert out["summary"] == "Only English."
+
+
+async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    """Status für Mitteilungen, Sprachen der KI-Zusammenfassung, Termine anderer Klassen, Einstellungs-Link."""
+    from custom_components.schulmanager import dashboard as dash_mod
+
+    today = dt_util.now().date()
+    tomorrow = dt_util.start_of_local_day(today + timedelta(days=1))
+    prompts: list[str] = []
+
+    async def fake_ai(call: ServiceCall):
+        prompts.append(call.data["instructions"])
+        return {"data": {
+            "zusammenfassung": "Hausaufgaben fehlen.",
+            "zusammenfassungen": {"de": "Hausaufgaben fehlen.", "en": "Homework missing.", "ca": "Falten deures."},
+            "kategorie": "info", "dringlichkeit": "mittel", "aufgaben": [],
+            "termine": [
+                {"titel": "Elternabend 8b", "datum": (today + timedelta(days=4)).isoformat()},
+                {"titel": "Schullandheim 5a+5b", "datum": (today + timedelta(days=5)).isoformat()},
+            ],
+        }}
+
+    hass.services.async_register("ai_task", "generate_data", fake_ai, supports_response=SupportsResponse.ONLY)
+
+    async def fake_fetch(self, need_download=None):
+        res = _fake_result(today, with_pdf=False)
+        res.children[0].appointments = [
+            {"uid": "a1", "title": "SA in Deutsch (Mü)", "kind": "schulaufgabe", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+            {"uid": "a2", "title": "kLN in Chemie (8_C_8ABC_Sch) (Sch)", "kind": "test", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+            {"uid": "a3", "title": "Grundwissenstest Chemie Jgst. 10", "kind": "test", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+            {"uid": "a4", "title": "SA in Englisch", "detail": "SA in Englisch (7_E_7C_Hu)", "kind": "schulaufgabe", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+        ]
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"ai_task_entity": "ai_task.claude", "summary_languages": ["de", "en", "ca"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        uid = "bspgym-7-nachricht-11_3"
+        for _ in range(20):
+            if m.items[uid]["analysis"].get("status") == "fertig":
+                break
+            await asyncio.sleep(0.05)
+
+        # Sprachen im Prompt und in der Auswertung
+        assert prompts and '"ca": "Zusammenfassung auf Katalanisch"' in prompts[0]
+        assert "nicht Klasse 8b" in prompts[0]
+        assert m.items[uid]["analysis"]["summaries"] == {
+            "de": "Hausaufgaben fehlen.", "en": "Homework missing.", "ca": "Falten deures."
+        }
+
+        # Termine anderer Klassen ausgeblendet (Portal und KI)
+        ev = {e["uid"]: e for e in m.child_events("anna")}
+        assert "a1" in ev and "a2" in ev
+        assert "a3" not in ev and "a4" not in ev
+        titles = {e["title"] for e in m.child_events("anna")}
+        assert "Elternabend 8b" in titles and "Schullandheim 5a+5b" not in titles
+
+        # Status einer Mitteilung
+        assert m.items[uid].get("status") in (None, "offen")
+        await hass.services.async_call(DOMAIN, "update_item", {"item_id": uid, "status": "in_arbeit"}, blocking=True)
+        assert m.items[uid]["status"] == "in_arbeit"
+        await hass.services.async_call(DOMAIN, "update_item", {"item_id": uid, "status": "erledigt"}, blocking=True)
+        assert m.items[uid]["status"] == "erledigt" and m.items[uid]["read"] is True and m.items[uid]["done_at"]
+
+        client = await hass_ws_client(hass)
+        await client.send_json({"id": 1, "type": "schulmanager/data"})
+        res = (await client.receive_json())["result"]
+        assert res["languages"] == [["de", "Deutsch"], ["en", "English"], ["ca", "Català"]]
+        item = next(i for i in res["children"][0]["items"] if i["uid"] == uid)
+        assert item["status"] == "erledigt" and item["status_label"] == "Erledigt"
+        assert item["summaries"]["en"] == "Homework missing."
+
+        await hass.services.async_call(DOMAIN, "update_item", {"item_id": uid, "status": "offen"}, blocking=True)
+        assert m.items[uid]["status"] == "offen" and "done_at" not in m.items[uid]
+
+        # Einstellung aus: alle Termine wieder sichtbar
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"own_class_only": False, "summary_languages": []}
+        )
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        assert m.summary_languages == ["de", "en"]  # leer -> Standard
+        ev = {e["uid"]: e for e in m.child_events("anna")}
+        assert "a3" in ev and "a4" in ev
+
+        # Einstellungen von der Startseite erreichbar
+        cfg = dash_mod.build_config(hass, m, "tabs")
+        assert "/config/integrations/integration/schulmanager" in cfg["views"][0]["header"]["card"]["content"]
+    await hass.config_entries.async_unload(entry.entry_id)

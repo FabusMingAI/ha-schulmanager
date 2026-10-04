@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 – 2026-10-04
+
+- New: **sick notes** (*Krankmeldungen*) from Eltern-Portal (read only). Sensor `sensor.schule_<child>_krankmeldungen` with school days off sick in the current school year, sick notes in the calendar and in the appointments card (🤒, explained in the legend). An empty portal response keeps known sick notes. Closes #1. / Neu: **Krankmeldungen** aus dem Eltern-Portal (nur lesen) – Sensor mit Krankheitstagen im Schuljahr, Einträge im Kalender und in der Termin-Karte (🤒, in der Legende erklärt).
+
 ## 0.5.4 – 2026-10-04
 
 - Timetable card: changes are written in plain words with full subject names (e.g. "Englisch entfällt", "Raumänderung: Raum N12"). README (English and German) updated with the new cards and screenshots. / Stundenplan-Karte: Änderungen in Klartext mit ausgeschriebenen Fächern; README (deutsch und englisch) mit den neuen Karten und Bildern.

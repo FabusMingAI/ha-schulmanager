@@ -15,7 +15,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ## Features
 
-- **Reads the portal directly** – parent letters (*Elternbriefe*), messages from teachers, notice board, surveys, exam dates, **timetable** and **substitution plan** (*Vertretungsplan*). Several schools and children with one installation.
+- **Reads the portal directly** – parent letters (*Elternbriefe*), messages from teachers, notice board, surveys, exam dates, **timetable**, **substitution plan** (*Vertretungsplan*) and **sick notes** (*Krankmeldungen*). Several schools and children with one installation.
 - **Files per child** – PDFs and attachments go to `Media › schulmanager › <child> › <school year>`.
 - **AI analysis** via Home Assistant's [AI Task](https://www.home-assistant.io/integrations/ai_task/) (Anthropic, OpenAI, Google, Ollama …): summary, urgency, tasks, deadlines, amounts, IBAN and payment reference, appointments. Without AI a simple rule-based detection is used.
 - **Tasks with status** *open / in progress / done*, comments, due dates – as a to-do list, calendar and sensors.
@@ -46,7 +46,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 - All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks** and **all**.
 - **Hover an entry** to see the AI's short summary (tap once on phones). Clicking a deadline or an appointment taken from a letter opens its details.
-- A **legend** at the bottom explains the icons: 🏫 appointment from the portal (e.g. exam), 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
+- A **legend** at the bottom explains the icons: 🏫 appointment from the portal (e.g. exam), 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, 🤒 sick note, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
 
 ### Timetable & substitutions – `custom:schulmanager-stundenplan`
 
@@ -90,11 +90,12 @@ On the first run the last 120 days are imported; only the last 21 days (and all 
 |---|---|
 | `sensor.schule_<child>_status` | Traffic light `rot` / `gelb` / `gruen`; attributes contain open tasks and recent messages |
 | `todo.schule_<child>_aufgaben` | Task list – complete, reschedule, add your own tasks |
-| `calendar.schule_<child>_kalender` | Deadlines, appointments from letters, exam dates, substitutions and cancelled lessons |
+| `calendar.schule_<child>_kalender` | Deadlines, appointments from letters, exam dates, substitutions, cancelled lessons and sick notes |
 | `sensor.schule_<child>_offene_zahlungen` | Open payments in € |
 | `sensor.schule_<child>_nachste_frist`, `…_uberfallig`, `…_offene_aufgaben`, `…_ungelesene_mitteilungen` | Counters and next deadline |
 | `sensor.schule_<child>_stundenplan` | Timetable: lessons today; day and week plan as attributes |
 | `sensor.schule_<child>_vertretungen` | Substitution plan: changes from today (cancelled lessons, substitutes, room changes); new entries are pushed and shown in calendar and morning summary |
+| `sensor.schule_<child>_krankmeldungen` | Sick notes: school days off sick in the current school year; list of sick notes (from, to, days, comment) and the latest one as attributes |
 | `sensor.schulmanager_letzter_abruf` | Diagnostics: last update, errors, pending analyses |
 
 Entity IDs follow your Home Assistant language (shown here for German).
@@ -120,7 +121,8 @@ Events for your own automations: `schulmanager_new_item`, `schulmanager_task_rem
 - **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days.
 - **Timetable and substitution plan** are only available if the school has enabled them in Eltern-Portal. If the portal briefly returns an empty page, the last known plan is kept.
 - **Unofficial:** Eltern-Portal has no public API. Access uses the library [pyelternportal](https://github.com/michull/pyelternportal), which reads the web pages. If the portal layout changes, single sections may stop working until an update; the error shows up in `sensor.schulmanager_letzter_abruf`.
-- **Not yet included:** communication with the class teacher (only subject teachers), sick notes and the class register.
+- **Sick notes** are only read, never submitted – report sickness in the portal as usual.
+- **Not yet included:** communication with the class teacher (only subject teachers) and the class register.
 - If you also use the HACS integration `elternportal`, keep both on the same `pyelternportal` version (here 0.0.25).
 - This project is not affiliated with Eltern-Portal or its operator.
 

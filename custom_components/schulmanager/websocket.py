@@ -196,6 +196,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 "items": [_item_light(m, i) for i in m.child_items(key)[:60]],
                 "events": _agenda(m, key),
                 "timetable": m.data["timetable"].get(key, {}).get("lessons", []),
+                "sicknotes": m.child_sicknotes(key)[:30],
                 "substitutions": {
                     "available": m.data["substitutions"].get(key, {}).get("available", False),
                     "stand": m.data["substitutions"].get(key, {}).get("stand"),

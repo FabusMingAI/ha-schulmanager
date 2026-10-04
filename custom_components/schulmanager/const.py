@@ -96,6 +96,7 @@ EVENT_CATEGORIES: Final = {
     "entfall": ("❌", "Stunde entfällt"),
     "vertretung": ("🔁", "Vertretung / Änderung"),
     "raum": ("🚪", "Raumänderung"),
+    "krank": ("🤒", "Krankmeldung"),
 }
 SUBSTITUTION_KINDS: Final = ("entfall", "vertretung", "raum")
 

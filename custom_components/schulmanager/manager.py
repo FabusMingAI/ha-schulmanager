@@ -218,6 +218,7 @@ class SchulManager:
             "timetable": stored.get("timetable", {}),
             "substitutions": stored.get("substitutions", {}),
             "subs_seen": stored.get("subs_seen", {}),
+            "sicknotes": stored.get("sicknotes", {}),
         }
 
     async def async_start(self) -> None:
@@ -355,6 +356,13 @@ class SchulManager:
                     "lessons": pchild.timetable,
                     "updated": dt_util.now().isoformat(),
                 }
+            if pchild.sicknotes is not None and (
+                pchild.sicknotes or not self.data["sicknotes"].get(key)
+            ):
+                # leere Antwort überschreibt keine bekannten Krankmeldungen
+                self.data["sicknotes"][key] = sorted(
+                    pchild.sicknotes, key=lambda n: (n["start"], n["end"])
+                )
             if pchild.substitutions is not None and (
                 pchild.substitutions.get("available")
                 or key not in self.data["substitutions"]
@@ -911,6 +919,25 @@ class SchulManager:
                     "task_id": t["id"],
                 }
             )
+        for n in self.data["sicknotes"].get(child, []):
+            first = date.fromisoformat(n["start"])
+            last = date.fromisoformat(n.get("end") or n["start"])
+            name = self.children.get(child, {}).get("name", child)
+            span = "" if first == last else f" ({first.strftime('%d.%m.')}–{last.strftime('%d.%m.')})"
+            out.append(
+                {
+                    "uid": f"krank-{child}-{n['start']}-{n.get('end')}",
+                    "summary": f"🤒 Krankmeldung {name}",
+                    "start": first,
+                    "end": max(last, first) + timedelta(days=1),
+                    "description": n.get("comment") or "Krankmeldung im Eltern-Portal",
+                    "category": "krank",
+                    "icon": "🤒",
+                    "title": f"Krankmeldung{span}",
+                    "hover": (n.get("comment") or "Krankmeldung im Eltern-Portal")
+                    + span,
+                }
+            )
         since = subst_from or dt_util.now().date() - timedelta(days=7)
         for d in self.data["substitutions"].get(child, {}).get("days", []):
             day = date.fromisoformat(d["date"])
@@ -1033,6 +1060,24 @@ class SchulManager:
             return None
 
         return find(nums[0], "start"), find(nums[-1], "end")
+
+    def child_sicknotes(self, child: str, school_year_only: bool = False) -> list[dict[str, Any]]:
+        """Krankmeldungen eines Kindes, neueste zuerst, mit Zahl der Schultage."""
+        today = dt_util.now().date()
+        start_year = date(today.year if today.month >= 8 else today.year - 1, 8, 1)
+        out = []
+        for n in self.data["sicknotes"].get(child, []):
+            first = date.fromisoformat(n["start"])
+            last = date.fromisoformat(n.get("end") or n["start"])
+            if school_year_only and last < start_year:
+                continue
+            days = sum(
+                1
+                for i in range((last - first).days + 1)
+                if (first + timedelta(days=i)).isoweekday() <= 5
+            )
+            out.append({**n, "days": days})
+        return sorted(out, key=lambda n: n["start"], reverse=True)
 
     def child_substitutions(self, child: str, include_past: bool = False) -> list[dict[str, Any]]:
         """Tage des Vertretungsplans ab heute (mit Einträgen und leeren Tagen)."""
@@ -1336,6 +1381,7 @@ class SchulManager:
             self.data["timetable"].pop(k, None)
             self.data["substitutions"].pop(k, None)
             self.data["subs_seen"].pop(k, None)
+            self.data["sicknotes"].pop(k, None)
         for uid in [u for u, i in self.items.items() if i.get("school") == school]:
             self.items.pop(uid)
         for tid in [t for t, v in self.tasks.items() if v.get("child") in kids]:

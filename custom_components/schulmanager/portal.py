@@ -97,6 +97,8 @@ class PortalChild:
     timetable: list[dict[str, Any]] | None = None
     # Vertretungsplan: None = nicht gelesen (Fehler), sonst Tage mit Einträgen
     substitutions: dict[str, Any] | None = None
+    # Krankmeldungen: None = nicht gelesen (Fehler), sonst Liste {start, end, comment}
+    sicknotes: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -166,6 +168,7 @@ class SchulPortal(ElternPortalAPI):
             poll=True,
             lesson=True,
             substitution=True,
+            sicknote=True,
         )
         neg = -abs(int(lookback_days))
         self.set_option_threshold(
@@ -372,6 +375,7 @@ class SchulPortal(ElternPortalAPI):
                     "poll",
                     "lesson",
                     "substitution",
+                    "sicknote",
                 ):
                     method = getattr(self, f"async_{name}_{sfx}")
                     if err := await self._section(name, method):
@@ -389,6 +393,16 @@ class SchulPortal(ElternPortalAPI):
                     child.timetable = list(self._timetable)
                 if "substitution" not in failed:
                     child.substitutions = dict(self._subst)
+                if "sicknote" not in failed:
+                    child.sicknotes = [
+                        {
+                            "start": n.start.isoformat(),
+                            "end": (n.end or n.start).isoformat(),
+                            "comment": n.comment,
+                        }
+                        for n in getattr(st, "sicknotes", [])
+                        if n.start
+                    ]
                 child.appointments = [
                     {
                         "uid": f"{self.school}-{st.student_id}-termin-{a.appointment_id}",

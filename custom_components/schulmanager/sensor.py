@@ -45,6 +45,7 @@ async def async_setup_entry(
             UnreadSensor(manager, child),
             SubstitutionSensor(manager, child),
             TimetableSensor(manager, child),
+            SicknoteSensor(manager, child),
         ]
     async_add_entities(entities)
 
@@ -316,6 +317,34 @@ class TimetableSensor(SchulEntity, SensorEntity):
                 for wd in range(1, 7)
                 if any(x["weekday"] == wd for x in lessons)
             },
+        }
+
+
+class SicknoteSensor(SchulEntity, SensorEntity):
+    """Krankmeldungen: Schultage im laufenden Schuljahr, Liste als Attribut."""
+
+    _attr_icon = "mdi:emoticon-sick-outline"
+    _attr_native_unit_of_measurement = "Tage"
+    _unrecorded_attributes = frozenset({"krankmeldungen"})
+
+    def __init__(self, manager: SchulManager, child: str) -> None:
+        super().__init__(manager, child, "krankmeldungen")
+
+    @property
+    def native_value(self) -> int:
+        return sum(n["days"] for n in self.manager.child_sicknotes(self.child, school_year_only=True))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        year = self.manager.child_sicknotes(self.child, school_year_only=True)
+        rows = [
+            {"von": n["start"], "bis": n["end"], "tage": n["days"], "kommentar": n.get("comment")}
+            for n in self.manager.child_sicknotes(self.child)
+        ]
+        return {
+            "anzahl_schuljahr": len(year),
+            "letzte": rows[0] if rows else None,
+            "krankmeldungen": rows[:30],
         }
 
 

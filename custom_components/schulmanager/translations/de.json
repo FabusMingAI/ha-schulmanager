@@ -67,13 +67,15 @@
           "auto_download": "Anhänge/PDFs automatisch ablegen",
           "analyze_days": "Beim ersten Import auswerten: die letzten",
           "lookback_days": "Mitteilungen aus dem Portal lesen: die letzten",
-          "dashboard": "Dashboard „Schule“"
+          "dashboard": "Dashboard „Schule“",
+          "appointment_kinds": "Termine aus dem Portal anzeigen"
         },
         "data_description": {
           "ai_task_entity": "Liest Aufgaben, Fristen, Beträge und Termine aus Briefen und PDFs. Ohne KI greift eine einfache Regel-Erkennung.",
           "reminder_days": "Beispiel 3,1,0 = drei Tage vorher, am Vortag und am Tag selbst. Überfällige Aufgaben werden täglich erinnert.",
           "auto_download": "Hinweis: Das Eltern-Portal wertet das Herunterladen eines Elternbriefs als Empfangsbestätigung.",
-          "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast."
+          "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast.",
+          "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests."
         }
       },
       "add_portal": {
@@ -290,6 +292,13 @@
         "tabs": "Reiter (Übersicht + je Kind)",
         "single": "Eine Seite",
         "off": "Nicht verwalten"
+      }
+    },
+    "appointment_kinds": {
+      "options": {
+        "schulaufgabe": "Schulaufgaben der Klasse",
+        "test": "Tests / Kurzarbeiten / kl. Leistungsnachweise / Stegreifaufgaben",
+        "schule": "Termine der Schule (Ferien, Sekretariat, Veranstaltungen …)"
       }
     }
   }

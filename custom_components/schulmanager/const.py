@@ -79,6 +79,26 @@ TASK_TYPE_ICONS: Final = {
     "lesen": "📖",
 }
 
+TASK_TYPE_LABELS: Final = {
+    "aufgabe": "Aufgabe",
+    "zahlung": "Zahlung",
+    "rueckmeldung": "Rückmeldung",
+    "unterschrift": "Unterschrift",
+    "mitbringen": "Mitbringen",
+    "termin": "Termin",
+    "lesen": "Lesen",
+}
+
+# Kategorien im Kalender / in der Terminliste (Icon, Legende)
+EVENT_CATEGORIES: Final = {
+    "portal": ("🏫", "Termin aus dem Portal (z. B. Schulaufgabe)"),
+    "termin": ("📅", "Termin aus einer Mitteilung"),
+    "entfall": ("❌", "Stunde entfällt"),
+    "vertretung": ("🔁", "Vertretung / Änderung"),
+    "raum": ("🚪", "Raumänderung"),
+}
+SUBSTITUTION_KINDS: Final = ("entfall", "vertretung", "raum")
+
 STATUS_OPEN: Final = "offen"
 STATUS_DONE: Final = "erledigt"
 STATUS_PROGRESS: Final = "in_arbeit"
@@ -92,6 +112,7 @@ AMPEL_RED: Final = "rot"
 # --- Events ---
 EVENT_NEW_ITEM: Final = f"{DOMAIN}_new_item"
 EVENT_TASK_REMINDER: Final = f"{DOMAIN}_task_reminder"
+EVENT_SUBSTITUTION: Final = f"{DOMAIN}_substitution"
 SIGNAL_UPDATED: Final = f"{DOMAIN}_updated"
 
 # Aktionen der Companion-App-Benachrichtigungen

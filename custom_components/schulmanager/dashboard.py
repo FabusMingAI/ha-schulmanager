@@ -75,16 +75,12 @@ def _header(names: list[str]) -> dict[str, Any]:
 def _schulmanager_card(
     hass: HomeAssistant, manager: SchulManager, links: bool, title: bool = True
 ) -> dict[str, Any]:
-    """Entitäten-Karte „Schulmanager“: Ampel je Kind, letzter Abruf, Aktionen."""
+    """Entitäten-Karte „Schulmanager“: letzter Abruf und Aktionen.
+
+    Die Kinder stehen nicht mehr als eigene Zeilen darin – dafür gibt es die
+    Reiter bzw. die Schulmanager-Karte je Kind.
+    """
     rows: list[Any] = []
-    for key, child in manager.children.items():
-        status = _child_entities(hass, manager, key)["status"]
-        if not status:
-            continue
-        row: dict[str, Any] = {"entity": status, "name": child["name"], "icon": "mdi:account-school"}
-        if links:
-            row["tap_action"] = {"action": "navigate", "navigation_path": f"/{DASHBOARD_URL}/{key}"}
-        rows.append(row)
     if last := _eid(hass, "sensor", f"{manager.entry.entry_id}_letzter_abruf"):
         rows.append(last)
     rows += [
@@ -109,8 +105,16 @@ def _schulmanager_card(
     return card
 
 
-def _calendar(entities: list[str]) -> dict[str, Any]:
-    return {"type": "calendar", "initial_view": "listWeek", "entities": entities}
+def _termine(child: str | None = None) -> dict[str, Any]:
+    """Terminliste mit KI-Kurzbeschreibung beim Überfahren und Legende."""
+    card: dict[str, Any] = {"type": "custom:schulmanager-termine", "grid_options": {"columns": 12}}
+    if child:
+        card["child"] = child
+    return card
+
+
+def _stundenplan(child: str) -> dict[str, Any]:
+    return {"type": "custom:schulmanager-stundenplan", "child": child, "grid_options": {"columns": 12}}
 
 
 def _portal_button(child: dict[str, Any]) -> dict[str, Any] | None:
@@ -131,15 +135,13 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
     """Lovelace-Konfiguration für die gewählte Ansicht."""
     children = manager.children
     names = [c["name"] for c in children.values()]
-    calendars = [
-        cal for key in children if (cal := _child_entities(hass, manager, key)["calendar"])
-    ]
 
     if mode == DASHBOARD_SINGLE:
         sections: list[dict[str, Any]] = []
         for key, child in children.items():
             cards: list[dict[str, Any]] = [
-                {"type": "custom:schulmanager-card", "child": key, "grid_options": {"columns": 12}}
+                {"type": "custom:schulmanager-card", "child": key, "grid_options": {"columns": 12}},
+                _stundenplan(key),
             ]
             if btn := _portal_button(child):
                 cards.append(btn)
@@ -148,7 +150,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
             {
                 "type": "grid",
                 "column_span": 2,
-                "cards": [_calendar(calendars), _schulmanager_card(hass, manager, links=False)],
+                "cards": [_termine(), _schulmanager_card(hass, manager, links=False)],
             }
         )
         view = {
@@ -175,7 +177,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                     "type": "grid",
                     "cards": [
                         {"type": "heading", "heading": "Termine & Fristen", "icon": "mdi:calendar"},
-                        _calendar(calendars),
+                        _termine(),
                     ],
                 },
                 {
@@ -189,10 +191,12 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
         }
     ]
     for key, child in children.items():
-        ents = _child_entities(hass, manager, key)
-        side: list[dict[str, Any]] = []
-        if ents["calendar"]:
-            side.append(_calendar([ents["calendar"]]))
+        side: list[dict[str, Any]] = [
+            {"type": "heading", "heading": "Stundenplan & Vertretungen", "icon": "mdi:timetable"},
+            _stundenplan(key),
+            {"type": "heading", "heading": "Termine & Fristen", "icon": "mdi:calendar"},
+            _termine(key),
+        ]
         if btn := _portal_button(child):
             side.append(btn)
         sections = [

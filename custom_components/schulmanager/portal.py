@@ -93,6 +93,10 @@ class PortalChild:
     classname: str | None
     items: list[PortalItem] = field(default_factory=list)
     appointments: list[dict[str, Any]] = field(default_factory=list)
+    # Stundenplan: None = nicht gelesen (Fehler), sonst Liste der Stunden
+    timetable: list[dict[str, Any]] | None = None
+    # Vertretungsplan: None = nicht gelesen (Fehler), sonst Tage mit Einträgen
+    substitutions: dict[str, Any] | None = None
 
 
 @dataclass
@@ -160,6 +164,8 @@ class SchulPortal(ElternPortalAPI):
             letter=True,
             message=True,
             poll=True,
+            lesson=True,
+            substitution=True,
         )
         neg = -abs(int(lookback_days))
         self.set_option_threshold(
@@ -169,6 +175,8 @@ class SchulPortal(ElternPortalAPI):
             poll_threshold=neg,
         )
         self._letter_links: dict[str, str] = {}
+        self._timetable: list[dict[str, Any]] = []
+        self._subst: dict[str, Any] = {"days": [], "stand": None, "available": False}
         self._extra_messages: list[PortalItem] = []
         self._keep_session = False
 
@@ -193,6 +201,22 @@ class SchulPortal(ElternPortalAPI):
             href = tag.get("href")
             if match and href:
                 self._letter_links[match[0]] = href
+
+
+    # ------------------------------------------------------------------
+    # Stundenplan: eigene Auswertung mit Uhrzeiten und Mehrfach-Kursen
+    # ------------------------------------------------------------------
+    async def async_lesson_parse(self, html: str) -> None:
+        self._timetable = parse_timetable(html, self._beautiful_soup_parser)
+        self._student.lessons = []
+
+    # ------------------------------------------------------------------
+    # Vertretungsplan: eigene Auswertung (behält das ursprüngliche Fach,
+    # erkennt Entfall und auch Tage ohne Vertretung)
+    # ------------------------------------------------------------------
+    async def async_substitution_parse(self, html: str) -> None:
+        self._subst = parse_substitutions(html, self._beautiful_soup_parser)
+        self._student.substitutions = []
 
     # ------------------------------------------------------------------
     # Nachrichten Eltern/Fachlehrer: eigene Auswertung mit ID + Anhängen
@@ -337,10 +361,22 @@ class SchulPortal(ElternPortalAPI):
                 if not self._demo:
                     await self.async_set_child_online()
                 sfx = "demo" if self._demo else "online"
-                for name in ("appointment", "letter", "message", "blackboard", "poll"):
+                failed: set[str] = set()
+                self._timetable = []
+                self._subst = {"days": [], "stand": None, "available": False}
+                for name in (
+                    "appointment",
+                    "letter",
+                    "message",
+                    "blackboard",
+                    "poll",
+                    "lesson",
+                    "substitution",
+                ):
                     method = getattr(self, f"async_{name}_{sfx}")
                     if err := await self._section(name, method):
                         errors.append(err)
+                        failed.add(name)
 
                 child = PortalChild(
                     student_id=st.student_id,
@@ -349,10 +385,15 @@ class SchulPortal(ElternPortalAPI):
                     classname=st.classname,
                 )
                 child.items = self._collect_items()
+                if "lesson" not in failed:
+                    child.timetable = list(self._timetable)
+                if "substitution" not in failed:
+                    child.substitutions = dict(self._subst)
                 child.appointments = [
                     {
                         "uid": f"{self.school}-{st.student_id}-termin-{a.appointment_id}",
                         "title": a.short or a.title,
+                        "detail": a.title if a.short and a.title != a.short else None,
                         "start": a.start,
                         "end": a.end,
                     }
@@ -480,6 +521,125 @@ class SchulPortal(ElternPortalAPI):
                 LOGGER.warning("Download %s fehlgeschlagen: %s", url, err)
 
 
+# ----------------------------------------------------------------------
+# Stundenplan und Vertretungsplan (reine HTML-Auswertung, gut testbar)
+# ----------------------------------------------------------------------
+_TIME_RE = re.compile(r"(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})")
+_ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|unterrichtsfrei", re.I)
+
+
+def _lines(tag: Any) -> list[str]:
+    return [t.strip() for t in tag.find_all(string=True) if t.strip()]
+
+
+def parse_timetable(html: str, parser: str = "html.parser") -> list[dict[str, Any]]:
+    """Stundenplan der Klasse: eine Zeile je Stunde und Wochentag (1 = Montag)."""
+    soup = bs4.BeautifulSoup(html, parser)
+    out: list[dict[str, Any]] = []
+    for row in soup.select("#asam_content div.table-responsive table tr"):
+        cells = row.find_all("td", recursive=False)
+        if len(cells) < 6:
+            continue
+        head = _lines(cells[0])
+        if not head:
+            continue
+        number = head[0].rstrip(".").strip()
+        start = end = None
+        if m := _TIME_RE.search(" ".join(head)):
+            start = f"{int(m[1]):02d}:{m[2]}"
+            end = f"{int(m[3]):02d}:{m[4]}"
+        for weekday, cell in enumerate(cells[1:7], start=1):
+            inner = cell.select_one("span span") or cell
+            parts = _lines(inner)
+            if not parts:
+                continue
+            subject = parts[0]
+            room = parts[1] if len(parts) > 1 else ""
+            if not subject.strip(" /"):
+                continue
+            out.append(
+                {
+                    "weekday": weekday,
+                    "lesson": number,
+                    "start": start,
+                    "end": end,
+                    "subject": subject,
+                    "room": room.strip(" /") and room,
+                }
+            )
+    out.sort(key=lambda x: (x["weekday"], _lesson_sort(x["lesson"])))
+    return out
+
+
+def _lesson_sort(value: str) -> tuple[int, str]:
+    m = re.match(r"\d+", value or "")
+    return (int(m[0]) if m else 99, value or "")
+
+
+def substitution_kind(entry: dict[str, Any]) -> str:
+    """'entfall', 'raum' oder 'vertretung'."""
+    text = " ".join(
+        str(entry.get(k) or "") for k in ("substitute", "subject", "room", "info")
+    )
+    if _ENTFALL_RE.search(text) or entry.get("substitute") in ("---", "–", "-") and not entry.get("room"):
+        return "entfall"
+    info = (entry.get("info") or "").lower()
+    if "raum" in info and entry.get("substitute") in ("", None, entry.get("teacher")):
+        return "raum"
+    return "vertretung"
+
+
+def parse_substitutions(html: str, parser: str = "html.parser") -> dict[str, Any]:
+    """Vertretungsplan: {'available', 'stand', 'days': [{'date', 'entries'}]}."""
+    soup = bs4.BeautifulSoup(html, parser)
+    center = soup.select_one("#asam_content .main_center")
+    result: dict[str, Any] = {"available": center is not None, "stand": None, "days": []}
+    if center is None:
+        return result
+    if m := re.search(r"Stand:?\s*([\d.]+\s*[\d:]*)", center.get_text(" ")):
+        result["stand"] = m[1].strip()
+    day: dict[str, Any] | None = None
+    for tag in center.find_all(["div", "table"], recursive=False):
+        if tag.name == "div" and "list" in (tag.get("class") or []):
+            if m := re.search(r"(\d{2})\.(\d{2})\.(\d{4})", tag.get_text()):
+                iso = f"{m[3]}-{m[2]}-{m[1]}"
+                day = next((d for d in result["days"] if d["date"] == iso), None)
+                if day is None:
+                    day = {"date": iso, "entries": []}
+                    result["days"].append(day)
+            continue
+        if tag.name != "table" or day is None:
+            continue
+        for row in tag.select("tr"):
+            if "vp_plan_head" in (row.get("class") or []):
+                continue
+            cells = row.find_all("td", recursive=False)
+            if len(cells) < 6:
+                continue
+            old = [
+                s.get_text(strip=True)
+                for s in cells[3].select("span[style*='line-through']")
+            ]
+            for span in cells[3].select("span[style*='line-through']"):
+                span.decompose()
+            entry = {
+                "lesson": re.sub(
+                    r"\.(?=\s*[-–])", "", cells[0].get_text(strip=True)
+                ).removesuffix("."),
+                "teacher": cells[1].get_text(strip=True),
+                "substitute": cells[2].get_text(strip=True),
+                "subject": cells[3].get_text(" ", strip=True),
+                "old_subject": " ".join(o for o in old if o) or None,
+                "room": cells[4].get_text(strip=True),
+                "info": cells[5].get_text(" ", strip=True),
+            }
+            if entry["old_subject"] == entry["subject"]:
+                entry["old_subject"] = None
+            entry["kind"] = substitution_kind(entry)
+            day["entries"].append(entry)
+    return result
+
+
 async def async_validate(
     session: aiohttp.ClientSession, school: str, username: str, password: str
 ) -> str:
@@ -497,6 +657,8 @@ __all__ = [
     "PortalResult",
     "SchulPortal",
     "async_validate",
+    "parse_substitutions",
+    "parse_timetable",
     "school_from_input",
     "pyelternportal",
 ]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import voluptuous as vol
@@ -15,6 +15,9 @@ from homeassistant.util import dt as dt_util
 from .analyzer import fmt_eur
 from .const import (
     DOMAIN,
+    EVENT_CATEGORIES,
+    TASK_TYPE_ICONS as _ICONS,
+    TASK_TYPE_LABELS,
     KIND_LABELS,
     SIGNAL_UPDATED,
     STATUS_DONE,
@@ -23,6 +26,57 @@ from .const import (
 )
 
 MAX_DONE_DAYS = 45
+AGENDA_PAST_DAYS = 1
+AGENDA_DAYS = 90
+
+
+def _event_light(e: dict[str, Any]) -> dict[str, Any]:
+    start, end = e["start"], e["end"]
+    if isinstance(start, datetime):
+        start_l = dt_util.as_local(start)
+        end_l = dt_util.as_local(end)
+        day, until = start_l.date(), end_l.date()
+        time_, time_end = start_l.strftime("%H:%M"), end_l.strftime("%H:%M")
+    else:
+        day, until = start, end - timedelta(days=1)
+        time_ = time_end = None
+    return {
+        "uid": e["uid"],
+        "date": day.isoformat(),
+        "until": until.isoformat() if until > day else None,
+        "time": time_,
+        "time_end": time_end,
+        "title": e.get("title") or e["summary"],
+        "icon": e.get("icon") or "📅",
+        "category": e.get("category") or "termin",
+        "hover": e.get("hover") or e.get("description") or "",
+        "location": e.get("location"),
+        "item_uid": e.get("item_uid"),
+        "task_id": e.get("task_id"),
+    }
+
+
+def _agenda(m, key: str) -> list[dict[str, Any]]:
+    today = dt_util.now().date()
+    first, last = today - timedelta(days=AGENDA_PAST_DAYS), today + timedelta(days=AGENDA_DAYS)
+    out = []
+    for e in m.child_events(key, subst_from=today):
+        ev = _event_light(e)
+        overdue_task = bool(ev["task_id"])  # offene Fristen bleiben sichtbar
+        if date.fromisoformat(ev["date"]) > last or (
+            date.fromisoformat(ev["until"] or ev["date"]) < first and not overdue_task
+        ):
+            continue
+        out.append(ev)
+    out.sort(key=lambda x: (x["date"], x["time"] or "", x["title"]))
+    return out
+
+
+def _legend() -> dict[str, list[str]]:
+    legend = {k: [v[0], v[1]] for k, v in EVENT_CATEGORIES.items()}
+    for typ, label in TASK_TYPE_LABELS.items():
+        legend[f"frist_{typ}"] = [_ICONS.get(typ, "✅"), f"Frist: {label}"]
+    return legend
 
 
 def _manager(hass: HomeAssistant):
@@ -140,6 +194,22 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 "payments_text": fmt_eur(s["payments_total"]) if s["payments_total"] else None,
                 "tasks": tasks,
                 "items": [_item_light(m, i) for i in m.child_items(key)[:60]],
+                "events": _agenda(m, key),
+                "timetable": m.data["timetable"].get(key, {}).get("lessons", []),
+                "substitutions": {
+                    "available": m.data["substitutions"].get(key, {}).get("available", False),
+                    "stand": m.data["substitutions"].get(key, {}).get("stand"),
+                    "updated": m.data["substitutions"].get(key, {}).get("updated"),
+                    "days": [
+                        {
+                            "date": d["date"],
+                            "entries": [
+                                {**e, "text": m.substitution_text(e)} for e in d["entries"]
+                            ],
+                        }
+                        for d in m.child_substitutions(key)
+                    ],
+                },
             }
         )
     connection.send_result(
@@ -148,6 +218,8 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
             "children": children,
             "last_update": m.last_update.isoformat() if m.last_update else None,
             "errors": m.last_errors,
+            "legend": _legend(),
+            "today": today.isoformat(),
         },
     )
 

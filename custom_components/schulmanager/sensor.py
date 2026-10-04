@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -43,6 +43,8 @@ async def async_setup_entry(
             NextDueSensor(manager, child),
             PaymentsSensor(manager, child),
             UnreadSensor(manager, child),
+            SubstitutionSensor(manager, child),
+            TimetableSensor(manager, child),
         ]
     async_add_entities(entities)
 
@@ -213,6 +215,108 @@ class UnreadSensor(SchulEntity, SensorEntity):
     @property
     def native_value(self) -> int:
         return len(self.manager.child_summary(self.child)["unread"])
+
+
+def _lesson_line(x: dict[str, Any]) -> str:
+    time_ = f" {x['start']}" if x.get("start") else ""
+    room = f" ({x['room']})" if x.get("room") else ""
+    return f"{x['lesson']}.{time_} {x['subject']}{room}"
+
+
+class SubstitutionSensor(SchulEntity, SensorEntity):
+    """Anzahl der Vertretungen/Ausfälle ab heute, Einträge als Attribut."""
+
+    _attr_icon = "mdi:account-switch"
+    _attr_native_unit_of_measurement = "Änderungen"
+    _unrecorded_attributes = frozenset({"eintraege", "tage"})
+
+    def __init__(self, manager: SchulManager, child: str) -> None:
+        super().__init__(manager, child, "vertretungen")
+
+    @property
+    def native_value(self) -> int:
+        return sum(len(d["entries"]) for d in self.manager.child_substitutions(self.child))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        m = self.manager
+        plan = m.data["substitutions"].get(self.child, {})
+        days = m.child_substitutions(self.child)
+        today = dt_util.now().date().isoformat()
+        tomorrow = (dt_util.now().date() + timedelta(days=1)).isoformat()
+        entries = [
+            {
+                "datum": d["date"],
+                "stunde": e.get("lesson"),
+                "fach": e.get("subject"),
+                "statt": e.get("old_subject"),
+                "lehrkraft": e.get("teacher"),
+                "vertretung": e.get("substitute"),
+                "raum": e.get("room"),
+                "info": e.get("info"),
+                "art": e.get("kind"),
+                "text": m.substitution_text(e),
+            }
+            for d in days
+            for e in d["entries"]
+        ]
+        return {
+            "heute": [x["text"] for x in entries if x["datum"] == today],
+            "morgen": [x["text"] for x in entries if x["datum"] == tomorrow],
+            "eintraege": entries,
+            "tage": [d["date"] for d in days],
+            "stand": plan.get("stand"),
+            "verfuegbar": plan.get("available", False),
+            "abgerufen": plan.get("updated"),
+        }
+
+
+class TimetableSensor(SchulEntity, SensorEntity):
+    """Stundenplan: Zahl der Stunden heute, Tages- und Wochenplan als Attribut."""
+
+    _attr_icon = "mdi:timetable"
+    _attr_native_unit_of_measurement = "Stunden"
+    _unrecorded_attributes = frozenset({"woche", "heute", "naechster_schultag_plan"})
+
+    def __init__(self, manager: SchulManager, child: str) -> None:
+        super().__init__(manager, child, "stundenplan")
+
+    def _lessons(self) -> list[dict[str, Any]]:
+        return self.manager.data["timetable"].get(self.child, {}).get("lessons", [])
+
+    @property
+    def available(self) -> bool:
+        return bool(self._lessons())
+
+    @property
+    def native_value(self) -> int:
+        wd = dt_util.now().isoweekday()
+        return sum(1 for x in self._lessons() if x["weekday"] == wd)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        lessons = self._lessons()
+        today = dt_util.now().date()
+        nxt = today + timedelta(days=1)
+        while nxt.isoweekday() > 5 or not any(x["weekday"] == nxt.isoweekday() for x in lessons):
+            nxt += timedelta(days=1)
+            if (nxt - today).days > 7:
+                break
+        names = ["", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"]
+        todays = [x for x in lessons if x["weekday"] == today.isoweekday()]
+        return {
+            "heute": [_lesson_line(x) for x in todays],
+            "schluss_heute": todays[-1].get("end") if todays else None,
+            "naechster_schultag": nxt.isoformat(),
+            "naechster_schultag_plan": [
+                _lesson_line(x) for x in lessons if x["weekday"] == nxt.isoweekday()
+            ],
+            "woche": {
+                names[wd]: [_lesson_line(x) for x in lessons if x["weekday"] == wd]
+                for wd in range(1, 7)
+                if any(x["weekday"] == wd for x in lessons)
+            },
+        }
 
 
 class SchulUpdateSensor(SensorEntity):

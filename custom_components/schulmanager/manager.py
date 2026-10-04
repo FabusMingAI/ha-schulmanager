@@ -62,7 +62,9 @@ from .const import (
     DEFAULT_TTS_END,
     DEFAULT_TTS_START,
     DOMAIN,
+    EVENT_CATEGORIES,
     EVENT_NEW_ITEM,
+    EVENT_SUBSTITUTION,
     EVENT_TASK_REMINDER,
     KIND_LABELS,
     KIND_LETTER,
@@ -75,6 +77,7 @@ from .const import (
     STATUS_OPEN,
     STATUS_PROGRESS,
     STORAGE_VERSION,
+    SUBSTITUTION_KINDS,
     TASK_TYPE_ICONS,
 )
 from .portal import (
@@ -113,6 +116,17 @@ def _fmt_date(value: str | None) -> str:
         return ""
     d = date.fromisoformat(value[:10])
     return d.strftime("%d.%m.")
+
+
+WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+def _day_label(day: date, today: date) -> str:
+    if day == today:
+        return "Heute"
+    if day == today + timedelta(days=1):
+        return "Morgen"
+    return f"{WEEKDAYS[day.weekday()]} {day.strftime('%d.%m.')}"
 
 
 def _days_text(days: int) -> str:
@@ -201,6 +215,9 @@ class SchulManager:
             "children": stored.get("children", {}),
             "initialized": stored.get("initialized", []),
             "dashboard": stored.get("dashboard", {}),
+            "timetable": stored.get("timetable", {}),
+            "substitutions": stored.get("substitutions", {}),
+            "subs_seen": stored.get("subs_seen", {}),
         }
 
     async def async_start(self) -> None:
@@ -308,6 +325,7 @@ class SchulManager:
             days=int(self.opt(CONF_ANALYZE_DAYS, DEFAULT_ANALYZE_DAYS))
         )
         new_count = 0
+        fresh_subs: dict[str, list[tuple[str, dict[str, Any]]]] = {}
         for pchild in result.children:
             key = slugify(pchild.firstname) or pchild.student_id
             self.children[key] = {
@@ -323,11 +341,26 @@ class SchulManager:
                 {
                     "uid": a["uid"],
                     "title": a["title"],
+                    "detail": a.get("detail"),
                     "start": a["start"].isoformat() if a["start"] else None,
                     "end": a["end"].isoformat() if a["end"] else None,
                 }
                 for a in pchild.appointments
             ]
+            if pchild.timetable is not None and (
+                pchild.timetable or not self.data["timetable"].get(key, {}).get("lessons")
+            ):
+                # leere Antwort (z. B. Seite gerade nicht erreichbar) überschreibt nichts
+                self.data["timetable"][key] = {
+                    "lessons": pchild.timetable,
+                    "updated": dt_util.now().isoformat(),
+                }
+            if pchild.substitutions is not None and (
+                pchild.substitutions.get("available")
+                or key not in self.data["substitutions"]
+            ):
+                if fresh := self._merge_substitutions(key, pchild.substitutions):
+                    fresh_subs[key] = fresh
             for pitem in pchild.items:
                 stored = self.items.get(pitem.uid)
                 if stored is None:
@@ -370,6 +403,8 @@ class SchulManager:
                     if pitem.files and not stored.get("files"):
                         await self._store_files(stored, pitem.files)
                 self._sync_portal_tasks(stored, today)
+        for key, fresh in fresh_subs.items():
+            await self._notify_substitutions(key, fresh)
         if first_import:
             self.data["initialized"].append(result.school)
             if new_count:
@@ -788,15 +823,22 @@ class SchulManager:
             "next_task": dated[0] if dated else None,
         }
 
-    def child_events(self, child: str) -> list[dict[str, Any]]:
-        """Alle Kalendereinträge eines Kindes (normalisiert)."""
+    def child_events(self, child: str, subst_from: date | None = None) -> list[dict[str, Any]]:
+        """Alle Kalendereinträge eines Kindes (normalisiert).
+
+        Neben den Feldern für den Kalender enthält jeder Eintrag ``category``,
+        ``icon``, ``title`` und ``hover`` (Kurzbeschreibung, bei Mitteilungen die
+        KI-Zusammenfassung) sowie ggf. ``item_uid``/``task_id`` für die Karte.
+        """
         out: list[dict[str, Any]] = []
+        tz = dt_util.get_default_time_zone()
         for a in self.data["appointments"].get(child, []):
             if not a.get("start"):
                 continue
             start = datetime.fromisoformat(a["start"])
             end = datetime.fromisoformat(a["end"]) if a.get("end") else start
             end = end - timedelta(hours=2)  # pyelternportal addiert 2 h
+            hover = a.get("detail") or a["title"]
             out.append(
                 {
                     "uid": a["uid"],
@@ -804,6 +846,10 @@ class SchulManager:
                     "start": start.date(),
                     "end": max(end.date(), start.date()) + timedelta(days=1),
                     "description": "Termin aus dem Eltern-Portal",
+                    "category": "portal",
+                    "icon": "🏫",
+                    "title": a["title"],
+                    "hover": f"{hover} – Termin aus dem Eltern-Portal",
                 }
             )
         for ev in self.data["events"].values():
@@ -813,18 +859,28 @@ class SchulManager:
             day = date.fromisoformat(ev["date"])
             desc = f"Aus: {item.get('title', '')}"
             if ev.get("time"):
-                tz = dt_util.get_default_time_zone()
                 start = datetime.combine(day, time.fromisoformat(ev["time"]), tz)
                 entry = {"start": start, "end": start + timedelta(hours=1)}
             else:
                 end_day = date.fromisoformat(ev["end"]) if ev.get("end") else day
                 entry = {"start": day, "end": max(end_day, day) + timedelta(days=1)}
+            summary = item.get("analysis", {}).get("summary")
+            hover = [summary or ev.get("details") or ""]
+            if ev.get("location"):
+                hover.append(f"Ort: {ev['location']}")
+            if item:
+                hover.append(f"Aus: {item.get('title', '')}")
             out.append(
                 {
                     "uid": ev["uid"],
                     "summary": f"📅 {ev['title']}",
                     "description": desc,
                     "location": ev.get("location"),
+                    "category": "termin",
+                    "icon": "📅",
+                    "title": ev["title"],
+                    "hover": " · ".join(h for h in hover if h),
+                    "item_uid": ev.get("item_uid"),
                     **entry,
                 }
             )
@@ -832,15 +888,65 @@ class SchulManager:
             if not t.get("due"):
                 continue
             day = date.fromisoformat(t["due"])
+            item = self.items.get(t.get("item_uid") or "", {})
+            icon = TASK_TYPE_ICONS.get(t["type"], "✅")
+            hover = [
+                t.get("details") or "",
+                item.get("analysis", {}).get("summary") or "",
+            ]
+            if item:
+                hover.append(f"Aus: {item.get('title', '')}")
             out.append(
                 {
                     "uid": f"frist-{t['id']}",
-                    "summary": f"{TASK_TYPE_ICONS.get(t['type'], '✅')} Frist: {self.task_label(t)}",
+                    "summary": f"{icon} Frist: {self.task_label(t)}",
                     "start": day,
                     "end": day + timedelta(days=1),
                     "description": self.task_description(t),
+                    "category": f"frist_{t['type']}",
+                    "icon": icon,
+                    "title": f"Frist: {self.task_label(t)}",
+                    "hover": " · ".join(dict.fromkeys(h for h in hover if h)),
+                    "item_uid": t.get("item_uid"),
+                    "task_id": t["id"],
                 }
             )
+        since = subst_from or dt_util.now().date() - timedelta(days=7)
+        for d in self.data["substitutions"].get(child, {}).get("days", []):
+            day = date.fromisoformat(d["date"])
+            if day < since:
+                continue
+            for e in d["entries"]:
+                kind = e.get("kind") if e.get("kind") in SUBSTITUTION_KINDS else "vertretung"
+                icon = EVENT_CATEGORIES[kind][0]
+                begin, finish = self.lesson_times(child, day, e.get("lesson") or "")
+                if begin:
+                    start = datetime.combine(day, time.fromisoformat(begin), tz)
+                    stop = (
+                        datetime.combine(day, time.fromisoformat(finish), tz)
+                        if finish
+                        else start + timedelta(minutes=45)
+                    )
+                    entry = {"start": start, "end": max(stop, start + timedelta(minutes=5))}
+                else:
+                    entry = {"start": day, "end": day + timedelta(days=1)}
+                text = self.substitution_text(e)
+                hover = [text]
+                if e.get("teacher"):
+                    hover.append(f"Lehrkraft laut Plan: {e['teacher']}")
+                out.append(
+                    {
+                        "uid": f"vertretung-{e['uid']}",
+                        "summary": f"{icon} {self.substitution_text(e, with_teacher=False)}",
+                        "description": "\n".join(hover),
+                        "location": e.get("room") or None,
+                        "category": kind,
+                        "icon": icon,
+                        "title": self.substitution_text(e, with_teacher=False),
+                        "hover": " · ".join(hover),
+                        **entry,
+                    }
+                )
         return out
 
     def task_label(self, t: dict[str, Any]) -> str:
@@ -874,6 +980,115 @@ class SchulManager:
         if t.get("source") == "regeln":
             lines.append("⚠️ Ohne KI erkannt – bitte prüfen.")
         return "\n\n".join(lines)
+
+
+    # ------------------------------------------------------------------
+    # Stundenplan und Vertretungsplan
+    # ------------------------------------------------------------------
+    def _merge_substitutions(
+        self, key: str, subst: dict[str, Any]
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Vertretungsplan speichern; liefert neu aufgetauchte Einträge ab heute."""
+        today = dt_util.now().date()
+        known = key in self.data["substitutions"]
+        seen = set(self.data["subs_seen"].get(key, []))
+        days: list[dict[str, Any]] = []
+        fresh: list[tuple[str, dict[str, Any]]] = []
+        for d in subst.get("days", []):
+            entries = []
+            for e in d.get("entries", []):
+                e = dict(e)
+                raw = "|".join(
+                    [key, d["date"]]
+                    + [str(e.get(k) or "") for k in ("lesson", "subject", "substitute", "room", "info")]
+                )
+                e["uid"] = hashlib.sha1(raw.encode()).hexdigest()[:12]
+                entries.append(e)
+                if date.fromisoformat(d["date"]) >= today and e["uid"] not in seen:
+                    fresh.append((d["date"], e))
+            days.append({"date": d["date"], "entries": entries})
+        self.data["substitutions"][key] = {
+            "available": bool(subst.get("available")),
+            "stand": subst.get("stand"),
+            "days": days,
+            "updated": dt_util.now().isoformat(),
+        }
+        current = [e["uid"] for d in days for e in d["entries"]]
+        self.data["subs_seen"][key] = (current + [u for u in seen if u not in current])[:300]
+        return fresh if known else []
+
+    def lesson_times(self, child: str, day: date, lesson: str) -> tuple[str | None, str | None]:
+        """Beginn und Ende einer Stunde (z. B. '3' oder '3-4') laut Stundenplan."""
+        lessons = self.data["timetable"].get(child, {}).get("lessons", [])
+        nums = re.findall(r"\d+", lesson or "")
+        if not nums or not lessons:
+            return None, None
+
+        def find(num: str, field: str) -> str | None:
+            same_day = [x for x in lessons if x["weekday"] == day.isoweekday()]
+            for pool in (same_day, lessons):
+                for x in pool:
+                    if x["lesson"] == num and x.get(field):
+                        return x[field]
+            return None
+
+        return find(nums[0], "start"), find(nums[-1], "end")
+
+    def child_substitutions(self, child: str, include_past: bool = False) -> list[dict[str, Any]]:
+        """Tage des Vertretungsplans ab heute (mit Einträgen und leeren Tagen)."""
+        today = dt_util.now().date()
+        plan = self.data["substitutions"].get(child, {})
+        return [
+            d for d in plan.get("days", [])
+            if include_past or date.fromisoformat(d["date"]) >= today
+        ]
+
+    def substitution_text(self, e: dict[str, Any], with_teacher: bool = True) -> str:
+        lesson = f"{e['lesson']}. Std." if e.get("lesson") else ""
+        subj = e.get("subject") or e.get("old_subject") or ""
+        head = " ".join(x for x in (lesson, subj) if x)
+        info = (e.get("info") or "").strip()
+        if e.get("kind") == "entfall":
+            text = f"{head} entfällt"
+            if info and not re.fullmatch(r"(?i)entf[aä]llt\.?", info):
+                text += f" – {info}"
+            return text
+        if e.get("kind") == "raum":
+            text = f"{head}: Raum {e.get('room') or '?'}"
+            if re.fullmatch(r"(?i)raum(änderung|wechsel)\.?", info):
+                info = ""
+        else:
+            text = f"{head}: Vertretung"
+            if with_teacher and e.get("substitute"):
+                text += f" {e['substitute']}"
+            if e.get("room"):
+                text += f", Raum {e['room']}"
+        if e.get("old_subject"):
+            text += f" (statt {e['old_subject']})"
+        if info:
+            text += f" – {info}"
+        return text
+
+    async def _notify_substitutions(
+        self, child: str, fresh: list[tuple[str, dict[str, Any]]]
+    ) -> None:
+        name = self.children.get(child, {}).get("name", child)
+        today = dt_util.now().date()
+        lines = []
+        for day, e in sorted(fresh, key=lambda x: (x[0], x[1].get("lesson") or "")):
+            lines.append(f"{_day_label(date.fromisoformat(day), today)}: {self.substitution_text(e)}")
+        await self._notify(
+            f"🔁 Vertretungsplan {name}",
+            "\n".join(lines[:8]) + (f"\n… und {len(lines) - 8} weitere" if len(lines) > 8 else ""),
+            {"tag": f"schulmanager-vertretung-{child}", "group": f"schulmanager-{child}"},
+        )
+        self.hass.bus.async_fire(
+            EVENT_SUBSTITUTION,
+            {
+                "child": child,
+                "entries": [{"date": d, **e} for d, e in fresh],
+            },
+        )
 
     # ------------------------------------------------------------------
     # Benachrichtigungen
@@ -957,7 +1172,9 @@ class SchulManager:
             },
         )
         self.hass.bus.async_fire(
-            EVENT_NEW_ITEM,
+            EVENT_CATEGORIES,
+    EVENT_NEW_ITEM,
+    EVENT_SUBSTITUTION,
             {
                 "child": item["child"],
                 "kind": item["kind"],
@@ -1071,16 +1288,22 @@ class SchulManager:
                 start = ev["start"]
                 day = start.date() if isinstance(start, datetime) else start
                 if day == today and not ev["uid"].startswith("frist-"):
-                    lines.append(f"  📅 Heute: {ev['summary'][2:]}")
+                    lines.append(f"  {ev['icon']} Heute: {ev['title']}")
             if len(lines) == 1:
                 lines.append("  Alles erledigt.")
             blocks.append("\n".join(lines))
         return "\n".join(blocks)
 
     async def async_send_digest(self, force: bool = False) -> bool:
+        today = dt_util.now().date()
         has_content = any(
             (s := self.child_summary(k))["overdue"] or s["due_soon"] or s["due_week"] or s["unread"]
             for k in self.children
+        ) or any(
+            d["entries"]
+            for k in self.children
+            for d in self.child_substitutions(k)
+            if d["date"] == today.isoformat()
         )
         if not (has_content or force):
             return False
@@ -1110,6 +1333,9 @@ class SchulManager:
         for k in kids:
             self.children.pop(k)
             self.data["appointments"].pop(k, None)
+            self.data["timetable"].pop(k, None)
+            self.data["substitutions"].pop(k, None)
+            self.data["subs_seen"].pop(k, None)
         for uid in [u for u, i in self.items.items() if i.get("school") == school]:
             self.items.pop(uid)
         for tid in [t for t, v in self.tasks.items() if v.get("child") in kids]:

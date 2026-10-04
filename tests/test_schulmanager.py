@@ -761,7 +761,7 @@ async def test_timetable_substitutions_flow(
     res = (await ws.receive_json())["result"]
     child = res["children"][0]
     cats = {e["category"] for e in child["events"]}
-    assert {"portal", "entfall", "raum"} <= cats and any(c.startswith("frist_") for c in cats)
+    assert {"schulaufgabe", "entfall", "raum"} <= cats and any(c.startswith("frist_") for c in cats)
     frist = next(e for e in child["events"] if e["task_id"])
     assert frist["hover"] and frist["item_uid"]
     assert res["legend"]["entfall"][0] == "❌" and res["legend"]["frist_zahlung"][0] == "💶"
@@ -861,4 +861,56 @@ async def test_optional_section_disconnect_keeps_fetch(hass: HomeAssistant, medi
     assert "erika" in m.children and m.items, "Abruf darf nicht abbrechen"
     assert m.data["timetable"]["erika"]["lessons"]
     assert any("sicknote" in e for e in m.last_errors), m.last_errors
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> None:
+    """Portal-Termine: Standard nur Schulaufgaben und Tests, Termine der Schule per Einstellung."""
+    from custom_components.schulmanager.portal import appointment_kind, appointment_subject
+
+    assert appointment_kind("event-important", "x") == "schulaufgabe"
+    assert appointment_kind("event-warning", "x") == "test"
+    assert appointment_kind("event-info", "Sommerferien") == "schule"
+    assert appointment_kind(None, "kLN in Chemie (Sch)") == "test"
+    assert appointment_subject("kLN in Französisch (8_F_8B_Ab) (Ab)") == "Französisch"
+    assert appointment_subject("SA in Deutsch (Mü)") == "Deutsch"
+
+    today = dt_util.now().date()
+    tomorrow = dt_util.start_of_local_day(today + timedelta(days=1))
+
+    async def fake_fetch(self, need_download=None):
+        res = _fake_result(today)
+        res.children[0].appointments = [
+            {"uid": "a1", "title": "SA in Deutsch (Mü)", "kind": "schulaufgabe", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+            {"uid": "a2", "title": "kLN in Chemie (Sch)", "kind": "test", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+            {"uid": "a3", "title": "Sommerferien", "kind": "schule", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
+        ]
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        ev = {e["uid"]: e for e in m.child_events("anna")}
+        assert ev["a1"]["category"] == "schulaufgabe" and ev["a1"]["icon"] == "📝" and ev["a1"]["subject"] == "Deutsch"
+        assert ev["a2"]["category"] == "test" and ev["a2"]["icon"] == "✏️"
+        assert "a3" not in ev  # Termine der Schule standardmäßig aus
+        assert "📝 Morgen: SA in Deutsch (Mü)" in m.digest_text()
+
+        # Einstellung: auch Termine der Schule, aber keine Tests
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"appointment_kinds": ["schulaufgabe", "schule"]}
+        )
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        ev = {e["uid"]: e for e in m.child_events("anna")}
+        assert "a3" in ev and ev["a3"]["category"] == "portal" and "a2" not in ev
     await hass.config_entries.async_unload(entry.entry_id)

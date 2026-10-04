@@ -600,10 +600,14 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     titles = [v["title"] for v in cfg["views"]]
     assert titles[0] == "Übersicht" and len(titles) == 1 + len(m.children), titles
     overview = json.dumps(cfg["views"][0])
-    assert "calendar.schule_erika_kalender" in overview and "Schulmanager" in overview
+    assert "custom:schulmanager-termine" in overview and "Schulmanager" in overview
+    # keine Zeilen je Kind mehr in der Schulmanager-Karte der Übersicht
+    assert "sensor.schule_erika_status" not in overview
     assert cfg["views"][1]["sections"][0]["cards"][0] == {
         "type": "custom:schulmanager-card", "child": "erika", "grid_options": {"columns": 12}
     }
+    child_view = json.dumps(cfg["views"][1])
+    assert "custom:schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
     assert os.path.isfile(hass.config.path("www", "schulmanager", "icon.png"))
 
     # eigene Änderung bleibt erhalten
@@ -627,4 +631,140 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     for _ in range(5):
         await hass.async_block_till_done()
     assert not await dash_mod.async_apply(hass, entry.runtime_data, force=True)
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+_SUBST_HTML = """
+<div id="asam_content"><div class="main_center">
+<div class="list bold full_width text_center">Mo., {d0} - KW 41</div>
+<table class="table"><tbody>
+<tr class="vp_plan_head"><td>Std.</td><td>Betrifft</td><td>Vertretung</td><td>Fach</td><td>Raum</td><td>Info</td></tr>
+<tr><td>3.</td><td>Huber</td><td>Maier</td><td><span style="text-decoration: line-through;">&nbsp;M&nbsp;</span> D</td><td>104</td><td></td></tr>
+<tr><td>5.-6.</td><td>Huber</td><td>---</td><td>E</td><td></td><td>entfällt</td></tr>
+<tr><td>2.</td><td>Kurz</td><td></td><td>B</td><td>N12</td><td>Raumänderung</td></tr>
+</tbody></table>
+<div class="list bold full_width text_center">Di., {d1} - KW 41</div>
+<table class="table"><tbody>
+<tr class="vp_plan_head"><td>Std.</td><td>Betrifft</td><td>Vertretung</td><td>Fach</td><td>Raum</td><td>Info</td></tr>
+<tr><td colspan="6">Keine Vertretungen</td></tr>
+</tbody></table>
+<div>Stand: 05.10.2026 07:15</div>
+</div></div>
+"""
+
+
+async def test_portal_parsing_timetable_substitutions() -> None:
+    """Stundenplan mit Uhrzeiten, Vertretungsplan mit Entfall, Raumänderung, altem Fach."""
+    from pyelternportal.demo import DEMO_HTML_LESSON
+
+    from custom_components.schulmanager.portal import parse_substitutions, parse_timetable
+
+    plan = parse_timetable(DEMO_HTML_LESSON)
+    first = plan[0]
+    assert first == {
+        "weekday": 1, "lesson": "1", "start": "08:10", "end": "08:55", "subject": "Ku", "room": "OG2_24"
+    }
+    assert {x["weekday"] for x in plan} == {1, 2, 3, 4, 5}
+    res = parse_substitutions(_SUBST_HTML.format(d0="05.10.2026", d1="06.10.2026"))
+    assert res["available"] and len(res["days"]) == 2
+    e1, e2, e3 = res["days"][0]["entries"]
+    assert e1["subject"] == "D" and e1["old_subject"] == "M" and e1["kind"] == "vertretung"
+    assert e2["lesson"] == "5-6"
+    assert e2["kind"] == "entfall"
+    assert e3["kind"] == "raum"
+    assert res["days"][1] == {"date": "2026-10-06", "entries": []}
+    assert parse_substitutions("<html><body>Login</body></html>")["available"] is False
+
+
+async def test_timetable_substitutions_flow(
+    hass: HomeAssistant, media_dir, hass_ws_client
+) -> None:
+    """Stundenplan + Vertretungen: Sensoren, Kalender, Push nur bei Neuem, Karte-Daten."""
+    from custom_components.schulmanager.portal import parse_substitutions, parse_timetable
+    from pyelternportal.demo import DEMO_HTML_LESSON
+
+    await async_setup_component(hass, "http", {})
+    today = dt_util.now().date()
+    tomorrow = today + timedelta(days=1)
+    html = _SUBST_HTML.format(d0=today.strftime("%d.%m.%Y"), d1=tomorrow.strftime("%d.%m.%Y"))
+    state = {"subst": parse_substitutions(html)}
+
+    async def fake_fetch(self, need_download=None):
+        res = _fake_result(today)
+        res.children[0].timetable = state.get("timetable", parse_timetable(DEMO_HTML_LESSON))
+        res.children[0].substitutions = state["subst"]
+        return res
+
+    notified: list[dict] = []
+
+    async def fake_notify(call: ServiceCall) -> None:
+        notified.append(dict(call.data))
+
+    hass.services.async_register("notify", "handy", fake_notify)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"notify_services": ["notify.handy"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        # erster Abruf: keine Vertretungs-Push (nur Einrichtung)
+        assert not any("Vertretungsplan" in n.get("title", "") for n in notified)
+        st = hass.states.get("sensor.schule_anna_vertretungen")
+        assert st.state == "3", st
+        assert any("entfällt" in t for t in st.attributes["heute"])
+        assert st.attributes["morgen"] == []
+        tt = hass.states.get("sensor.schule_anna_stundenplan")
+        assert tt is not None and tt.attributes["woche"]["Montag"][0].startswith("1. 08:10 Ku")
+
+        # neue Vertretung für morgen -> genau eine Push
+        state["subst"]["days"][1]["entries"].append(
+            {"lesson": "1", "teacher": "Kurz", "substitute": "Lang", "subject": "Ph",
+             "old_subject": None, "room": "P1", "info": "", "kind": "vertretung"}
+        )
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        pushes = [n for n in notified if "Vertretungsplan" in n.get("title", "")]
+        assert len(pushes) == 1 and "Morgen: 1. Std. Ph: Vertretung Lang, Raum P1" in pushes[0]["message"]
+        # unverändert -> keine weitere Push
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        assert len([n for n in notified if "Vertretungsplan" in n.get("title", "")]) == 1
+        # Portal liefert kurzzeitig nichts (z. B. Seite weg) -> alte Daten bleiben
+        good = state["subst"]
+        state["subst"] = {"available": False, "stand": None, "days": []}
+        state["timetable"] = []
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        assert hass.states.get("sensor.schule_anna_vertretungen").state == "4"
+        assert m.data["timetable"]["anna"]["lessons"]
+        state["subst"] = good
+        state.pop("timetable")
+
+    # Kalender: Vertretung mit Uhrzeit aus dem Stundenplan, Entfall als Eintrag
+    events = m.child_events("anna")
+    subs = [e for e in events if e["uid"].startswith("vertretung-")]
+    assert any(e["category"] == "entfall" and "entfällt" in e["summary"] for e in subs)
+    ph = next(e for e in subs if "Ph" in e["title"])
+    if tomorrow.isoweekday() <= 5:
+        assert ph["start"].strftime("%H:%M") == "08:10"
+    # Tagesübersicht nennt heutige Änderungen
+    assert "entfällt" in m.digest_text()
+
+    # Kartendaten: Termine mit Kategorie + Kurzbeschreibung, Legende, Stundenplan
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "schulmanager/data"})
+    res = (await ws.receive_json())["result"]
+    child = res["children"][0]
+    cats = {e["category"] for e in child["events"]}
+    assert {"portal", "entfall", "raum"} <= cats and any(c.startswith("frist_") for c in cats)
+    frist = next(e for e in child["events"] if e["task_id"])
+    assert frist["hover"] and frist["item_uid"]
+    assert res["legend"]["entfall"][0] == "❌" and res["legend"]["frist_zahlung"][0] == "💶"
+    assert child["timetable"][0]["start"] == "08:10"
+    assert child["substitutions"]["days"][0]["entries"][0]["text"].startswith("3. Std. D")
     await hass.config_entries.async_unload(entry.entry_id)

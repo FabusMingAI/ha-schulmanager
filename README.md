@@ -64,6 +64,8 @@ On the first run the last 120 days are imported; only the last 21 days (and all 
 | `calendar.schule_<child>_kalender` | Deadlines, appointments from letters and exam dates |
 | `sensor.schule_<child>_offene_zahlungen` | Open payments in € |
 | `sensor.schule_<child>_nachste_frist`, `…_uberfallig`, `…_offene_aufgaben`, `…_ungelesene_mitteilungen` | Counters and next deadline |
+| `sensor.schule_<child>_stundenplan` | Timetable: lessons today; day and week plan as attributes |
+| `sensor.schule_<child>_vertretungen` | Substitution plan: changes from today (cancelled lessons, substitutes, room changes); new entries are pushed and shown in calendar and morning summary |
 | `sensor.schulmanager_letzter_abruf` | Diagnostics: last update, errors, pending analyses |
 
 Entity IDs follow your Home Assistant language (shown here for German).
@@ -86,6 +88,7 @@ Events: `schulmanager_new_item` and `schulmanager_task_reminder` for your own au
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, Schulmanager therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.
 - **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days.
+- **Cards:** `custom:schulmanager-card` (tasks & messages), `custom:schulmanager-termine` (appointments & deadlines; hover shows the AI summary, legend at the bottom), `custom:schulmanager-stundenplan` (timetable with substitutions). Optional `child: <name>`.
 - **Unofficial:** Eltern-Portal has no public API. Access uses the library [pyelternportal](https://github.com/michull/pyelternportal), which reads the web pages. If the portal layout changes, single sections may stop working until an update; the error shows up in `sensor.schulmanager_letzter_abruf`.
 - This project is not affiliated with Eltern-Portal or its operator.
 

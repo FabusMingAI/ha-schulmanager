@@ -58,7 +58,7 @@ Den Ordner `custom_components/schulmanager` nach `/config/custom_components/schu
    - **KI-Dienst**: eure AI-Task-Entität. Ohne KI greift nur die einfache Regel-Erkennung.
    - **Push an**: z. B. `mobile_app_<handy_1>` und `mobile_app_<handy_2>`
    - **Sprachansagen auf**: Assist-Satelliten (Ansage direkt) oder Lautsprecher (dafür zusätzlich einen TTS-Dienst wählen)
-4. **Dashboard**: Der Schulmanager legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (Kalender und Status aller Kinder) und **einem Reiter pro Kind**, ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
+4. **Dashboard**: Der Schulmanager legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (Termine & Fristen aller Kinder und Status) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
 
 Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur die der letzten 21 Tage (und alle noch unbestätigten Briefe) werden ausgewertet und als ungelesen markiert, der Rest landet als gelesen im Archiv. Es gibt einmalig eine kurze Einrichtungs-Push statt einer Flut.
 
@@ -71,6 +71,8 @@ Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur 
 - `todo.schule_<kind>_aufgaben`: Aufgabenliste. Abhaken, Datum ändern und eigene Aufgaben ergänzen geht ganz normal, auch per Sprachassistent.
 - `calendar.schule_<kind>_kalender`: Fristen, Termine aus den Briefen und Schulaufgaben aus dem Portal
 - `sensor.schule_<kind>_offene_zahlungen` (€), `…_nachste_frist`, `…_uberfallig`, `…_offene_aufgaben`, `…_ungelesene_mitteilungen`
+- `sensor.schule_<kind>_stundenplan`: Zahl der Stunden heute; Tages-, Folgetags- und Wochenplan als Attribute
+- `sensor.schule_<kind>_vertretungen`: Zahl der Änderungen ab heute; Attribute `heute`, `morgen` und alle Einträge (Stunde, Fach, Vertretung, Raum, Info, Art: `entfall`/`vertretung`/`raum`). Neue Einträge kommen als Push, heutige stehen in der Tagesübersicht, alle im Kalender.
 - `sensor.schulmanager_letzter_abruf`: Diagnose, mit Fehlern und Anzahl noch ausstehender Auswertungen
 
 ## Aktionen (für Automationen, Skripte, Assist)
@@ -93,6 +95,7 @@ Events für eigene Automationen: `schulmanager_new_item` (mit `child`, `title`, 
 - **Empfangsbestätigung:** Das Eltern-Portal zählt das Herunterladen eines Elternbriefs als „Empfang bestätigt“. Mit aktivierter automatischer Ablage bestätigt der Schulmanager deshalb neue Briefe, sobald er die PDF holt. Wer das nicht will, schaltet „Anhänge/PDFs automatisch ablegen“ aus. Dann entsteht je Brief die Aufgabe „Empfang im Portal bestätigen“.
 - **Datenschutz:** Alles bleibt in Home Assistant. Ausnahme: Ist ein KI-Dienst gewählt, gehen Text und PDF-Inhalt der Mitteilung zur Auswertung an dessen Anbieter. PDF-Links im Dashboard sind signiert (30 Tage gültig) und ohne Anmeldung bzw. Signatur nicht abrufbar.
 - **Inoffiziell:** Das Portal hat keine offizielle Schnittstelle. Der Zugriff läuft über die Bibliothek [pyelternportal](https://github.com/michull/pyelternportal), die das HTML ausliest. Ändert der Anbieter das Layout, kann ein Bereich vorübergehend ausfallen. Der Fehler steht dann in `sensor.schulmanager_letzter_abruf`, die übrigen Bereiche laufen weiter.
+- **Karten:** `custom:schulmanager-card` (Aufgaben & Mitteilungen), `custom:schulmanager-termine` (Termine & Fristen; Maus darauf zeigt die KI-Kurzbeschreibung, unten eine Legende der Kategorien) und `custom:schulmanager-stundenplan` (Tag/Woche mit hervorgehobenen Vertretungen). Jeweils optional `child: <kind>`.
 - **Noch nicht enthalten:** „Kommunikation Eltern/Klassenleitung“ (nur Fachlehrkräfte), Krankmeldungen und das Klassenbuch.
 - Wer zusätzlich die HACS-Integration `elternportal` nutzt, sollte auf dieselbe `pyelternportal`-Version achten (hier 0.0.25).
 - Dieses Projekt steht in keiner Verbindung zum Eltern-Portal oder dessen Betreiber.

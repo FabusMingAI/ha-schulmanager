@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.3 – 2026-10-04
+
+- More subject abbreviations (iF, iL, PhÜ, CÜ). / Weitere Fächerkürzel.
+
+## 0.5.2 – 2026-10-04
+
+- Timetable card shows full subject names in bold (e.g. "Biologie", "Mathematik (Intensivierung)", "Sport") instead of abbreviations. / Stundenplan zeigt Fächer ausgeschrieben statt Kürzeln.
+
+## 0.5.1 – 2026-10-04
+
+- Timetable card: lesson times no longer wrap. / Stundenplan-Karte: Uhrzeiten brechen nicht mehr um.
+
+## 0.5.0 – 2026-10-04
+
+- New: **timetable and substitution plan** from the Eltern-Portal. Sensors `sensor.schule_<child>_stundenplan` and `sensor.schule_<child>_vertretungen`, substitutions and cancelled lessons in the calendar (with lesson times) and in the morning summary, push notification when a new change appears. / Neu: **Stundenplan und Vertretungsplan** – Sensoren, Einträge im Kalender und in der Tagesübersicht, Push bei neuen Vertretungen oder Ausfällen.
+- New cards `custom:schulmanager-termine` (appointments and deadlines; hovering shows the AI summary, legend of all categories at the bottom) and `custom:schulmanager-stundenplan` (day and week view with changes highlighted). / Neue Karten „Termine“ (Kurzbeschreibung beim Überfahren, Legende) und „Stundenplan“.
+- Dashboard: the overview's Schulmanager card no longer lists one row per child; child tabs now show timetable and appointments. / Dashboard: keine Kinder-Zeilen mehr in der Schulmanager-Karte der Übersicht; Kinder-Reiter mit Stundenplan und Terminen.
+
 ## 0.4.0 – 2026-10-03
 
 - New: the integration creates and maintains the **"Schule" dashboard**. Default layout on phones: tabs **Overview** (calendar + Schulmanager status with links) and **one tab per child**. Choose *Tabs*, *Single page* or *Do not manage* under Configure → Settings. / Neu: Dashboard „Schule“ wird automatisch angelegt – Reiter „Übersicht“ und je Kind, einstellbar unter Konfigurieren → Einstellungen.

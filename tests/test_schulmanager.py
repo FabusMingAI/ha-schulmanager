@@ -839,3 +839,26 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
     res = (await ws.receive_json())["result"]
     assert any(e["category"] == "krank" and "Arzttermin" in e["hover"] for e in res["children"][0]["events"])
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_optional_section_disconnect_keeps_fetch(hass: HomeAssistant, media_dir) -> None:
+    """Trennt das Portal bei einem Zusatzbereich die Verbindung, laufen die übrigen Bereiche weiter."""
+    import aiohttp
+
+    async def boom(self):
+        raise aiohttp.ServerDisconnectedError()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "demo", "school_name": "Demo", "username": "", "password": ""}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_sicknote_demo", boom):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    m = entry.runtime_data
+    assert "erika" in m.children and m.items, "Abruf darf nicht abbrechen"
+    assert m.data["timetable"]["erika"]["lessons"]
+    assert any("sicknote" in e for e in m.last_errors), m.last_errors
+    await hass.config_entries.async_unload(entry.entry_id)

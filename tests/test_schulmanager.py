@@ -605,6 +605,7 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     right = cfg["views"][0]["sections"][1]["cards"]
     plans = [c["child"] for c in right if c["type"] == "custom:schulmanager-stundenplan"]
     assert plans == list(m.children), right
+    assert all(c.get("view") == "week" for c in right if c["type"] == "custom:schulmanager-stundenplan")
     assert all(c["type"] != "entities" for c in right)
     assert "sensor.schule_erika_status" not in overview
     assert cfg["views"][1]["sections"][0]["cards"][0] == {

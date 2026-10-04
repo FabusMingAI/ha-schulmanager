@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.2 – 2026-10-04
+
+- Timetable card: the week view no longer needs horizontal scrolling in narrow cards (half a column on the *Overview* tab, child tabs, phones). Narrow cards use short subject names ("Mathe", "Engl.", "Reli/Eth") and short labels ("SA", "Vertr."). / Stundenplan: Wochenansicht ohne Querscrollen in schmalen Karten, mit abgekürzten Fächern.
+- Timetable card: new option `view: week` to start in the week view. The *Overview* tab of the "Schule" dashboard uses it for both timetables. / Neue Option `view: week`; die Übersicht startet in der Wochenansicht.
+
 ## 0.7.1 – 2026-10-04
 
 - Dashboard "Schule", tab *Overview*: the right-hand "Schulmanager" panel (last fetch, refresh, send summary) is replaced by **each child's timetable** with substitutions, exams and tests. Refresh and summary stay available as actions `schulmanager.refresh` / `schulmanager.send_digest`, and the last fetch as `sensor.schulmanager_letzter_abruf`. The dashboard updates by itself after the restart unless it was changed by hand (then: action `schulmanager.rebuild_dashboard`). / Dashboard „Schule“, Reiter *Übersicht*: Statt der Karte „Schulmanager“ steht rechts jetzt der **Stundenplan je Kind** mit Vertretungen, Schulaufgaben und Tests. Abrufen und Tagesübersicht bleiben als Aktionen erhalten.

@@ -22,7 +22,7 @@ OUT = HERE.parent / "images"
 SHOTS = [
     # (Dateiname, Karte, Breite, Aktion)
     ("stundenplan.png", "stundenplan", 380, "day"),
-    ("stundenplan-woche.png", "stundenplan", 640, "week"),
+    ("stundenplan-woche.png", "stundenplan", 700, "week"),
     ("termine.png", "termine", 400, "hover"),
     ("task-dialog.png", "task", 390, "dialog"),
 ]

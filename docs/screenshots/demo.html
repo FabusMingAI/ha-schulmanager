@@ -155,7 +155,7 @@
   s.src = "../../custom_components/schulmanager/www/schulmanager-card.js";
   s.onload = () => {
     const el = document.createElement(card === "task" ? "schulmanager-card" : "schulmanager-" + card);
-    el.setConfig({});
+    el.setConfig(q.get("view") ? { view: q.get("view") } : {});
     document.getElementById("wrap").appendChild(el);
     el.hass = window.hass;
     window.cardEl = el;

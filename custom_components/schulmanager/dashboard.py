@@ -113,8 +113,11 @@ def _termine(child: str | None = None) -> dict[str, Any]:
     return card
 
 
-def _stundenplan(child: str) -> dict[str, Any]:
-    return {"type": "custom:schulmanager-stundenplan", "child": child, "grid_options": {"columns": 12}}
+def _stundenplan(child: str, view: str | None = None) -> dict[str, Any]:
+    card: dict[str, Any] = {"type": "custom:schulmanager-stundenplan", "child": child, "grid_options": {"columns": 12}}
+    if view:
+        card["view"] = view
+    return card
 
 
 def _portal_button(child: dict[str, Any]) -> dict[str, Any] | None:
@@ -181,7 +184,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                     ],
                 },
                 {
-                    # Rechte Spalte: Stundenplan je Kind (seit 0.7.1 statt der Schulmanager-Karte)
+                    # Rechte Spalte: Stundenplan je Kind in Wochenansicht (seit 0.7.1 statt der Schulmanager-Karte)
                     "type": "grid",
                     "cards": [
                         card
@@ -192,7 +195,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                                 "heading": f"Stundenplan {child['name']}",
                                 "icon": "mdi:timetable",
                             },
-                            _stundenplan(key),
+                            _stundenplan(key, view="week"),
                         )
                     ],
                 },

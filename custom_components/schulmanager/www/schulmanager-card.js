@@ -4,9 +4,10 @@
  *   type: custom:schulmanager-termine      # Termine & Fristen mit Legende
  *   type: custom:schulmanager-stundenplan  # Stundenplan mit Vertretungen
  *   child: anna          # optional, ohne Angabe: alle Kinder
+ *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.7.1";
+  const VERSION = "0.7.2";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -154,10 +155,22 @@
     .badge.vertretung, .badge.raum { background: rgba(255,166,0,.18); color: var(--warning-color,#e08a00); }
     .chg { font-size:.82em; color: var(--warning-color,#e08a00); margin-top:2px; }
     .les.entfall .chg { color: var(--error-color,#db4437); }
-    .wk { overflow-x:auto; padding: 0 12px 4px; }
-    .wk table { border-collapse: collapse; width:100%; min-width: 520px; font-size:.82em; table-layout: fixed; }
+    .wk { overflow-x:auto; padding: 0 12px 4px; container-type: inline-size; }
+    .wk table { border-collapse: collapse; width:100%; font-size:.82em; table-layout: fixed; }
     .wk th:first-child { width: 3.4em; }
-    .wk td { overflow-wrap:anywhere; }
+    .wk td { overflow-wrap:break-word; hyphens:auto; }
+    .wk .sh { display:none; }
+    /* schmale Karten (z. B. halbe Spalte): kurze Fachnamen, kleinere Schrift – kein Querscrollen */
+    @container (max-width: 640px) {
+      .wk table { font-size:.74em; }
+      .wk .lg { display:none; }
+      .wk .sh { display:inline; }
+      .wk th, .wk td { padding:3px 2px; }
+      .wk th:first-child { width: 2.9em; }
+    }
+    @container (max-width: 380px) {
+      .wk th .dt { display:none; }
+    }
     .wk th, .wk td { border:1px solid var(--divider-color); padding:4px 5px; text-align:center; vertical-align:top; }
     .wk th { color: var(--secondary-text-color); font-weight:500; }
     .wk th.today { color: var(--primary-color); }
@@ -593,6 +606,17 @@
     if (parts.length > 1 && parts.every((x) => RELIGION.has(x))) return "Religion / Ethik";
     return [...new Set(parts.map(partName))].join(" / ");
   };
+  // Kurzform für die Wochenansicht in schmalen Karten, z. B. "Mathematik (Intensivierung)" -> "Mathe Int."
+  const SHORT = [
+    [/\s*\(Intensivierung\)/g, " Int."], [/\s*\(Übung\)/g, " Ü"], [/\s*\(Wahlfach\)/g, " (W)"], [/\s*\(Förderunterricht\)/g, " Förd."],
+    [/Mathematik/g, "Mathe"], [/Englisch/g, "Engl."], [/Französisch/g, "Franz."], [/Spanisch/g, "Span."], [/Italienisch/g, "Ital."],
+    [/Griechisch/g, "Griech."], [/Biologie/g, "Bio"], [/Geschichte/g, "Gesch."], [/Geographie/g, "Geo"], [/Informatik/g, "Info"],
+    [/Natur und Technik/g, "NuT"], [/Religion \/ Ethik/g, "Reli/Eth"], [/Ev\. Religion/g, "Ev. Reli"], [/Kath\. Religion/g, "Kath. Reli"],
+    [/Berufsorientierung/g, "BO"], [/Wirtschaft und Recht/g, "WR"], [/Wirtschaftsinformatik/g, "WIn"], [/Sozialkunde/g, "Sozi"],
+    [/Politik und Gesellschaft/g, "PuG"], [/Klassenleiterstunde/g, "KL-Std."], [/Intensivierung/g, "Int."], [/Stimmbildung/g, "Stimmb."],
+    [/Tischtennis/g, "TT"], [/Schwimmen/g, "Schwimm."], [/Orchester/g, "Orch."], [/Profilfach/g, "Profil"],
+  ];
+  const shortName = (s) => SHORT.reduce((t, [re, r]) => t.replace(re, r), fullName(s)).replace(/\s*\/\s*/g, "/");
   const lessonNums = (txt) => {
     const nums = String(txt || "").match(/\d+/g) || [];
     if (nums.length === 2 && /-|–|bis/.test(txt)) {
@@ -638,6 +662,8 @@
   };
   const EXAM_LABEL = { schulaufgabe: ["📝", "Schulaufgabe", "exam-sa"], test: ["✏️", "Test", "exam-test"] };
   const KIND_LABEL = { entfall: "entfällt", vertretung: "Vertretung", raum: "Raum" };
+  const KIND_SHORT = { entfall: "entfällt", vertretung: "Vertr.", raum: "Raum" };
+  const EXAM_SHORT = { schulaufgabe: "SA", test: "Test" };
 
   class SchulmanagerTermineCard extends SchulmanagerCard {
     getCardSize() {
@@ -813,10 +839,16 @@
       );
       root.querySelectorAll("[data-week]").forEach((el) =>
         el.addEventListener("click", () => {
-          this._week = { ...(this._week || {}), [el.dataset.week]: !(this._week || {})[el.dataset.week] };
+          this._week = { ...(this._week || {}), [el.dataset.week]: !this._isWeek(el.dataset.week) };
           this._render();
         })
       );
+    }
+
+    // Wochenansicht aktiv? Ohne Klick gilt die Einstellung `view: week` der Karte.
+    _isWeek(key) {
+      const w = (this._week || {})[key];
+      return w === undefined ? this._config.view === "week" : w;
     }
 
     // Datum des nächsten (oder heutigen) Tages mit diesem Wochentag
@@ -862,15 +894,15 @@
         const n = (byDate[iso] || []).length;
         const ex = (exams[iso] || []).map((e) => EXAM_LABEL[e.category][0]).join("");
         const tip = [`${WD_LONG[wd]} ${fmtShort(iso)}`, ...(exams[iso] || []).map((e) => e.title)].join("\n");
-        html += `<button class="pill ${iso === sel && !(this._week || {})[c.key] ? "on" : ""} ${iso === today ? "today" : ""}" data-child="${esc(c.key)}" data-day="${iso}" title="${esc(tip)}">${WD[wd]}${ex ? `<span class="x">${ex}</span>` : ""}${n ? `<span class="n">${n}</span>` : ""}</button>`;
+        html += `<button class="pill ${iso === sel && !this._isWeek(c.key) ? "on" : ""} ${iso === today ? "today" : ""}" data-child="${esc(c.key)}" data-day="${iso}" title="${esc(tip)}">${WD[wd]}${ex ? `<span class="x">${ex}</span>` : ""}${n ? `<span class="n">${n}</span>` : ""}</button>`;
       }
-      html += `<button class="pill ${(this._week || {})[c.key] ? "on" : ""}" data-week="${esc(c.key)}">Woche</button></div>`;
+      html += `<button class="pill ${this._isWeek(c.key) ? "on" : ""}" data-week="${esc(c.key)}">Woche</button></div>`;
 
       const soon = Object.keys(exams).filter((d) => d >= today && d <= addDays(today, 13)).sort();
       if (soon.length) {
         html += `<div class="info">${soon.map((d) => exams[d].map((e) => `${EXAM_LABEL[e.category][0]} ${dayLabel(d, today).split(" · ")[0]}: ${esc(e.subject ? fullName(e.subject) : e.title)}`).join(" · ")).join(" · ")}</div>`;
       }
-      if ((this._week || {})[c.key]) html += this._weekHtml(c, today, byDate);
+      if (this._isWeek(c.key)) html += this._weekHtml(c, today, byDate);
       else html += this._dayHtml(c, sel, today, byDate[sel] || [], byDate.hasOwnProperty(sel));
 
       // Vertretungsplan-Überblick
@@ -935,9 +967,9 @@
       const nums = [...new Set(c.timetable.map((l) => l.lesson))].sort((a, b) => Number(a) - Number(b));
       const times = {};
       for (const l of c.timetable) if (l.start && !times[l.lesson]) times[l.lesson] = l.start;
-      let html = `<div class="wk"><table><tr><th></th>`;
+      let html = `<div class="wk"><table lang="de"><tr><th></th>`;
       const dates = [1, 2, 3, 4, 5].map((wd) => this._dateFor(wd, today));
-      dates.forEach((iso, i) => (html += `<th class="${iso === today ? "today" : ""}">${WD[i + 1]} ${fmtShort(iso)}</th>`));
+      dates.forEach((iso, i) => (html += `<th class="${iso === today ? "today" : ""}">${WD[i + 1]} <span class="dt">${fmtShort(iso)}</span></th>`));
       html += `</tr>`;
       for (const nr of nums) {
         html += `<tr><th>${esc(nr)}.<div class="r">${esc(times[nr] || "")}</div></th>`;
@@ -947,7 +979,7 @@
           const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
           const ex = l && ((this._exams || {})[iso] || []).find((e) => e.subject && sameSubject(e.subject, l.subject));
           const exCls = ex ? " " + EXAM_LABEL[ex.category][2] : "";
-          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? esc(fullName(l.subject)) + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r">${KIND_LABEL[kind]}</div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} ${EXAM_LABEL[ex.category][1]}</div>` : ""}</td>`;
+          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? `<span class="lg">${esc(fullName(l.subject))}</span><span class="sh">${esc(shortName(l.subject))}</span>` + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r"><span class="lg">${KIND_LABEL[kind]}</span><span class="sh">${KIND_SHORT[kind] || KIND_LABEL[kind]}</span></div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} <span class="lg">${EXAM_LABEL[ex.category][1]}</span><span class="sh">${EXAM_SHORT[ex.category]}</span></div>` : ""}</td>`;
         });
         html += `</tr>`;
       }

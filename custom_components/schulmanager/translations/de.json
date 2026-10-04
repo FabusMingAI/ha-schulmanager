@@ -79,7 +79,7 @@
           "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast.",
           "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests.",
           "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar.",
-          "summary_languages": "Bis zu 4 Sprachen; jede wird in der Zusammenfassung ein eigener Reiter. Die erste gewählte Sprache gilt für Push-Nachrichten. Gilt für neu ausgewertete Mitteilungen; ältere lassen sich mit „Neu auswerten“ nachziehen."
+          "summary_languages": "Bis zu 4 Sprachen; jede wird in der Zusammenfassung ein eigener Reiter. Die erste gewählte Sprache gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache, wird im Hintergrund nur die Zusammenfassung übersetzt – Aufgaben bleiben unverändert."
         }
       },
       "add_portal": {

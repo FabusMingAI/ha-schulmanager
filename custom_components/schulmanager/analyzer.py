@@ -255,6 +255,58 @@ class AnalyzeError(Exception):
     """Auswertung fehlgeschlagen."""
 
 
+TRANSLATE_PROMPT = """Übersetze die folgende Zusammenfassung einer Mitteilung aus dem \
+Eltern-Portal einer Schule (Sprache: {source}) in diese Sprachen: {targets}.
+Formuliere natürlich und knapp, behalte Daten, Beträge und Namen unverändert bei \
+und füge nichts hinzu.
+
+Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, Sprachcode als Schlüssel:
+{{{fmt}}}
+
+--- ZUSAMMENFASSUNG ---
+{summary}
+"""
+
+
+async def async_translate_summary(
+    hass: HomeAssistant,
+    ai_entity: str,
+    summary: str,
+    source: str,
+    targets: list[str],
+) -> dict[str, str]:
+    """Nur die Zusammenfassung übersetzen – Aufgaben und Termine bleiben unberührt."""
+    targets = [t for t in targets if t in LANGUAGE_PROMPT_NAMES and t != source]
+    if not targets or not summary:
+        return {}
+    prompt = TRANSLATE_PROMPT.format(
+        source=LANGUAGE_PROMPT_NAMES.get(source, source),
+        targets=", ".join(f"{LANGUAGE_PROMPT_NAMES[t]} ({t})" for t in targets),
+        fmt=", ".join(f'"{t}": "…"' for t in targets),
+        summary=summary,
+    )
+    try:
+        resp = await hass.services.async_call(
+            "ai_task",
+            "generate_data",
+            {"task_name": "Schulmanager: Übersetzung", "instructions": prompt, "entity_id": ai_entity},
+            blocking=True,
+            return_response=True,
+        )
+    except HomeAssistantError as err:
+        raise AnalyzeError(f"KI-Dienst nicht erreichbar: {err}") from err
+    result = (resp or {}).get("data")
+    try:
+        raw = result if isinstance(result, dict) else _extract_json(str(result or ""))
+    except (ValueError, json.JSONDecodeError) as err:
+        raise AnalyzeError(f"KI-Antwort nicht lesbar: {err}") from err
+    return {
+        t: raw[t].strip()[:600]
+        for t in targets
+        if isinstance(raw.get(t), str) and raw[t].strip()
+    }
+
+
 # ----------------------------------------------------------------------
 # Regel-basierte Auswertung (ohne KI)
 # ----------------------------------------------------------------------

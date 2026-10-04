@@ -1076,3 +1076,73 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
         cfg = dash_mod.build_config(hass, m, "tabs")
         assert "/config/integrations/integration/schulmanager" in cfg["views"][0]["header"]["card"]["content"]
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_translate_missing_summaries(hass: HomeAssistant, media_dir) -> None:
+    """Fehlende Sprachen werden nur übersetzt – Aufgaben, Status und Kommentare bleiben unberührt."""
+    today = dt_util.now().date()
+    calls: list[str] = []
+
+    async def fake_ai(call: ServiceCall):
+        text = call.data["instructions"]
+        calls.append(text)
+        if text.startswith("Übersetze"):
+            return {"data": {"en": "Class trip, transfer 185 €.", "es": "Viaje escolar, transferir 185 €."}}
+        # Auswertung wie vor 0.8.0: nur deutsche Zusammenfassung
+        return {"data": {
+            "zusammenfassung": "Klassenfahrt, 185 € überweisen.", "kategorie": "zahlung", "dringlichkeit": "mittel",
+            "aufgaben": [{"titel": "Klassenfahrt bezahlen", "typ": "zahlung", "betrag": 185}], "termine": [],
+        }}
+
+    hass.services.async_register("ai_task", "generate_data", fake_ai, supports_response=SupportsResponse.ONLY)
+
+    async def fake_fetch(self, need_download=None):
+        res = _fake_result(today, with_pdf=False)
+        res.children[0].items = [res.children[0].items[0]]
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"ai_task_entity": "ai_task.claude", "summary_languages": ["de"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    uid = "bspgym-7-elternbrief-501"
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        for _ in range(40):
+            if m.items[uid]["analysis"].get("status") == "fertig":
+                break
+            await asyncio.sleep(0.05)
+        tid = next(t for t, task in m.tasks.items() if task.get("item_uid") == uid and task.get("source") == "ki")
+        before = {t: dict(task) for t, task in m.tasks.items()}
+        m.update_task(tid, status="erledigt", comment="überwiesen")
+        m.items[uid]["analysis"].pop("summaries", None)  # Stand vor 0.8.0
+        analyses = sum(1 for c in calls if not c.startswith("Übersetze"))
+
+        # Sprachen erweitern -> nur Übersetzung, keine neue Auswertung
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+        await hass.config_entries.options.async_configure(result["flow_id"], {"ai_task_entity": "ai_task.claude", "summary_languages": ["de", "en", "es"]})
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        for _ in range(60):
+            if len(m.items[uid]["analysis"].get("summaries") or {}) == 3:
+                break
+            await asyncio.sleep(0.05)
+        a = m.items[uid]["analysis"]
+        assert a["summaries"] == {
+            "de": "Klassenfahrt, 185 € überweisen.",
+            "en": "Class trip, transfer 185 €.",
+            "es": "Viaje escolar, transferir 185 €.",
+        }
+        assert sum(1 for c in calls if not c.startswith("Übersetze")) == analyses
+        assert any(c.startswith("Übersetze") and "Englisch (en)" in c for c in calls)
+        assert set(m.tasks) == set(before)  # keine neuen oder doppelten Aufgaben
+        assert m.tasks[tid]["status"] == "erledigt" and m.tasks[tid]["comment"] == "überwiesen"
+        # kein zweiter Versuch, wenn schon alles da ist
+        assert m._missing_translations() == []
+    await hass.config_entries.async_unload(entry.entry_id)

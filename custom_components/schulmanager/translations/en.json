@@ -79,7 +79,7 @@
           "dashboard": "Tabs: “Overview” with calendar and Schulmanager plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it.",
           "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests.",
           "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible.",
-          "summary_languages": "Up to 4 languages; each becomes its own tab in the summary. The first chosen language is used for push notifications. Applies to newly analysed messages; older ones can be updated with \"Neu auswerten\" (re-analyse)."
+          "summary_languages": "Up to 4 languages; each becomes its own tab in the summary. The first chosen language is used for push notifications. If an already analysed message lacks a language, only its summary is translated in the background – tasks stay untouched."
         }
       },
       "add_portal": {

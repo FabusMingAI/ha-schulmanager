@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 – 2026-10-04
+
+- AI summary: missing languages are added by translating only the existing summary in the background – for messages analysed before 0.8.0 and whenever a language is added in the settings. Tasks, appointments, status and comments are never touched (a full re-analysis could reword task titles and create duplicates). / KI-Zusammenfassung: Fehlende Sprachen werden im Hintergrund nur übersetzt – ohne Aufgaben neu zu erzeugen.
+
 ## 0.8.0 – 2026-10-04
 
 - New: messages have a status **open / in progress / done** like tasks (dialog in the card, action `schulmanager.update_item`). Done messages count as read and move to the "Erledigt" tab. / Neu: Mitteilungen mit Status Offen / In Arbeit / Erledigt; erledigte wandern in den Reiter „Erledigt“.

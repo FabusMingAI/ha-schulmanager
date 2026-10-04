@@ -31,6 +31,7 @@ from .analyzer import (
     AnalyzeError,
     analyze_rules,
     async_analyze_ai,
+    async_translate_summary,
     fmt_eur,
     summary_languages,
 )
@@ -267,7 +268,7 @@ class SchulManager:
         self._worker = self.entry.async_create_background_task(
             self.hass, self._analysis_worker(), "schulmanager_analyse"
         )
-        if self._pending():
+        if self._pending() or self._missing_translations():
             self._queue_event.set()
 
     async def async_stop(self) -> None:
@@ -611,21 +612,72 @@ class SchulManager:
             key=lambda i: i.get("sent") or "",
         )
 
+    def _missing_translations(self) -> list[dict[str, Any]]:
+        """Ausgewertete Mitteilungen, denen eine der gewählten Sprachen fehlt."""
+        if not self.opt(CONF_AI_ENTITY):
+            return []
+        langs = self.summary_languages
+        out = []
+        for item in self.items.values():
+            a = item.get("analysis", {})
+            if a.get("status") != "fertig" or not a.get("summary"):
+                continue
+            have = set(a.get("summaries") or {}) or {"de"}
+            missing = [lang for lang in langs if lang not in have]
+            tried = set(a.get("translate_tried") or [])
+            if missing and not set(missing) <= tried:
+                out.append(item)
+        return sorted(out, key=lambda i: i.get("sent") or "", reverse=True)
+
+    async def _translate(self, item: dict[str, Any]) -> None:
+        """Fehlende Sprachen der Zusammenfassung ergänzen – ohne Aufgaben neu zu erzeugen."""
+        a = item["analysis"]
+        summaries = dict(a.get("summaries") or {})
+        if not summaries:
+            # vor 0.8.0 ausgewertet: Zusammenfassung ist deutsch
+            summaries = {"de": a["summary"]}
+        source = next(iter(summaries))
+        missing = [lang for lang in self.summary_languages if lang not in summaries]
+        a["translate_tried"] = sorted(set(a.get("translate_tried") or []) | set(missing))
+        try:
+            summaries.update(
+                await async_translate_summary(
+                    self.hass, self.opt(CONF_AI_ENTITY), summaries[source], source, missing
+                )
+            )
+        except AnalyzeError as err:
+            LOGGER.debug("Übersetzung von %s fehlgeschlagen: %s", item["uid"], err)
+        a["summaries"] = summaries
+
     async def _analysis_worker(self) -> None:
         while True:
             await self._queue_event.wait()
             self._queue_event.clear()
-            while pending := self._pending():
-                item = pending[0]
+            await self._work_queue()
+            # danach fehlende Sprachen der Zusammenfassung nachtragen (neue Mitteilungen haben Vorrang)
+            while not self._pending() and (todo := self._missing_translations()):
+                item = todo[0]
                 try:
-                    await self._analyze(item)
-                except Exception as err:  # noqa: BLE001
-                    LOGGER.exception("Auswertung von %s fehlgeschlagen", item["uid"])
-                    item["analysis"] = {"status": "fehler", "error": str(err)}
+                    await self._translate(item)
+                except Exception:  # noqa: BLE001
+                    LOGGER.exception("Übersetzung von %s fehlgeschlagen", item["uid"])
+                    item["analysis"]["translate_tried"] = list(self.summary_languages)
                 self._changed()
-                if item.pop("notify", False):
-                    await self._notify_item(item)
-                await asyncio.sleep(0)
+                await asyncio.sleep(1)
+            await self._work_queue()
+
+    async def _work_queue(self) -> None:
+        while pending := self._pending():
+            item = pending[0]
+            try:
+                await self._analyze(item)
+            except Exception as err:  # noqa: BLE001
+                LOGGER.exception("Auswertung von %s fehlgeschlagen", item["uid"])
+                item["analysis"] = {"status": "fehler", "error": str(err)}
+            self._changed()
+            if item.pop("notify", False):
+                await self._notify_item(item)
+            await asyncio.sleep(0)
 
     def _context(self, item: dict[str, Any]) -> dict[str, Any]:
         child = self.children.get(item["child"], {})

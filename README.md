@@ -22,14 +22,39 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 - **Reminders** by push notification (with *Done* and *Remind me tomorrow* buttons), a daily morning summary and optional voice announcements.
 - **Timetable & substitutions** – cancelled lessons, substitute teachers and room changes appear in the timetable card, the calendar (with lesson times) and the morning summary; a new change triggers a push notification.
 - **Traffic light per child** – red / yellow / green for dashboards and automations.
-- **Three dashboard cards included**, set up automatically in the "Schule" dashboard:
-  - `custom:schulmanager-card` – tasks and messages; tap a task to see the letter, the PDF and the payment details.
-  - `custom:schulmanager-termine` – appointments and deadlines of all children; hover an entry (tap on phones) to see the AI summary, with a legend of all category icons at the bottom.
-  - `custom:schulmanager-stundenplan` – day and week timetable with full subject names; changes from the substitution plan are highlighted.
+- **Three dashboard cards included**, set up automatically in the "Schule" dashboard – see [The cards](#the-cards).
 
-<p align="left"><img src="docs/images/task-dialog.png" width="260" alt="Task details"> <img src="docs/images/termine.png" width="260" alt="Appointments with AI summary on hover"> <img src="docs/images/stundenplan.png" width="260" alt="Timetable with substitutions"></p>
+> The user interface texts of the cards, notifications and the AI output are in German, because Eltern-Portal is a German service. Configuration dialogs are available in English and German.
 
-> The user interface texts of the card, notifications and the AI output are in German, because Eltern-Portal is a German service. Configuration dialogs are available in English and German.
+## The cards
+
+The integration loads three cards automatically and places them in the "Schule" dashboard; no HACS frontend resources are needed. All three accept an optional `child: <name>`; without it they show all children.
+
+### Tasks & messages – `custom:schulmanager-card`
+
+Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt** (done) per child.
+
+<p align="center"><img src="docs/images/task-dialog.png" width="320" alt="Task details"></p>
+
+- **Tap a task** to open its details: status **open / in progress / done**, change the due date, add your own **comment**, payment details with "copy" for IBAN and payment reference, plus the **source** with AI summary, original text, PDF and a link to Eltern-Portal.
+- **Tap a message** to see its text, the PDF and the tasks created from it; it is marked as read.
+- "In progress" still counts as open: the task stays in the traffic light and reminders and shows up in the to-do list with ⏳.
+
+### Appointments & deadlines – `custom:schulmanager-termine`
+
+<p align="center"><img src="docs/images/termine.png" width="320" alt="Appointments with AI summary on hover"></p>
+
+- All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks** and **all**.
+- **Hover an entry** to see the AI's short summary (tap once on phones). Clicking a deadline or an appointment taken from a letter opens its details.
+- A **legend** at the bottom explains the icons: 🏫 appointment from the portal (e.g. exam), 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
+
+### Timetable & substitutions – `custom:schulmanager-stundenplan`
+
+<p align="center"><img src="docs/images/stundenplan.png" width="320" alt="Timetable with substitutions"></p>
+
+- Day view with times and rooms, switchable to the whole **week**. In the morning it shows today; after the last lesson and at weekends it shows the next school day.
+- Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
+- Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.
 
 ## Requirements
 
@@ -93,9 +118,10 @@ Events for your own automations: `schulmanager_new_item`, `schulmanager_task_rem
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, Schulmanager therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.
 - **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days.
-- **Cards in your own dashboards:** all three cards accept an optional `child: <name>`; without it they show all children.
 - **Timetable and substitution plan** are only available if the school has enabled them in Eltern-Portal. If the portal briefly returns an empty page, the last known plan is kept.
 - **Unofficial:** Eltern-Portal has no public API. Access uses the library [pyelternportal](https://github.com/michull/pyelternportal), which reads the web pages. If the portal layout changes, single sections may stop working until an update; the error shows up in `sensor.schulmanager_letzter_abruf`.
+- **Not yet included:** communication with the class teacher (only subject teachers), sick notes and the class register.
+- If you also use the HACS integration `elternportal`, keep both on the same `pyelternportal` version (here 0.0.25).
 - This project is not affiliated with Eltern-Portal or its operator.
 
 ## Development

@@ -2,7 +2,7 @@
 
 ## 0.5.4 – 2026-10-04
 
-- Timetable card: changes are written in plain words with full subject names (e.g. "Englisch entfällt", "Raumänderung: Raum N12"). README updated with the new cards and screenshots. / Stundenplan-Karte: Änderungen in Klartext mit ausgeschriebenen Fächern; README mit den neuen Karten und Bildern.
+- Timetable card: changes are written in plain words with full subject names (e.g. "Englisch entfällt", "Raumänderung: Raum N12"). README (English and German) updated with the new cards and screenshots. / Stundenplan-Karte: Änderungen in Klartext mit ausgeschriebenen Fächern; README (deutsch und englisch) mit den neuen Karten und Bildern.
 
 ## 0.5.3 – 2026-10-04
 

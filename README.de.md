@@ -122,6 +122,15 @@ Events für eigene Automationen: `schulmanager_new_item` (mit `child`, `title`, 
 - Wer zusätzlich die HACS-Integration `elternportal` nutzt, sollte auf dieselbe `pyelternportal`-Version achten (hier 0.0.25).
 - Dieses Projekt steht in keiner Verbindung zum Eltern-Portal oder dessen Betreiber.
 
+## Entwicklung
+
+```bash
+pip install -r requirements_test.txt
+pytest
+```
+
+Issues und Pull-Requests sind willkommen.
+
 ## Lizenz
 
 [MIT](LICENSE)

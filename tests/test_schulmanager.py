@@ -768,3 +768,74 @@ async def test_timetable_substitutions_flow(
     assert child["timetable"][0]["start"] == "08:10"
     assert child["substitutions"]["days"][0]["entries"][0]["text"].startswith("3. Std. D")
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_sicknotes(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    """Krankmeldungen: Demo-Portal, Sensor, Kalender (Kategorie krank), leerer Abruf behält Daten."""
+    # Demo-Schule liefert eine Krankmeldung für heute
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "demo", "school_name": "Demo", "username": "", "password": ""}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    m = entry.runtime_data
+    assert m.data["sicknotes"]["erika"], m.data["sicknotes"]
+    assert hass.states.get("sensor.schule_erika_krankmeldungen") is not None
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    await async_setup_component(hass, "http", {})
+    today = dt_util.now().date()
+    # Montag bis Mittwoch einer Woche im laufenden Schuljahr
+    monday = today - timedelta(days=today.weekday())
+    state = {
+        "notes": [
+            {"start": monday.isoformat(), "end": (monday + timedelta(days=2)).isoformat(), "comment": "Fieber"},
+            {"start": "2020-01-13", "end": "2020-01-14", "comment": None},
+        ]
+    }
+
+    async def fake_fetch(self, need_download=None):
+        res = _fake_result(today)
+        res.children[0].sicknotes = state["notes"]
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        st = hass.states.get("sensor.schule_anna_krankmeldungen")
+        # nur das laufende Schuljahr zählt: 3 Schultage
+        assert st.state == "3", st
+        assert st.attributes["letzte"]["kommentar"] == "Fieber"
+        assert len(st.attributes["krankmeldungen"]) == 2
+        ev = [e for e in m.child_events("anna") if e["category"] == "krank"]
+        assert len(ev) == 2 and ev[0]["icon"] == "🤒" and "Fieber" in ev[0]["hover"] + ev[1]["hover"]
+        # leerer Abruf (Seite gerade weg) löscht nichts
+        state["notes"] = []
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        assert hass.states.get("sensor.schule_anna_krankmeldungen").state == "3"
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "schulmanager/data"})
+    res = (await ws.receive_json())["result"]
+    assert res["legend"]["krank"][0] == "🤒"
+    child = res["children"][0]
+    assert child["sicknotes"][0]["comment"] == "Fieber"
+    # in der Terminliste stehen nur aktuelle Krankmeldungen (ab gestern)
+    assert all(e["date"] >= (today - timedelta(days=1)).isoformat() or e.get("until") for e in child["events"] if e["category"] == "krank")
+    m.data["sicknotes"]["anna"].append({"start": today.isoformat(), "end": today.isoformat(), "comment": "Arzttermin"})
+    await ws.send_json({"id": 2, "type": "schulmanager/data"})
+    res = (await ws.receive_json())["result"]
+    assert any(e["category"] == "krank" and "Arzttermin" in e["hover"] for e in res["children"][0]["events"])
+    await hass.config_entries.async_unload(entry.entry_id)

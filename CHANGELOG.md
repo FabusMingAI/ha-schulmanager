@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 – 2026-10-04
+
+- New: portal appointments are classified like in Eltern-Portal – **exams** (*Schulaufgabe*, 📝), **tests** (*Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe*, ✏️) and **school appointments** (🏫). By default only exams and tests are shown; school appointments can be switched on under Configure → Settings → "Portal appointments to show". / Neu: Portal-Termine nach Art wie im Eltern-Portal; standardmäßig nur Schulaufgaben und Tests, Termine der Schule per Einstellung.
+- New: exams and tests are highlighted in the timetable card (weekday buttons, day box, badge on the matching subject, week view) and tomorrow's exams/tests appear in the morning summary. / Neu: Schulaufgaben und Tests im Stundenplan hervorgehoben, morgige in der Tagesübersicht.
+
 ## 0.6.1 – 2026-10-04
 
 - Fix: if a school does not offer the timetable, substitution plan or sick notes page and the portal drops the connection there, only that section is skipped – the rest of the portal (letters, messages, tasks) is still fetched. In 0.6.0 the whole fetch for that school was aborted. / Behoben: Bietet eine Schule Stundenplan, Vertretungsplan oder Krankmeldungen nicht an und trennt das Portal dort die Verbindung, wird nur dieser Bereich übersprungen. In 0.6.0 brach der ganze Abruf dieser Schule ab.

@@ -6,7 +6,7 @@
  *   child: anna          # optional, ohne Angabe: alle Kinder
  */
 (() => {
-  const VERSION = "0.5.4";
+  const VERSION = "0.7.0";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -164,6 +164,16 @@
     .wk td.chg-entfall { background: rgba(219,68,55,.12); }
     .wk td.chg-vertretung, .wk td.chg-raum { background: rgba(255,166,0,.15); }
     .wk .r { color: var(--secondary-text-color); font-size:.9em; }
+    .exam { margin: 4px 16px 6px; padding: 8px 10px; border-radius: 8px; background: rgba(142,36,170,.14); border-left: 3px solid #8e24aa; font-size:.9em; }
+    .exam.test { background: rgba(30,136,229,.12); border-left-color: #1e88e5; }
+    .exam b { font-weight:600; }
+    .badge.exam-sa { background: rgba(142,36,170,.18); color: #ab47bc; }
+    .badge.exam-test { background: rgba(30,136,229,.16); color: #42a5f5; }
+    .les.has-exam { box-shadow: inset 3px 0 0 #8e24aa; }
+    .les.has-test { box-shadow: inset 3px 0 0 #1e88e5; }
+    .wk td.exam-sa { outline: 2px solid #8e24aa; outline-offset: -2px; }
+    .wk td.exam-test { outline: 2px solid #1e88e5; outline-offset: -2px; }
+    .pill .x { margin-left:2px; font-size:.8em; }
     .info { padding: 4px 16px 8px; font-size:.82em; color: var(--secondary-text-color); }
   `;
 
@@ -618,6 +628,15 @@
     if (info) t += ` – ${info}`;
     return t;
   };
+  // Schulaufgaben/Tests einem Fach im Stundenplan zuordnen (Wortanfang, 6 Buchstaben)
+  const stems = (txt) =>
+    String(txt || "").toLowerCase().replace(/[^a-zäöüß]+/g, " ").split(" ").filter((w) => w.length >= 4).map((w) => w.slice(0, 6));
+  const sameSubject = (examSubject, lessonSubject) => {
+    const a = stems(examSubject);
+    const b = stems(fullName(lessonSubject) + " " + lessonSubject);
+    return a.some((x) => b.includes(x));
+  };
+  const EXAM_LABEL = { schulaufgabe: ["📝", "Schulaufgabe", "exam-sa"], test: ["✏️", "Test", "exam-test"] };
   const KIND_LABEL = { entfall: "entfällt", vertretung: "Vertretung", raum: "Raum" };
 
   class SchulmanagerTermineCard extends SchulmanagerCard {
@@ -831,6 +850,9 @@
       for (const d of subst.days || []) byDate[d.date] = d.entries;
       const sel = (this._sel || {})[c.key] || this._defaultDay(c, today);
       const multi = this._data.children.length > 1;
+      const exams = {};
+      for (const e of c.events || []) if (EXAM_LABEL[e.category]) (exams[e.date] = exams[e.date] || []).push(e);
+      this._exams = exams;
       let html = `<div class="child">`;
       if (multi || this._config.show_name) html += `<div class="head"><div class="name">${esc(c.name)}</div>${c.classname ? `<div class="sub">Klasse ${esc(c.classname)}</div>` : ""}</div>`;
       // Tagesauswahl Mo–Fr (+ Tage aus dem Vertretungsplan)
@@ -838,10 +860,16 @@
       for (let wd = 1; wd <= 5; wd++) {
         const iso = this._dateFor(wd, today);
         const n = (byDate[iso] || []).length;
-        html += `<button class="pill ${iso === sel && !(this._week || {})[c.key] ? "on" : ""} ${iso === today ? "today" : ""}" data-child="${esc(c.key)}" data-day="${iso}" title="${WD_LONG[wd]} ${fmtShort(iso)}">${WD[wd]}${n ? `<span class="n">${n}</span>` : ""}</button>`;
+        const ex = (exams[iso] || []).map((e) => EXAM_LABEL[e.category][0]).join("");
+        const tip = [`${WD_LONG[wd]} ${fmtShort(iso)}`, ...(exams[iso] || []).map((e) => e.title)].join("\n");
+        html += `<button class="pill ${iso === sel && !(this._week || {})[c.key] ? "on" : ""} ${iso === today ? "today" : ""}" data-child="${esc(c.key)}" data-day="${iso}" title="${esc(tip)}">${WD[wd]}${ex ? `<span class="x">${ex}</span>` : ""}${n ? `<span class="n">${n}</span>` : ""}</button>`;
       }
       html += `<button class="pill ${(this._week || {})[c.key] ? "on" : ""}" data-week="${esc(c.key)}">Woche</button></div>`;
 
+      const soon = Object.keys(exams).filter((d) => d >= today && d <= addDays(today, 13)).sort();
+      if (soon.length) {
+        html += `<div class="info">${soon.map((d) => exams[d].map((e) => `${EXAM_LABEL[e.category][0]} ${dayLabel(d, today).split(" · ")[0]}: ${esc(e.subject ? fullName(e.subject) : e.title)}`).join(" · ")).join(" · ")}</div>`;
+      }
       if ((this._week || {})[c.key]) html += this._weekHtml(c, today, byDate);
       else html += this._dayHtml(c, sel, today, byDate[sel] || [], byDate.hasOwnProperty(sel));
 
@@ -870,6 +898,12 @@
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       let html = `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
+      const dayExams = (this._exams || {})[iso] || [];
+      for (const e of dayExams) {
+        const [icon, label] = EXAM_LABEL[e.category];
+        html += `<div class="exam ${e.category === "test" ? "test" : ""}">${icon} <b>${label}</b>: ${esc(e.title)}</div>`;
+      }
+      const examFor = (subject) => dayExams.find((e) => e.subject && sameSubject(e.subject, subject));
       if (!c.timetable.length) html += `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
       else if (!lessons.length) html += `<div class="empty">Kein Unterricht laut Stundenplan.</div>`;
       for (const l of lessons) {
@@ -877,10 +911,13 @@
         const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
         const isNow = iso === today && l.start && l.end && hhmm >= l.start && hhmm < l.end;
         const long = fullName(l.subject);
-        html += `<div class="les ${kind} ${isNow ? "now" : ""}">
+        const ex = examFor(l.subject);
+        const exCls = ex ? (ex.category === "test" ? "has-test" : "has-exam") : "";
+        const exBadge = ex ? `<span class="badge ${EXAM_LABEL[ex.category][2]}">${EXAM_LABEL[ex.category][0]} ${EXAM_LABEL[ex.category][1]}</span>` : "";
+        html += `<div class="les ${kind} ${exCls} ${isNow ? "now" : ""}">
             <span class="nr">${esc(l.lesson)}.</span>
             <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
-            <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}</div>
+            <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}${exBadge}</div>
               ${ch.map((e) => `<div class="chg">${esc(changeText(e))}</div>`).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
           </div>`;
@@ -908,11 +945,13 @@
           const l = c.timetable.find((x) => x.weekday === i + 1 && x.lesson === nr);
           const ch = (byDate[iso] || []).filter((e) => lessonNums(e.lesson).includes(String(nr)));
           const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
-          html += `<td class="${kind ? "chg-" + kind : ""}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? esc(fullName(l.subject)) + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r">${KIND_LABEL[kind]}</div>` : ""}</td>`;
+          const ex = l && ((this._exams || {})[iso] || []).find((e) => e.subject && sameSubject(e.subject, l.subject));
+          const exCls = ex ? " " + EXAM_LABEL[ex.category][2] : "";
+          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? esc(fullName(l.subject)) + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r">${KIND_LABEL[kind]}</div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} ${EXAM_LABEL[ex.category][1]}</div>` : ""}</td>`;
         });
         html += `</tr>`;
       }
-      return html + `</table></div><div class="info">Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum).</div>`;
+      return html + `</table></div><div class="info">Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum). Umrandet: 📝 Schulaufgabe (lila), ✏️ Test (blau).</div>`;
     }
   }
 

@@ -1,5 +1,3 @@
-<p align="center"><img src="docs/images/icon@2x.png" width="128" alt="Schulmanager-Icon"></p>
-
 # Schulmanager für Home Assistant
 
 **English:** [README.md](README.md)

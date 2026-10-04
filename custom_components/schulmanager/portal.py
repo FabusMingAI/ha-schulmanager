@@ -38,6 +38,8 @@ from .const import (
 )
 
 MAX_FILE_SIZE = 25 * 1024 * 1024
+# Bereiche, die nicht jede Schule anbietet: Netzwerkfehler dort brechen den Abruf nicht ab
+OPTIONAL_SECTIONS = frozenset({"lesson", "substitution", "sicknote"})
 
 PortalAuthError = BadCredentialsException
 PortalConnectionError = (
@@ -332,8 +334,14 @@ class SchulPortal(ElternPortalAPI):
     async def _section(self, name: str, coro_factory: Callable[[], Any]) -> str | None:
         try:
             await coro_factory()
-        except (aiohttp.ClientError, TimeoutError):
-            raise
+        except (aiohttp.ClientError, TimeoutError) as err:
+            if name not in OPTIONAL_SECTIONS:
+                raise
+            # Zusatzbereiche (Stundenplan, Vertretungen, Krankmeldungen) sind nicht
+            # bei jeder Schule freigeschaltet; manche Portale trennen dann die
+            # Verbindung. Das darf den Abruf der übrigen Bereiche nicht abbrechen.
+            LOGGER.info("%s: Bereich '%s' nicht verfügbar: %s", self.school, name, err)
+            return f"{name}: nicht verfügbar ({err or type(err).__name__})"
         except Exception as err:  # noqa: BLE001 - Portal-HTML ändert sich gern
             LOGGER.warning(
                 "%s: Bereich '%s' konnte nicht gelesen werden: %s",

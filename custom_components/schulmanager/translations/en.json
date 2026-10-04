@@ -132,6 +132,12 @@
       },
       "letzter_abruf": {
         "name": "Last update"
+      },
+      "vertretungen": {
+        "name": "Substitutions"
+      },
+      "stundenplan": {
+        "name": "Timetable"
       }
     },
     "todo": {

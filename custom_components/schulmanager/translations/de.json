@@ -132,6 +132,12 @@
       },
       "letzter_abruf": {
         "name": "Letzter Abruf"
+      },
+      "vertretungen": {
+        "name": "Vertretungen"
+      },
+      "stundenplan": {
+        "name": "Stundenplan"
       }
     },
     "todo": {

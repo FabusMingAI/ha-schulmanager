@@ -33,6 +33,7 @@ CONF_AUTO_DOWNLOAD: Final = "auto_download"
 CONF_LOOKBACK_DAYS: Final = "lookback_days"
 CONF_ANALYZE_DAYS: Final = "analyze_days"
 CONF_DASHBOARD: Final = "dashboard"
+CONF_APPOINTMENT_KINDS: Final = "appointment_kinds"
 
 DEFAULT_DIGEST_ENABLED: Final = True
 DEFAULT_DIGEST_TIME: Final = "06:45:00"
@@ -44,6 +45,13 @@ DEFAULT_SCAN_INTERVAL: Final = 30  # Minuten
 DEFAULT_AUTO_DOWNLOAD: Final = True
 DEFAULT_LOOKBACK_DAYS: Final = 120
 DEFAULT_ANALYZE_DAYS: Final = 21
+
+# Termine aus dem Portal (Kalender „Termine“): Arten laut Legende im Portal
+APPT_SCHOOL: Final = "schule"  # Termin der Schule (event-info)
+APPT_EXAM: Final = "schulaufgabe"  # Schulaufgabe der Klasse (event-important)
+APPT_TEST: Final = "test"  # Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe (event-warning)
+APPOINTMENT_KINDS: Final = [APPT_EXAM, APPT_TEST, APPT_SCHOOL]
+DEFAULT_APPOINTMENT_KINDS: Final = [APPT_EXAM, APPT_TEST]
 
 # --- Datenmodell ---
 KIND_LETTER: Final = "elternbrief"
@@ -91,7 +99,9 @@ TASK_TYPE_LABELS: Final = {
 
 # Kategorien im Kalender / in der Terminliste (Icon, Legende)
 EVENT_CATEGORIES: Final = {
-    "portal": ("🏫", "Termin aus dem Portal (z. B. Schulaufgabe)"),
+    "schulaufgabe": ("📝", "Schulaufgabe"),
+    "test": ("✏️", "Test / Kurzarbeit / Stegreifaufgabe"),
+    "portal": ("🏫", "Termin der Schule"),
     "termin": ("📅", "Termin aus einer Mitteilung"),
     "entfall": ("❌", "Stunde entfällt"),
     "vertretung": ("🔁", "Vertretung / Änderung"),

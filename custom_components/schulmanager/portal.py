@@ -416,6 +416,7 @@ class SchulPortal(ElternPortalAPI):
                         "uid": f"{self.school}-{st.student_id}-termin-{a.appointment_id}",
                         "title": a.short or a.title,
                         "detail": a.title if a.short and a.title != a.short else None,
+                        "kind": appointment_kind(a.classname, a.short or a.title),
                         "start": a.start,
                         "end": a.end,
                     }
@@ -550,6 +551,33 @@ _TIME_RE = re.compile(r"(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})")
 _ENTFALL_RE = re.compile(r"entf[aä]ll|ausfall|f[aä]llt\s+aus|\bfrei\b|unterrichtsfrei", re.I)
 
 
+_TEST_RE = re.compile(r"^(kLN|KA|StA|Ex|Test|Kurzarbeit|Stegreif)", re.I)
+
+
+def appointment_kind(classname: str | None, title: str | None = None) -> str:
+    """Art eines Portal-Termins laut Legende: 'schulaufgabe', 'test' oder 'schule'."""
+    cls = (classname or "").lower()
+    if "important" in cls:
+        return "schulaufgabe"
+    if "warning" in cls:
+        return "test"
+    if "info" in cls:
+        return "schule"
+    title = (title or "").strip()
+    if re.match(r"^(SA|Schulaufgabe)\b", title):
+        return "schulaufgabe"
+    if _TEST_RE.match(title):
+        return "test"
+    return "schule"
+
+
+def appointment_subject(title: str | None) -> str | None:
+    """Fach aus 'SA in Deutsch (Mü)' oder 'kLN in Französisch (8_F_8B_Ab) (Ab)'."""
+    if m := re.search(r"\bin\s+([^()]+?)\s*(\(|$)", title or ""):
+        return m[1].strip()
+    return None
+
+
 def _lines(tag: Any) -> list[str]:
     return [t.strip() for t in tag.find_all(string=True) if t.strip()]
 
@@ -679,6 +707,8 @@ __all__ = [
     "PortalResult",
     "SchulPortal",
     "async_validate",
+    "appointment_kind",
+    "appointment_subject",
     "parse_substitutions",
     "parse_timetable",
     "school_from_input",

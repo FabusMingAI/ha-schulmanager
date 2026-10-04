@@ -33,6 +33,10 @@ from .const import (
     ACTION_READ,
     ACTION_SNOOZE,
     AMPEL_GREEN,
+    APPT_EXAM,
+    APPT_TEST,
+    CONF_APPOINTMENT_KINDS,
+    DEFAULT_APPOINTMENT_KINDS,
     AMPEL_RED,
     AMPEL_YELLOW,
     CONF_AI_ENTITY,
@@ -81,6 +85,8 @@ from .const import (
     TASK_TYPE_ICONS,
 )
 from .portal import (
+    appointment_kind,
+    appointment_subject,
     PortalAuthError,
     PortalConnectionError,
     PortalFile,
@@ -343,6 +349,7 @@ class SchulManager:
                     "uid": a["uid"],
                     "title": a["title"],
                     "detail": a.get("detail"),
+                    "kind": a.get("kind"),
                     "start": a["start"].isoformat() if a["start"] else None,
                     "end": a["end"].isoformat() if a["end"] else None,
                 }
@@ -840,9 +847,15 @@ class SchulManager:
         """
         out: list[dict[str, Any]] = []
         tz = dt_util.get_default_time_zone()
+        kinds = set(self.opt(CONF_APPOINTMENT_KINDS, DEFAULT_APPOINTMENT_KINDS) or [])
         for a in self.data["appointments"].get(child, []):
             if not a.get("start"):
                 continue
+            kind = a.get("kind") or appointment_kind(None, a.get("title"))
+            if kind not in kinds:
+                continue
+            category = {APPT_EXAM: "schulaufgabe", APPT_TEST: "test"}.get(kind, "portal")
+            icon, label = EVENT_CATEGORIES[category]
             start = datetime.fromisoformat(a["start"])
             end = datetime.fromisoformat(a["end"]) if a.get("end") else start
             end = end - timedelta(hours=2)  # pyelternportal addiert 2 h
@@ -850,14 +863,15 @@ class SchulManager:
             out.append(
                 {
                     "uid": a["uid"],
-                    "summary": f"🏫 {a['title']}",
+                    "summary": f"{icon} {a['title']}",
                     "start": start.date(),
                     "end": max(end.date(), start.date()) + timedelta(days=1),
-                    "description": "Termin aus dem Eltern-Portal",
-                    "category": "portal",
-                    "icon": "🏫",
+                    "description": f"{label} (Eltern-Portal)",
+                    "category": category,
+                    "icon": icon,
                     "title": a["title"],
-                    "hover": f"{hover} – Termin aus dem Eltern-Portal",
+                    "hover": f"{hover} – {label}",
+                    "subject": appointment_subject(a.get("detail") or a["title"]),
                 }
             )
         for ev in self.data["events"].values():
@@ -1334,6 +1348,8 @@ class SchulManager:
                 day = start.date() if isinstance(start, datetime) else start
                 if day == today and not ev["uid"].startswith("frist-"):
                     lines.append(f"  {ev['icon']} Heute: {ev['title']}")
+                elif day == today + timedelta(days=1) and ev.get("category") in ("schulaufgabe", "test"):
+                    lines.append(f"  {ev['icon']} Morgen: {ev['title']}")
             if len(lines) == 1:
                 lines.append("  Alles erledigt.")
             blocks.append("\n".join(lines))

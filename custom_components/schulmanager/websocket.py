@@ -53,6 +53,7 @@ def _event_light(e: dict[str, Any]) -> dict[str, Any]:
         "location": e.get("location"),
         "item_uid": e.get("item_uid"),
         "task_id": e.get("task_id"),
+        "subject": e.get("subject"),
     }
 
 

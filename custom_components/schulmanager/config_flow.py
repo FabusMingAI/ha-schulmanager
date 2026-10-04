@@ -22,6 +22,7 @@ from .const import (
     CONF_AI_ENTITY,
     CONF_ANALYZE_DAYS,
     CONF_AUTO_DOWNLOAD,
+    CONF_APPOINTMENT_KINDS,
     CONF_DASHBOARD,
     CONF_DIGEST_ENABLED,
     CONF_DIGEST_TIME,
@@ -39,6 +40,8 @@ from .const import (
     CONF_TTS_TARGETS,
     DEFAULT_ANALYZE_DAYS,
     DEFAULT_AUTO_DOWNLOAD,
+    APPOINTMENT_KINDS,
+    DEFAULT_APPOINTMENT_KINDS,
     DEFAULT_DASHBOARD,
     DEFAULT_DIGEST_ENABLED,
     DEFAULT_DIGEST_TIME,
@@ -262,6 +265,16 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                 ),
                 vol.Optional(CONF_LOOKBACK_DAYS, **opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=7, max=400, unit_of_measurement="Tage", mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(
+                    CONF_APPOINTMENT_KINDS, **opt(CONF_APPOINTMENT_KINDS, DEFAULT_APPOINTMENT_KINDS)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=APPOINTMENT_KINDS,
+                        translation_key="appointment_kinds",
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
                 ),
                 vol.Optional(CONF_DASHBOARD, **opt(CONF_DASHBOARD, DEFAULT_DASHBOARD)): selector.SelectSelector(
                     selector.SelectSelectorConfig(

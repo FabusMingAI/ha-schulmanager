@@ -119,7 +119,7 @@ Events for your own automations: `schulmanager_new_item`, `schulmanager_task_rem
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, Schulmanager therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.
 - **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days.
-- **Timetable and substitution plan** are only available if the school has enabled them in Eltern-Portal. If the portal briefly returns an empty page, the last known plan is kept.
+- **Timetable, substitution plan and sick notes** are only available if the school has enabled them in Eltern-Portal. If such a page is missing or the portal drops the connection there, only that section is skipped (noted in `sensor.schulmanager_letzter_abruf`); everything else is still fetched. If the portal briefly returns an empty page, the last known data is kept.
 - **Unofficial:** Eltern-Portal has no public API. Access uses the library [pyelternportal](https://github.com/michull/pyelternportal), which reads the web pages. If the portal layout changes, single sections may stop working until an update; the error shows up in `sensor.schulmanager_letzter_abruf`.
 - **Sick notes** are only read, never submitted – report sickness in the portal as usual.
 - **Not yet included:** communication with the class teacher (only subject teachers) and the class register.

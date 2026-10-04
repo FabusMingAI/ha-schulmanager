@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 – 2026-10-04
+
+- Fix: if a school does not offer the timetable, substitution plan or sick notes page and the portal drops the connection there, only that section is skipped – the rest of the portal (letters, messages, tasks) is still fetched. In 0.6.0 the whole fetch for that school was aborted. / Behoben: Bietet eine Schule Stundenplan, Vertretungsplan oder Krankmeldungen nicht an und trennt das Portal dort die Verbindung, wird nur dieser Bereich übersprungen. In 0.6.0 brach der ganze Abruf dieser Schule ab.
+
 ## 0.6.0 – 2026-10-04
 
 - New: **sick notes** (*Krankmeldungen*) from Eltern-Portal (read only). Sensor `sensor.schule_<child>_krankmeldungen` with school days off sick in the current school year, sick notes in the calendar and in the appointments card (🤒, explained in the legend). An empty portal response keeps known sick notes. Closes #1. / Neu: **Krankmeldungen** aus dem Eltern-Portal (nur lesen) – Sensor mit Krankheitstagen im Schuljahr, Einträge im Kalender und in der Termin-Karte (🤒, in der Legende erklärt).

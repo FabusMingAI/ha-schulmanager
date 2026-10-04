@@ -35,7 +35,7 @@ The integration loads three cards automatically and places them in the "Schule" 
 
 Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt** (done) per child.
 
-<p align="center"><img src="docs/images/task-dialog.png" width="320" alt="Task details"></p>
+<p align="left"><img src="docs/images/task-dialog.png" width="320" alt="Task details"></p>
 
 - **Tap a task** to open its details: status **open / in progress / done**, change the due date, add your own **comment**, payment details with "copy" for IBAN and payment reference, plus the **source** with AI summary, original text, PDF and a link to Eltern-Portal.
 - **Tap a message** to see its text, the PDF and the tasks created from it; it is marked as read.
@@ -43,7 +43,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 ### Appointments & deadlines – `custom:schulmanager-termine`
 
-<p align="center"><img src="docs/images/termine.png" width="320" alt="Appointments with AI summary on hover"></p>
+<p align="left"><img src="docs/images/termine.png" width="320" alt="Appointments with AI summary on hover"></p>
 
 - All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks** and **all**.
 - **Hover an entry** to see the AI's short summary (tap once on phones). Clicking a deadline or an appointment taken from a letter opens its details.
@@ -51,13 +51,13 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 ### Timetable & substitutions – `custom:schulmanager-stundenplan`
 
-<p align="center"><img src="docs/images/stundenplan.png" width="320" alt="Timetable with substitutions"></p>
+<p align="left"><img src="docs/images/stundenplan.png" width="320" alt="Timetable with substitutions"></p>
 
-<p align="center"><img src="docs/images/stundenplan-woche.png" width="560" alt="Week view with substitutions and exams"></p>
+<p align="left"><img src="docs/images/stundenplan-woche.png" width="560" alt="Week view with substitutions and exams"></p>
 
-<p align="center"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, regenerate with `python docs/screenshots/make_screenshots.py`).</sub></p>
+<p align="left"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, regenerate with `python docs/screenshots/make_screenshots.py`).</sub></p>
 
-- Day view with times and rooms, switchable to the whole **week**. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view (used on the *Overview* tab).
+- Day view with times and rooms, switchable to the whole **week**. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
 - Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.

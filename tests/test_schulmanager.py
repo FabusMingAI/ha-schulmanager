@@ -613,6 +613,7 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     }
     child_view = json.dumps(cfg["views"][1])
     assert "custom:schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
+    assert '"view": "week"' in child_view
     assert os.path.isfile(hass.config.path("www", "schulmanager", "icon.png"))
 
     # eigene Änderung bleibt erhalten

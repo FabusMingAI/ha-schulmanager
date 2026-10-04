@@ -113,7 +113,8 @@ def _termine(child: str | None = None) -> dict[str, Any]:
     return card
 
 
-def _stundenplan(child: str, view: str | None = None) -> dict[str, Any]:
+def _stundenplan(child: str, view: str | None = "week") -> dict[str, Any]:
+    """Stundenplan-Karte; startet überall in der Wochenansicht (seit 0.7.3)."""
     card: dict[str, Any] = {"type": "custom:schulmanager-stundenplan", "child": child, "grid_options": {"columns": 12}}
     if view:
         card["view"] = view
@@ -195,7 +196,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                                 "heading": f"Stundenplan {child['name']}",
                                 "icon": "mdi:timetable",
                             },
-                            _stundenplan(key, view="week"),
+                            _stundenplan(key),
                         )
                     ],
                 },

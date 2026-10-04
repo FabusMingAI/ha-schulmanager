@@ -7,7 +7,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.7.2";
+  const VERSION = "0.7.3";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {

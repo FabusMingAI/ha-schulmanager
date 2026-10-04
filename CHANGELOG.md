@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.3 – 2026-10-04
+
+- Dashboard "Schule": all timetables (overview, child tabs, single page) start in the week view. / Alle Stundenpläne im Dashboard „Schule“ starten in der Wochenansicht.
+- README: images left-aligned. / README: Bilder linksbündig.
+
 ## 0.7.2 – 2026-10-04
 
 - Timetable card: the week view no longer needs horizontal scrolling in narrow cards (half a column on the *Overview* tab, child tabs, phones). Narrow cards use short subject names ("Mathe", "Engl.", "Reli/Eth") and short labels ("SA", "Vertr."). / Stundenplan: Wochenansicht ohne Querscrollen in schmalen Karten, mit abgekürzten Fächern.

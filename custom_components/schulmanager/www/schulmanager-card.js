@@ -6,7 +6,7 @@
  *   child: anna          # optional, ohne Angabe: alle Kinder
  */
 (() => {
-  const VERSION = "0.5.3";
+  const VERSION = "0.5.4";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -597,6 +597,27 @@
     return v.length > n ? v.slice(0, n - 1).trimEnd() + " …" : v;
   };
   const room = (r) => String(r || "").replace(/^\/+|\/+$/g, "");
+  // Änderung in Klartext, ohne Kürzel und ohne Stundennummer (steht schon in der Zeile)
+  const changeText = (e) => {
+    const subj = fullName(e.subject || e.old_subject || "");
+    const info = String(e.info || "").trim();
+    const r = room(e.room);
+    let t;
+    if (e.kind === "entfall") {
+      t = `${subj ? subj + " " : ""}entfällt`;
+      if (info && !/^entf[aä]llt\.?$/i.test(info)) t += ` – ${info}`;
+      return t;
+    }
+    if (e.kind === "raum") {
+      t = `Raumänderung${r ? ": Raum " + r : ""}`;
+      if (info && !/^raum(änderung|wechsel)\.?$/i.test(info)) t += ` – ${info}`;
+      return t;
+    }
+    t = `Vertretung${subj ? ": " + subj : ""}${e.substitute ? " bei " + e.substitute : ""}${r ? ", Raum " + r : ""}`;
+    if (e.old_subject) t += ` (statt ${fullName(e.old_subject)})`;
+    if (info) t += ` – ${info}`;
+    return t;
+  };
   const KIND_LABEL = { entfall: "entfällt", vertretung: "Vertretung", raum: "Raum" };
 
   class SchulmanagerTermineCard extends SchulmanagerCard {
@@ -860,14 +881,14 @@
             <span class="nr">${esc(l.lesson)}.</span>
             <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
             <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}</div>
-              ${ch.map((e) => `<div class="chg">${esc(e.text)}</div>`).join("")}</div>
+              ${ch.map((e) => `<div class="chg">${esc(changeText(e))}</div>`).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
           </div>`;
       }
       const rest = entries.filter((e, i) => !used.has(i));
       if (rest.length) {
         html += `<div class="day">Weitere Änderungen</div>`;
-        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div><div class="chg">${esc(e.text)}</div></div><span class="rm">${esc(e.room || "")}</span></div>`;
+        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div><div class="chg">${esc(changeText(e))}</div></div><span class="rm">${esc(e.room || "")}</span></div>`;
       }
       return html;
     }
@@ -887,7 +908,7 @@
           const l = c.timetable.find((x) => x.weekday === i + 1 && x.lesson === nr);
           const ch = (byDate[iso] || []).filter((e) => lessonNums(e.lesson).includes(String(nr)));
           const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
-          html += `<td class="${kind ? "chg-" + kind : ""}" title="${esc(ch.map((e) => e.text).join("\n") || l?.subject || "")}">${l ? esc(fullName(l.subject)) + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r">${KIND_LABEL[kind]}</div>` : ""}</td>`;
+          html += `<td class="${kind ? "chg-" + kind : ""}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? esc(fullName(l.subject)) + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r">${KIND_LABEL[kind]}</div>` : ""}</td>`;
         });
         html += `</tr>`;
       }

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schulmanager – Demo-Karten</title>
+<!--
+  Rendert die Lovelace-Karten des Schulmanagers ohne Home Assistant mit erfundenen
+  Demo-Daten (keine echten Namen, Lehrkräfte, Schulen oder Räume). Grundlage für die
+  Screenshots in docs/images – siehe make_screenshots.py.
+  Aufruf: demo.html?card=stundenplan|termine&view=day|week&theme=light|dark
+-->
+<style>
+  :root {
+    --primary-color: #03a9f4;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --divider-color: rgba(0,0,0,.12);
+    --card-background-color: #fff;
+    --ha-card-background: #fff;
+    --secondary-background-color: #f5f5f5;
+    --error-color: #db4437;
+    --warning-color: #ffa600;
+    --success-color: #43a047;
+    --text-primary-color: #fff;
+    --ha-card-border-radius: 12px;
+    font-family: Roboto, "Noto Sans", "DejaVu Sans", sans-serif, "Noto Color Emoji";
+    font-size: 14px;
+    color: var(--primary-text-color);
+  }
+  :root[data-theme="dark"] {
+    --primary-text-color: #e1e1e1;
+    --secondary-text-color: #9b9b9b;
+    --divider-color: rgba(225,225,225,.12);
+    --card-background-color: #1c1c1c;
+    --ha-card-background: #1c1c1c;
+    --secondary-background-color: #282828;
+  }
+  body { margin: 0; padding: 16px; background: #fafafa; width: max-content; }
+  :root[data-theme="dark"] body { background: #111; }
+  #wrap { width: var(--w, 380px); }
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<script>
+  // Minimaler Ersatz für <ha-card>
+  customElements.define("ha-card", class extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" }).innerHTML = `<style>:host{display:block;background:var(--ha-card-background);border-radius:var(--ha-card-border-radius);border:1px solid var(--divider-color);padding:12px 0 8px;color:var(--primary-text-color);overflow:hidden}</style><slot></slot>`;
+    }
+  });
+
+  const TODAY = "2026-10-05"; // Montag
+  const T = [["08:00","08:45"],["08:50","09:35"],["09:55","10:40"],["10:45","11:30"],["11:45","12:30"],["12:35","13:20"],["14:00","14:45"],["14:50","15:35"]];
+  const plan = (rows) => rows.flatMap(([wd, subjects]) => subjects.map((s, i) => s && ({
+    weekday: wd, lesson: String(i + 1), start: T[i][0], end: T[i][1], subject: s[0], room: s[1],
+  })).filter(Boolean));
+
+  const anna = {
+    key: "anna", name: "Anna", classname: "7B", school: "Beispiel-Gymnasium", ampel: "gelb",
+    tasks: [], items: [], unread: 0, overdue: 0,
+    timetable: plan([
+      [1, [["D","204"],["D","204"],["M","204"],["B","BioS"],["Ev/K/Eth","112"],["E","204"]]],
+      [2, [["M","204"],["F","204"],["G","108"],["Ku","Ku1"],["Ku","Ku1"],["D","204"]]],
+      [3, [["M","204"],["E","204"],["Ph","PhS"],["B","BioS"],["G","108"],["Sm/Sw","TH2"],["Sm/Sw","TH2"]]],
+      [4, [["F","204"],["E","204"],["Mu","Mu2"],["M","204"],["Geo","110"],["Ev/K/Eth","112"]]],
+      [5, [["E","204"],["D","204"],["F","204"],["NuT_Inf","PC1"],["NuT_Inf","PC1"],["MInt","204"]]],
+    ]),
+    substitutions: {
+      available: true, stand: "05.10. 07:12",
+      days: [
+        { date: "2026-10-05", entries: [
+          { lesson: "4", kind: "raum", subject: "B", room: "C104", info: "" },
+        ]},
+        { date: "2026-10-07", entries: [
+          { lesson: "3", kind: "vertretung", subject: "Ph", substitute: "Hr. Beispiel", room: "PhS", info: "Aufgaben im Buch S. 42" },
+          { lesson: "4", kind: "entfall", subject: "B", info: "" },
+          { lesson: "5", kind: "raum", subject: "G", room: "214", info: "" },
+        ]},
+        { date: "2026-10-08", entries: [] },
+      ],
+    },
+    events: [
+      { uid: "e1", date: "2026-10-07", category: "schulaufgabe", icon: "📝", subject: "Englisch", title: "1. Schulaufgabe Englisch",
+        hover: "Unit 1 und 2: Simple past, Vokabeln S. 180–186, kurzer Brief schreiben." },
+      { uid: "e2", date: "2026-10-09", category: "test", icon: "✏️", subject: "Mathematik", title: "Stegreifaufgabe Mathematik (angekündigt)",
+        hover: "Bruchrechnen: Kürzen, Erweitern, Addieren." },
+      { uid: "e3", date: "2026-10-07", time: "09:55", time_end: "10:40", category: "vertretung", icon: "🔁", title: "3. Std. Physik: Vertretung",
+        hover: "Vertretung bei Hr. Beispiel, Raum PhS – Aufgaben im Buch S. 42" },
+      { uid: "e4", date: "2026-10-07", time: "10:45", time_end: "11:30", category: "entfall", icon: "❌", title: "4. Std. Biologie entfällt", hover: "" },
+      { uid: "e5", date: "2026-10-08", until: "2026-10-12", category: "frist_zahlung", icon: "💶", title: "Wandertag: 12,50 € überweisen", task_id: "t1",
+        hover: "Busfahrt und Eintritt Tierpark. Überweisung an das Schulkonto, Verwendungszweck: Wandertag 7B Anna." },
+      { uid: "e6", date: "2026-10-14", time: "08:00", category: "termin", icon: "📅", title: "Wandertag Tierpark", location: "Treffpunkt Haupteingang",
+        hover: "Rucksack mit Brotzeit und Trinkflasche, wetterfeste Kleidung. Rückkehr ca. 14 Uhr." },
+    ],
+  };
+  const max = {
+    key: "max", name: "Max", classname: "5A", school: "Muster-Realschule", ampel: "gruen",
+    tasks: [], items: [], unread: 0, overdue: 0, timetable: [], substitutions: { available: false, days: [] },
+    events: [
+      { uid: "b1", date: "2026-10-05", until: "2026-10-06", category: "frist_unterschrift", icon: "✍️", title: "Einverständnis Schwimmunterricht unterschreiben", task_id: "t2",
+        hover: "Formular unterschrieben bis Dienstag in der Klassenleitung abgeben." },
+      { uid: "b2", date: "2026-10-08", category: "schulaufgabe", icon: "📝", subject: "Deutsch", title: "1. Schulaufgabe Deutsch",
+        hover: "Erzählung schreiben: Erlebniserzählung mit Spannungsbogen." },
+      { uid: "b3", date: "2026-10-09", category: "portal", icon: "🏫", title: "Elternabend 5. Klassen, 19:00 Uhr",
+        hover: "Aula. Vorstellung der Klassenleitungen und Fahrtenprogramm." },
+    ],
+  };
+
+  const LEGEND = {
+    schulaufgabe: ["📝","Schulaufgabe"], test: ["✏️","Test / Kurzarbeit / Stegreifaufgabe"], portal: ["🏫","Termin der Schule"],
+    termin: ["📅","Termin aus einer Mitteilung"], entfall: ["❌","Stunde entfällt"], vertretung: ["🔁","Vertretung / Änderung"],
+    raum: ["🚪","Raumänderung"], krank: ["🤒","Krankmeldung"],
+    frist_aufgabe: ["✅","Frist: Aufgabe"], frist_zahlung: ["💶","Frist: Zahlung"], frist_rueckmeldung: ["↩️","Frist: Rückmeldung"],
+    frist_unterschrift: ["✍️","Frist: Unterschrift"], frist_mitbringen: ["🎒","Frist: Mitbringen"], frist_lesen: ["📖","Frist: Lesen"],
+  };
+
+  const q = new URLSearchParams(location.search);
+  const card = q.get("card") || "stundenplan";
+  const theme = q.get("theme") || "light";
+  document.documentElement.dataset.theme = theme;
+  if (q.get("w")) document.documentElement.style.setProperty("--w", q.get("w") + "px");
+  const children = card === "termine" ? [anna, max] : [anna];
+
+  // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
+  window.hass = {
+    callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, last_update: null, errors: {} } : {},
+    callService: async () => {},
+    connection: { subscribeMessage: () => Promise.resolve(() => {}) },
+  };
+
+  const s = document.createElement("script");
+  s.src = "../../custom_components/schulmanager/www/schulmanager-card.js";
+  s.onload = () => {
+    const el = document.createElement("schulmanager-" + card);
+    el.setConfig({});
+    document.getElementById("wrap").appendChild(el);
+    el.hass = window.hass;
+    window.cardEl = el;
+  };
+  document.head.appendChild(s);
+</script>
+</body>
+</html>

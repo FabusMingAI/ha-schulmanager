@@ -53,6 +53,10 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="center"><img src="docs/images/stundenplan.png" width="320" alt="Timetable with substitutions"></p>
 
+<p align="center"><img src="docs/images/stundenplan-woche.png" width="560" alt="Week view with substitutions and exams"></p>
+
+<p align="center"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, regenerate with `python docs/screenshots/make_screenshots.py`).</sub></p>
+
 - Day view with times and rooms, switchable to the whole **week**. In the morning it shows today; after the last lesson and at weekends it shows the next school day.
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
 - Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.

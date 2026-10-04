@@ -48,6 +48,10 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 <p align="center"><img src="docs/images/stundenplan.png" width="320" alt="Stundenplan mit Vertretungen"></p>
 
+<p align="center"><img src="docs/images/stundenplan-woche.png" width="560" alt="Wochenansicht mit Vertretungen und Leistungsnachweisen"></p>
+
+<p align="center"><sub>Die Screenshots zeigen erfundene Demo-Daten (`docs/screenshots/demo.html`, neu erzeugen mit `python docs/screenshots/make_screenshots.py`).</sub></p>
+
 - Tagesansicht mit Uhrzeit und Raum, umschaltbar auf die **Woche**. Vormittags zeigt sie den heutigen Tag, nach Schulschluss und am Wochenende den nächsten Schultag.
 - Fächer stehen **ausgeschrieben** da („Biologie“ statt „B“, „Mathematik (Intensivierung)“ statt „MInt“, „Sport“ statt „Sm/Sw“). Das Original-Kürzel erscheint, wenn man mit der Maus darauf zeigt.
 - Änderungen aus dem Vertretungsplan sind farbig markiert: rot = entfällt, orange = Vertretung oder Raumänderung. Die Zahl an den Wochentagen zeigt, wie viele Änderungen anstehen.

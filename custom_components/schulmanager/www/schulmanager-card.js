@@ -1,10 +1,12 @@
 /* Schulmanager-Karte für Home Assistant – Aufgaben und Mitteilungen pro Kind.
  * Wird von der Integration automatisch geladen. Verwendung im Dashboard:
- *   type: custom:schulmanager-card
+ *   type: custom:schulmanager-card         # Aufgaben & Mitteilungen
+ *   type: custom:schulmanager-termine      # Termine & Fristen mit Legende
+ *   type: custom:schulmanager-stundenplan  # Stundenplan mit Vertretungen
  *   child: anna          # optional, ohne Angabe: alle Kinder
  */
 (() => {
-  const VERSION = "0.3.1";
+  const VERSION = "0.5.3";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -111,6 +113,58 @@
     details summary { cursor:pointer; color: var(--primary-color); margin-top:8px; }
     .saved { color: var(--success-color,#43a047); font-size:.85em; margin-left:8px; }
     .warn { color: var(--warning-color,#ffa600); font-size:.85em; }
+    .tip { position: fixed; z-index: 10000; max-width: min(360px, 90vw); background: var(--card-background-color, #fff); color: var(--primary-text-color); border:1px solid var(--divider-color); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.35); padding: 10px 12px; font-size: .9em; line-height:1.4; pointer-events:none; }
+    .tip b { display:block; margin-bottom:4px; font-weight:600; }
+    .tip .k { color: var(--secondary-text-color); font-size:.85em; margin-top:6px; }
+    .day { padding: 10px 16px 2px; font-size:.8em; text-transform:uppercase; letter-spacing:.04em; color: var(--secondary-text-color); }
+    .day.today { color: var(--primary-color); font-weight:600; }
+    .day.over { color: var(--error-color,#db4437); font-weight:600; }
+    .ev { display:flex; align-items:flex-start; gap:10px; padding: 6px 16px; cursor:pointer; }
+    .ev:hover { background: var(--secondary-background-color); }
+    .ev .ic { width: 1.6em; text-align:center; flex:none; font-size:1.05em; line-height:1.4; }
+    .ev .tm { width: 3.2em; flex:none; font-size:.85em; color: var(--secondary-text-color); line-height:1.6; }
+    .ev .main { flex:1; min-width:0; }
+    .ev .t { line-height:1.4; }
+    .ev .hv { display:none; font-size:.85em; color: var(--secondary-text-color); margin-top:2px; }
+    .ev.open .hv { display:block; }
+    .ev .who { font-size:.75em; padding:1px 7px; border-radius:9px; color:#fff; flex:none; margin-top:2px; }
+    .ev.entfall .t { color: var(--error-color,#db4437); }
+    .ev.vertretung .t, .ev.raum .t { color: var(--warning-color,#e08a00); }
+    .legend { border-top:1px solid var(--divider-color); margin-top:8px; padding: 8px 16px 6px; display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.8em; color: var(--secondary-text-color); }
+    .legend .lt { width:100%; text-transform:uppercase; letter-spacing:.04em; font-size:.9em; }
+    .legend span { white-space:nowrap; }
+    .legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+    .bar { display:flex; gap:6px; padding: 0 16px 6px; flex-wrap:wrap; align-items:center; }
+    .pill { border:1px solid var(--divider-color); background:none; border-radius:16px; padding:4px 12px; cursor:pointer; font: inherit; font-size:.85em; color: var(--primary-text-color); }
+    .pill.on { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color,#fff); }
+    .pill .n { display:inline-block; min-width:1.2em; margin-left:4px; border-radius:8px; background: var(--warning-color,#ffa600); color:#fff; font-size:.8em; padding:0 4px; }
+    .pill.today { font-weight:600; }
+    .les { display:flex; align-items:center; gap:10px; padding: 7px 16px; }
+    .les + .les { border-top: 1px solid var(--divider-color); }
+    .les .nr { width:1.8em; text-align:right; font-weight:600; flex:none; }
+    .les .tm { width:6.6em; flex:none; font-size:.82em; color: var(--secondary-text-color); white-space:nowrap; }
+    .les .main { flex:1; min-width:0; }
+    .les .sj { font-weight:500; }
+    .les .ln { font-size:.8em; color: var(--secondary-text-color); }
+    .les .rm { font-size:.85em; color: var(--secondary-text-color); white-space:nowrap; }
+    .les.now { background: rgba(3,169,244,.08); }
+    .les.entfall .sj { text-decoration: line-through; color: var(--secondary-text-color); }
+    .badge { display:inline-block; font-size:.75em; padding:1px 7px; border-radius:9px; margin-left:6px; vertical-align:middle; }
+    .badge.entfall { background: rgba(219,68,55,.15); color: var(--error-color,#db4437); }
+    .badge.vertretung, .badge.raum { background: rgba(255,166,0,.18); color: var(--warning-color,#e08a00); }
+    .chg { font-size:.82em; color: var(--warning-color,#e08a00); margin-top:2px; }
+    .les.entfall .chg { color: var(--error-color,#db4437); }
+    .wk { overflow-x:auto; padding: 0 12px 4px; }
+    .wk table { border-collapse: collapse; width:100%; min-width: 520px; font-size:.82em; table-layout: fixed; }
+    .wk th:first-child { width: 3.4em; }
+    .wk td { overflow-wrap:anywhere; }
+    .wk th, .wk td { border:1px solid var(--divider-color); padding:4px 5px; text-align:center; vertical-align:top; }
+    .wk th { color: var(--secondary-text-color); font-weight:500; }
+    .wk th.today { color: var(--primary-color); }
+    .wk td.chg-entfall { background: rgba(219,68,55,.12); }
+    .wk td.chg-vertretung, .wk td.chg-raum { background: rgba(255,166,0,.15); }
+    .wk .r { color: var(--secondary-text-color); font-size:.9em; }
+    .info { padding: 4px 16px 8px; font-size:.82em; color: var(--secondary-text-color); }
   `;
 
   class SchulmanagerCard extends HTMLElement {
@@ -465,15 +519,390 @@
     }
   }
 
-  if (!customElements.get("schulmanager-card")) {
-    customElements.define("schulmanager-card", SchulmanagerCard);
-    window.customCards = window.customCards || [];
-    window.customCards.push({
-      type: "schulmanager-card",
-      name: "Schulmanager",
-      description: "Aufgaben und Mitteilungen aus dem Eltern-Portal – klickbar mit Status, Kommentar und PDF.",
-      preview: false,
-    });
-    console.info(`%c SCHULMANAGER-CARD %c ${VERSION} `, "background:#03a9f4;color:#fff", "");
+
+  // ================================================================
+  // Gemeinsame Helfer für Termine und Stundenplan
+  // ================================================================
+  const WD = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const WD_LONG = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+  const CHILD_COLORS = ["#1e88e5", "#8e24aa", "#00897b", "#f4511e", "#6d4c41"];
+  const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parseDay = (iso) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const addDays = (iso, n) => {
+    const d = parseDay(iso);
+    d.setDate(d.getDate() + n);
+    return isoDay(d);
+  };
+  const dayLabel = (iso, today) => {
+    const d = parseDay(iso);
+    const base = `${WD[d.getDay()]} ${fmtShort(iso)}`;
+    if (iso === today) return `Heute · ${base}`;
+    if (iso === addDays(today, 1)) return `Morgen · ${base}`;
+    if (iso === addDays(today, -1)) return `Gestern · ${base}`;
+    return base;
+  };
+  // Fächer-Kürzel bayerischer Schulen -> Klartext (nur zur Anzeige)
+  const SUBJECTS = {
+    D: "Deutsch", M: "Mathematik", E: "Englisch", F: "Französisch", L: "Latein", Sp: "Spanisch", Spa: "Spanisch", It: "Italienisch", Gr: "Griechisch",
+    Ku: "Kunst", Mu: "Musik", Geo: "Geographie", G: "Geschichte", B: "Biologie", C: "Chemie", Ph: "Physik", Inf: "Informatik", NuT: "Natur und Technik",
+    WR: "Wirtschaft und Recht", Sk: "Sozialkunde", PuG: "Politik und Gesellschaft", Ev: "Ev. Religion", K: "Kath. Religion", Eth: "Ethik",
+    Sm: "Sport (Jungen)", Sw: "Sport (Mädchen)", S: "Sport", Smw: "Sport", IntÜ: "Intensivierung", Int: "Intensivierung", Ch: "Chor", Orch: "Orchester",
+    Wi: "Wirtschaftsinformatik", Chor: "Chor", TTennis: "Tischtennis", Schwim: "Schwimmen", Fussball: "Fußball", Stimm: "Stimmbildung", Schach: "Schach", Big: "Big Band", Theater: "Theater", MbO: "Berufsorientierung", BO: "Berufsorientierung", P: "Profilfach", PSem: "P-Seminar", WSem: "W-Seminar", KR: "Klassenleiterstunde", KLS: "Klassenleiterstunde",
+  };
+  // Kürzel -> Klartext, z. B. "B" -> "Biologie", "MInt" -> "Mathematik (Intensivierung)",
+  // "Sm/Sw" -> "Sport", "Ev/K/Eth" -> "Religion / Ethik", "Ku_Wahl_Foto" -> "Kunst (Wahlfach)"
+  const SUFFIX = [[/Wahl/i, "Wahlfach"], [/^Int|_Int/, "Intensivierung"], [/(^|_)F[öo]/, "Förderunterricht"]];
+  const SPORT = new Set(["Sm", "Sw", "S", "Smw"]);
+  const RELIGION = new Set(["Ev", "K", "Eth"]);
+  const partName = (p) => {
+    if (SPORT.has(p)) return "Sport";
+    if (SUBJECTS[p]) return SUBJECTS[p];
+    // iF / iL = Intensivierung, PhÜ = Übung
+    if (/^i[A-ZÄÖÜ]/.test(p) && SUBJECTS[p.slice(1)]) return `${SUBJECTS[p.slice(1)]} (Intensivierung)`;
+    if (/Ü$/.test(p) && SUBJECTS[p.slice(0, -1)]) return `${SUBJECTS[p.slice(0, -1)]} (Übung)`;
+    // Fach + Zusatz direkt angehängt (MInt) oder mit Unterstrich (D_Fö, Ku_Wahl_Foto, NuT_NWw)
+    const m = p.match(/^([A-ZÄÖÜ][a-zäöü]*?)_?((?:Int|Wahl|F[öo])\w*)?(?:_(.*))?$/);
+    const pieces = p.split("_");
+    for (const [base, rest] of [[pieces[0], pieces.slice(1).join("_")], [m && m[1], m && (m[2] || "")]]) {
+      if (!base || !(SUBJECTS[base] || SPORT.has(base))) continue;
+      const name = SPORT.has(base) ? "Sport" : SUBJECTS[base];
+      const extra = SUFFIX.find(([re]) => re.test(rest || ""));
+      if (base === "Big" && /^Band/.test(rest || "")) return /Wahl/i.test(rest) ? "Big Band (Wahlfach)" : "Big Band";
+      return extra ? `${name} (${extra[1]})` : name;
+    }
+    const wahl = p.match(/^(.*?)_Wahl/i);
+    if (wahl) return `${wahl[1].replace(/_/g, " ")} (Wahlfach)`;
+    return p.replace(/_/g, " ");
+  };
+  const fullName = (s) => {
+    if (!s) return "";
+    const parts = String(s).split("/").map((x) => x.trim()).filter(Boolean);
+    if (parts.length > 1 && parts.every((x) => RELIGION.has(x))) return "Religion / Ethik";
+    return [...new Set(parts.map(partName))].join(" / ");
+  };
+  const lessonNums = (txt) => {
+    const nums = String(txt || "").match(/\d+/g) || [];
+    if (nums.length === 2 && /-|–|bis/.test(txt)) {
+      const out = [];
+      for (let i = Number(nums[0]); i <= Number(nums[1]); i++) out.push(String(i));
+      return out;
+    }
+    return nums;
+  };
+  const clip = (t, n = 280) => {
+    const v = String(t || "").replace(/\s+/g, " ").trim();
+    return v.length > n ? v.slice(0, n - 1).trimEnd() + " …" : v;
+  };
+  const room = (r) => String(r || "").replace(/^\/+|\/+$/g, "");
+  const KIND_LABEL = { entfall: "entfällt", vertretung: "Vertretung", raum: "Raum" };
+
+  class SchulmanagerTermineCard extends SchulmanagerCard {
+    getCardSize() {
+      return 6;
+    }
+
+    _render() {
+      const root = this.shadowRoot;
+      const keepDialog = root.querySelector(".ov");
+      let html = `<style>${STYLE}</style><ha-card>`;
+      if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      else if (!this._data) html += `<div class="empty">Lade …</div>`;
+      else html += this._agendaHtml();
+      html += `</ha-card>`;
+      root.innerHTML = html;
+      if (keepDialog) root.appendChild(keepDialog);
+      this._bindAgenda();
+    }
+
+    _agendaHtml() {
+      const d = this._data;
+      const today = d.today || isoDay(new Date());
+      const multi = d.children.length > 1;
+      const colors = {};
+      d.children.forEach((c, i) => (colors[c.key] = CHILD_COLORS[i % CHILD_COLORS.length]));
+      this._events = {};
+      let events = [];
+      for (const c of d.children) for (const e of c.events || []) {
+        const key = `${c.key}:${e.uid}`;
+        this._events[key] = { ...e, child: c.key, child_name: c.name };
+        events.push(this._events[key]);
+      }
+      const range = this._range || "2w";
+      const limit = range === "2w" ? addDays(today, 14) : addDays(today, 400);
+      const shown = events.filter((e) => e.date <= limit);
+      const hidden = events.length - shown.length;
+      shown.sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")) || a.title.localeCompare(b.title));
+      const groups = [];
+      const over = shown.filter((e) => (e.until || e.date) < today && e.task_id);
+      if (over.length) groups.push(["over", "Überfällig", over]);
+      const byDay = {};
+      for (const e of shown) {
+        if ((e.until || e.date) < today && e.task_id) continue;
+        const day = e.date < today && e.until ? today : e.date;
+        (byDay[day] = byDay[day] || []).push(e);
+      }
+      for (const day of Object.keys(byDay).sort()) groups.push([day, dayLabel(day, today), byDay[day]]);
+      let html = `<div class="bar">
+          <button class="pill ${range === "2w" ? "on" : ""}" data-range="2w">Nächste 2 Wochen</button>
+          <button class="pill ${range === "all" ? "on" : ""}" data-range="all">Alle${range === "2w" && hidden ? ` (+${hidden})` : ""}</button>
+        </div>`;
+      if (!groups.length) html += `<div class="empty">Keine Termine ${range === "2w" ? "in den nächsten zwei Wochen" : "geplant"} 🎉</div>`;
+      for (const [key, label, list] of groups) {
+        html += `<div class="day ${key === today ? "today" : key === "over" ? "over" : ""}">${esc(label)}</div>`;
+        for (const e of list) {
+          const sub = e.category === "entfall" || e.category === "vertretung" || e.category === "raum" ? e.category : "";
+          const time = e.time ? e.time : e.until ? "bis " + fmtShort(e.until) : "";
+          html += `<div class="ev ${sub}" data-ev="${esc(e.child + ":" + e.uid)}">
+              <span class="ic">${esc(e.icon)}</span>
+              <span class="tm">${esc(time)}</span>
+              <div class="main"><div class="t">${esc(e.title)}</div>
+                <div class="hv">${esc(clip(e.hover))}</div></div>
+              ${multi ? `<span class="who" style="background:${colors[e.child]}">${esc(e.child_name)}</span>` : ""}
+            </div>`;
+        }
+      }
+      // Legende: alle Kategorien, die in der Liste vorkommen
+      const legend = d.legend || {};
+      const cats = [...new Set(shown.map((e) => e.category))];
+      const order = Object.keys(legend);
+      cats.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      if (cats.length || multi) {
+        html += `<div class="legend"><span class="lt">Legende</span>`;
+        for (const c of cats) {
+          const [icon, label] = legend[c] || ["📅", c];
+          html += `<span>${esc(icon)} ${esc(label)}</span>`;
+        }
+        if (multi) for (const c of d.children) html += `<span><i style="background:${colors[c.key]}"></i>${esc(c.name)}</span>`;
+        html += `</div><div class="info">Maus auf einen Eintrag halten (am Handy antippen) zeigt die Kurzbeschreibung.</div>`;
+      }
+      return html;
+    }
+
+    _bindAgenda() {
+      const root = this.shadowRoot;
+      root.querySelectorAll("[data-range]").forEach((el) =>
+        el.addEventListener("click", () => {
+          this._range = el.dataset.range;
+          this._render();
+        })
+      );
+      const touch = window.matchMedia && window.matchMedia("(hover: none)").matches;
+      root.querySelectorAll("[data-ev]").forEach((el) => {
+        const ev = this._events[el.dataset.ev];
+        if (!ev) return;
+        if (!touch) {
+          el.addEventListener("mouseenter", (m) => this._showTip(ev, m));
+          el.addEventListener("mousemove", (m) => this._moveTip(m));
+          el.addEventListener("mouseleave", () => this._hideTip());
+        }
+        el.addEventListener("click", () => {
+          this._hideTip();
+          if (touch && !el.classList.contains("open") && ev.hover) {
+            el.classList.add("open");
+            return;
+          }
+          if (ev.task_id) this._openTask(ev.task_id);
+          else if (ev.item_uid) this._openItem(ev.item_uid);
+          else el.classList.toggle("open");
+        });
+      });
+    }
+
+    _showTip(ev, m) {
+      this._hideTip();
+      const legend = (this._data && this._data.legend) || {};
+      const cat = legend[ev.category];
+      const tip = document.createElement("div");
+      tip.className = "tip";
+      const when = `${dayLabel(ev.date, this._data.today)}${ev.time ? ", " + ev.time + (ev.time_end && ev.time_end !== ev.time ? "–" + ev.time_end : "") : ""}${ev.until ? " bis " + fmtShort(ev.until) : ""}`;
+      tip.innerHTML = `<b>${esc(ev.icon)} ${esc(ev.title)}</b>
+        ${ev.hover ? `<div>${esc(clip(ev.hover))}</div>` : ""}
+        <div class="k">${esc(when)}${ev.location ? " · " + esc(ev.location) : ""}${cat ? " · " + esc(cat[1]) : ""}${this._data.children.length > 1 ? " · " + esc(ev.child_name) : ""}</div>
+        ${ev.task_id || ev.item_uid ? `<div class="k">Klicken für Details</div>` : ""}`;
+      this.shadowRoot.appendChild(tip);
+      this._tip = tip;
+      this._moveTip(m);
+    }
+
+    _moveTip(m) {
+      const tip = this._tip;
+      if (!tip) return;
+      const pad = 14;
+      let x = m.clientX + pad;
+      let y = m.clientY + pad;
+      const r = tip.getBoundingClientRect();
+      if (x + r.width > window.innerWidth - 8) x = Math.max(8, m.clientX - r.width - pad);
+      if (y + r.height > window.innerHeight - 8) y = Math.max(8, m.clientY - r.height - pad);
+      tip.style.left = `${x}px`;
+      tip.style.top = `${y}px`;
+    }
+
+    _hideTip() {
+      if (this._tip) this._tip.remove();
+      this._tip = null;
+    }
   }
+
+  class SchulmanagerStundenplanCard extends SchulmanagerCard {
+    getCardSize() {
+      return 7;
+    }
+
+    _render() {
+      const root = this.shadowRoot;
+      const keepDialog = root.querySelector(".ov");
+      let html = `<style>${STYLE}</style><ha-card>`;
+      if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      else if (!this._data) html += `<div class="empty">Lade …</div>`;
+      else if (!this._data.children.length) html += `<div class="empty">Keine Kinder gefunden.</div>`;
+      else for (const c of this._data.children) html += this._planHtml(c);
+      html += `</ha-card>`;
+      root.innerHTML = html;
+      if (keepDialog) root.appendChild(keepDialog);
+      root.querySelectorAll("[data-day]").forEach((el) =>
+        el.addEventListener("click", () => {
+          this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.day };
+          this._week = { ...(this._week || {}), [el.dataset.child]: false };
+          this._render();
+        })
+      );
+      root.querySelectorAll("[data-week]").forEach((el) =>
+        el.addEventListener("click", () => {
+          this._week = { ...(this._week || {}), [el.dataset.week]: !(this._week || {})[el.dataset.week] };
+          this._render();
+        })
+      );
+    }
+
+    // Datum des nächsten (oder heutigen) Tages mit diesem Wochentag
+    _dateFor(weekday, today) {
+      const t = parseDay(today);
+      let diff = weekday - (t.getDay() || 7);
+      if (diff < 0) diff += 7;
+      return addDays(today, diff);
+    }
+
+    _defaultDay(c, today) {
+      const now = new Date();
+      const wd = parseDay(today).getDay();
+      const todays = c.timetable.filter((l) => l.weekday === wd);
+      const last = todays.length ? todays[todays.length - 1].end : null;
+      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      if (wd >= 1 && wd <= 5 && todays.length && (!last || hhmm < last)) return today;
+      // sonst: nächster Schultag
+      for (let i = 1; i <= 7; i++) {
+        const iso = addDays(today, i);
+        const w = parseDay(iso).getDay();
+        if (w >= 1 && w <= 5 && (c.timetable.some((l) => l.weekday === w) || !c.timetable.length)) return iso;
+      }
+      return today;
+    }
+
+    _planHtml(c) {
+      const today = this._data.today || isoDay(new Date());
+      const subst = c.substitutions || { days: [] };
+      const byDate = {};
+      for (const d of subst.days || []) byDate[d.date] = d.entries;
+      const sel = (this._sel || {})[c.key] || this._defaultDay(c, today);
+      const multi = this._data.children.length > 1;
+      let html = `<div class="child">`;
+      if (multi || this._config.show_name) html += `<div class="head"><div class="name">${esc(c.name)}</div>${c.classname ? `<div class="sub">Klasse ${esc(c.classname)}</div>` : ""}</div>`;
+      // Tagesauswahl Mo–Fr (+ Tage aus dem Vertretungsplan)
+      html += `<div class="bar">`;
+      for (let wd = 1; wd <= 5; wd++) {
+        const iso = this._dateFor(wd, today);
+        const n = (byDate[iso] || []).length;
+        html += `<button class="pill ${iso === sel && !(this._week || {})[c.key] ? "on" : ""} ${iso === today ? "today" : ""}" data-child="${esc(c.key)}" data-day="${iso}" title="${WD_LONG[wd]} ${fmtShort(iso)}">${WD[wd]}${n ? `<span class="n">${n}</span>` : ""}</button>`;
+      }
+      html += `<button class="pill ${(this._week || {})[c.key] ? "on" : ""}" data-week="${esc(c.key)}">Woche</button></div>`;
+
+      if ((this._week || {})[c.key]) html += this._weekHtml(c, today, byDate);
+      else html += this._dayHtml(c, sel, today, byDate[sel] || [], byDate.hasOwnProperty(sel));
+
+      // Vertretungsplan-Überblick
+      const days = (subst.days || []).filter((d) => d.date >= today);
+      if (!subst.available && !days.length) {
+        html += `<div class="info">Vertretungsplan: im Portal nicht verfügbar oder noch nicht abgerufen.</div>`;
+      } else {
+        const parts = days.map((d) => `${dayLabel(d.date, today).split(" · ")[0]}: ${d.entries.length ? d.entries.length + " Änderung" + (d.entries.length > 1 ? "en" : "") : "keine Änderungen"}`);
+        html += `<div class="info">🔁 Vertretungsplan${subst.stand ? ` (Stand ${esc(subst.stand)})` : ""}: ${esc(parts.join(" · ") || "keine Einträge")}</div>`;
+      }
+      html += `</div>`;
+      return html;
+    }
+
+    _dayHtml(c, iso, today, entries, known) {
+      const wd = parseDay(iso).getDay();
+      const lessons = c.timetable.filter((l) => l.weekday === wd);
+      const used = new Set();
+      const changes = (nr) =>
+        entries.filter((e, i) => {
+          const hit = lessonNums(e.lesson).includes(String(nr));
+          if (hit) used.add(i);
+          return hit;
+        });
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      let html = `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
+      if (!c.timetable.length) html += `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
+      else if (!lessons.length) html += `<div class="empty">Kein Unterricht laut Stundenplan.</div>`;
+      for (const l of lessons) {
+        const ch = changes(l.lesson);
+        const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
+        const isNow = iso === today && l.start && l.end && hhmm >= l.start && hhmm < l.end;
+        const long = fullName(l.subject);
+        html += `<div class="les ${kind} ${isNow ? "now" : ""}">
+            <span class="nr">${esc(l.lesson)}.</span>
+            <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
+            <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}</div>
+              ${ch.map((e) => `<div class="chg">${esc(e.text)}</div>`).join("")}</div>
+            <span class="rm">${esc(room(l.room))}</span>
+          </div>`;
+      }
+      const rest = entries.filter((e, i) => !used.has(i));
+      if (rest.length) {
+        html += `<div class="day">Weitere Änderungen</div>`;
+        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div><div class="chg">${esc(e.text)}</div></div><span class="rm">${esc(e.room || "")}</span></div>`;
+      }
+      return html;
+    }
+
+    _weekHtml(c, today, byDate) {
+      if (!c.timetable.length) return `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
+      const nums = [...new Set(c.timetable.map((l) => l.lesson))].sort((a, b) => Number(a) - Number(b));
+      const times = {};
+      for (const l of c.timetable) if (l.start && !times[l.lesson]) times[l.lesson] = l.start;
+      let html = `<div class="wk"><table><tr><th></th>`;
+      const dates = [1, 2, 3, 4, 5].map((wd) => this._dateFor(wd, today));
+      dates.forEach((iso, i) => (html += `<th class="${iso === today ? "today" : ""}">${WD[i + 1]} ${fmtShort(iso)}</th>`));
+      html += `</tr>`;
+      for (const nr of nums) {
+        html += `<tr><th>${esc(nr)}.<div class="r">${esc(times[nr] || "")}</div></th>`;
+        dates.forEach((iso, i) => {
+          const l = c.timetable.find((x) => x.weekday === i + 1 && x.lesson === nr);
+          const ch = (byDate[iso] || []).filter((e) => lessonNums(e.lesson).includes(String(nr)));
+          const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
+          html += `<td class="${kind ? "chg-" + kind : ""}" title="${esc(ch.map((e) => e.text).join("\n") || l?.subject || "")}">${l ? esc(fullName(l.subject)) + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r">${KIND_LABEL[kind]}</div>` : ""}</td>`;
+        });
+        html += `</tr>`;
+      }
+      return html + `</table></div><div class="info">Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum).</div>`;
+    }
+  }
+
+  const define = (tag, cls, name, description) => {
+    if (customElements.get(tag)) return;
+    customElements.define(tag, cls);
+    window.customCards = window.customCards || [];
+    window.customCards.push({ type: tag, name, description, preview: false });
+  };
+  define("schulmanager-card", SchulmanagerCard, "Schulmanager", "Aufgaben und Mitteilungen aus dem Eltern-Portal – klickbar mit Status, Kommentar und PDF.");
+  define("schulmanager-termine", SchulmanagerTermineCard, "Schulmanager: Termine", "Termine, Fristen und Vertretungen mit KI-Kurzbeschreibung und Legende.");
+  define("schulmanager-stundenplan", SchulmanagerStundenplanCard, "Schulmanager: Stundenplan", "Stundenplan mit Vertretungen und Ausfällen.");
+  console.info(`%c SCHULMANAGER-CARD %c ${VERSION} `, "background:#03a9f4;color:#fff", "");
 })();

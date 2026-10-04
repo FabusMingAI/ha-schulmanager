@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1 – 2026-10-04
+
+- Fix: the settings dialog (sections, new in 0.9.0) showed empty fields instead of the stored settings, so saving it could overwrite them. Stored values are shown again; sections that are not sent keep their values. / Behoben: Das Einstellungsfenster zeigte in 0.9.0 leere Felder statt der gespeicherten Einstellungen – Speichern hätte sie überschrieben.
+
 ## 0.9.0 – 2026-10-04
 
 - New: the **date a message appeared in Eltern-Portal** is shown in front of every task title – in the card lists, the message and task dialogs (with year), the morning summary and the to-do lists. Own tasks show the day they were added. Display only; stored titles stay unchanged. Closes #5. / Neu: Erscheinungsdatum im Portal vor jedem Aufgabentitel, in Dialogen, Tagesübersicht und To-do-Listen.

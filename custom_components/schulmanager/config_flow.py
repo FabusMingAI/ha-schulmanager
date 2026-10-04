@@ -226,7 +226,7 @@ class SchulmanagerOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             # Abschnitte liefern verschachtelte Werte; gespeichert wird weiterhin flach
-            user_input = _flatten(user_input)
+            user_input = _flatten(user_input, dict(self.config_entry.options))
             langs = [x for x in SUMMARY_LANGUAGES if x in (user_input.get(CONF_SUMMARY_LANGUAGES) or [])]
             if len(langs) > MAX_SUMMARY_LANGUAGES:
                 errors["base"] = "too_many_languages"
@@ -392,17 +392,25 @@ def _sectioned(flat: vol.Schema) -> vol.Schema:
         if not part:
             continue
         used.update(str(m.schema) for m in part)
-        out[vol.Optional(name, default={})] = section(vol.Schema(part), {"collapsed": collapsed})
+        # kein default am Abschnitt: sonst übernimmt die Oberfläche {} statt der
+        # gespeicherten Werte der einzelnen Felder
+        out[vol.Optional(name)] = section(vol.Schema(part), {"collapsed": collapsed})
     rest = {m: v for m, v in fields.items() if str(m.schema) not in used}
     return vol.Schema({**rest, **out})
 
 
-def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
+def _flatten(user_input: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+    """Abschnitte zu flachen Optionen zusammenführen.
+
+    Mitgeschickte Abschnitte gelten so, wie sie kommen (ein geleertes Feld wird
+    entfernt); nicht mitgeschickte Abschnitte behalten ihre bisherigen Werte.
+    """
+    flat = dict(current)
+    for name, keys, _collapsed in SETTINGS_SECTIONS:
+        if isinstance(user_input.get(name), dict):
+            for key in keys:
+                flat.pop(key, None)
+            flat.update(user_input[name])
     names = {name for name, _keys, _c in SETTINGS_SECTIONS}
-    flat: dict[str, Any] = {}
-    for key, value in user_input.items():
-        if key in names and isinstance(value, dict):
-            flat.update(value)
-        else:
-            flat[key] = value
+    flat.update({k: v for k, v in user_input.items() if k not in names})
     return flat

@@ -1272,6 +1272,18 @@ async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     # gespeicherte Werte erscheinen als Vorgabe im richtigen Abschnitt
     bell = {str(k): k for k in sec["benachrichtigungen"].schema.schema}
     assert bell["reminder_days"].default() == "1,0"
+    # so, wie die Oberfläche das Formular bekommt: Abschnitte ohne eigenen Vorgabewert,
+    # die gespeicherten Werte stecken in den Feldern (sonst bleiben die Felder leer)
+    import voluptuous_serialize
+    from homeassistant.helpers import config_validation as cv
+
+    ui = voluptuous_serialize.convert(result["data_schema"], custom_serializer=cv.custom_serializer)
+    by_name = {f["name"]: f for f in ui}
+    assert all("default" not in f for f in ui)
+    fields = {f["name"]: f for f in by_name["benachrichtigungen"]["schema"]}
+    assert fields["reminder_days"]["default"] == "1,0"
+    langs = {f["name"]: f for f in by_name["ki"]["schema"]}["summary_languages"]
+    assert langs["default"] == ["de", "ca"]
     # jede Option steckt in genau einem Abschnitt und hat Texte in beiden Sprachen
     all_keys = [k for _n, keys, _c in SETTINGS_SECTIONS for k in keys]
     assert len(all_keys) == len(set(all_keys))
@@ -1288,6 +1300,14 @@ async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     assert entry.options["dashboard"] == "single" and entry.options["scan_interval"] == 60
     assert entry.options["reminder_days"] == "1,0" and entry.options["summary_languages"] == ["de", "ca"]
     assert not any(n in entry.options for n, _k, _c in SETTINGS_SECTIONS if n != "dashboard")
+    # in einem mitgeschickten Abschnitt lässt sich ein Feld leeren (KI-Dienst entfernen)
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "ai_task_entity": "ai_task.x"})
+    await hass.async_block_till_done()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+    await hass.config_entries.options.async_configure(result["flow_id"], {"ki": {"summary_languages": ["de"]}})
+    await hass.async_block_till_done()
+    assert "ai_task_entity" not in entry.options and entry.options["reminder_days"] == "1,0"
     await hass.config_entries.async_unload(entry.entry_id)
 
 

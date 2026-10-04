@@ -6,6 +6,9 @@ Der Schulmanager holt alle Mitteilungen aus dem **[Eltern-Portal](https://www.el
 
 ![Dashboard](docs/images/dashboard.png)
 
+> [!NOTE]
+> Der Schulmanager ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Er liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
+
 ## Was passiert automatisch
 
 | Schritt | Was der Schulmanager tut |

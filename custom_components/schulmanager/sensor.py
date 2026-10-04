@@ -380,6 +380,7 @@ class SchulUpdateSensor(SensorEntity):
         return {
             "fehler": self.manager.last_errors,
             "auswertung_ausstehend": pending,
+            "uebersetzung_ausstehend": len(self.manager._missing_translations()),
             "mitteilungen_gesamt": len(self.manager.items),
             "kinder": [c["name"] for c in self.manager.children.values()],
         }

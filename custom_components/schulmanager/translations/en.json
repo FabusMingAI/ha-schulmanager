@@ -52,34 +52,92 @@
       },
       "settings": {
         "title": "Settings",
-        "data": {
-          "ai_task_entity": "AI service for analysis (AI Task entity)",
-          "notify_services": "Push notifications to (notify services, e.g. mobile_app_…)",
-          "digest_enabled": "Send daily summary in the morning",
-          "digest_time": "Daily summary time",
-          "reminder_time": "Deadline reminder time",
-          "reminder_days": "Remind … days before deadline (comma-separated)",
-          "tts_targets": "Voice announcements on (Assist satellites / speakers)",
-          "tts_engine": "TTS service (only needed for speakers)",
-          "tts_start": "Announcements not before",
-          "tts_end": "Announcements not after",
-          "scan_interval": "Poll portals every",
-          "auto_download": "Store attachments/PDFs automatically",
-          "analyze_days": "On first import, analyse the last",
-          "lookback_days": "Read portal messages from the last",
-          "dashboard": "“Schule” dashboard",
-          "appointment_kinds": "Portal appointments to show",
-          "own_class_only": "Only appointments of the child's class",
-          "summary_languages": "Languages of the AI summary"
-        },
-        "data_description": {
-          "ai_task_entity": "Extracts tasks, deadlines, amounts and dates from letters and PDFs. Without AI a simple rule-based detection is used.",
-          "reminder_days": "Example 3,1,0 = three days before, the day before and on the day. Overdue tasks are reminded daily.",
-          "auto_download": "Note: Eltern-Portal treats downloading a parent letter as acknowledging receipt.",
-          "dashboard": "Tabs: “Overview” with calendar and Schulmanager plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it.",
-          "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests.",
-          "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible.",
-          "summary_languages": "Up to 4 languages; each becomes its own tab in the summary. The first chosen language is used for push notifications. If an already analysed message lacks a language, only its summary is translated in the background – tasks stay untouched."
+        "description": "Frequently used sections are open, rarely used ones are collapsed.",
+        "sections": {
+          "ki": {
+            "name": "AI & languages",
+            "description": "Analysis of messages and languages of the summary",
+            "data": {
+              "ai_task_entity": "AI service for analysis (AI Task entity)",
+              "summary_languages": "Languages of the AI summary"
+            },
+            "data_description": {
+              "ai_task_entity": "Extracts tasks, deadlines, amounts and dates from letters and PDFs. Without AI a simple rule-based detection is used.",
+              "summary_languages": "Up to 4 languages; each becomes its own tab in the summary. The first chosen language is used for push notifications. If an already analysed message lacks a language, only its summary is translated in the background – tasks stay untouched."
+            }
+          },
+          "benachrichtigungen": {
+            "name": "Notifications & reminders",
+            "description": "Phone push, daily summary and deadline reminders",
+            "data": {
+              "notify_services": "Push notifications to (notify services, e.g. mobile_app_…)",
+              "digest_enabled": "Send daily summary in the morning",
+              "digest_time": "Daily summary time",
+              "reminder_time": "Deadline reminder time",
+              "reminder_days": "Remind … days before deadline (comma-separated)"
+            },
+            "data_description": {
+              "notify_services": "Phones that receive new messages, reminders and the daily summary as push notifications.",
+              "digest_enabled": "Only when something is due: traffic light per child, deadlines, unread items, today's appointments and substitutions.",
+              "digest_time": "Time of the daily summary.",
+              "reminder_time": "Deadline reminders are sent at this time.",
+              "reminder_days": "Example 3,1,0 = three days before, the day before and on the day. Overdue tasks are reminded daily."
+            }
+          },
+          "termine": {
+            "name": "Appointments & classes",
+            "description": "Which appointments appear in the calendar, appointments list and timetable",
+            "data": {
+              "appointment_kinds": "Portal appointments to show",
+              "own_class_only": "Only appointments of the child's class"
+            },
+            "data_description": {
+              "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests.",
+              "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible."
+            }
+          },
+          "sprachansagen": {
+            "name": "Voice announcements",
+            "description": "Announcements via Assist satellites or speakers",
+            "data": {
+              "tts_targets": "Voice announcements on (Assist satellites / speakers)",
+              "tts_engine": "TTS service (only needed for speakers)",
+              "tts_start": "Announcements not before",
+              "tts_end": "Announcements not after"
+            },
+            "data_description": {
+              "tts_targets": "For urgent messages and deadlines today/tomorrow. Leave empty for no announcements.",
+              "tts_engine": "Only needed for speakers; Assist satellites announce directly.",
+              "tts_start": "No announcements before this time.",
+              "tts_end": "No announcements after this time."
+            }
+          },
+          "abruf": {
+            "name": "Fetching & storage",
+            "description": "How often and how far back the portal is read",
+            "data": {
+              "scan_interval": "Poll portals every",
+              "auto_download": "Store attachments/PDFs automatically",
+              "analyze_days": "On first import, analyse the last",
+              "lookback_days": "Read portal messages from the last"
+            },
+            "data_description": {
+              "scan_interval": "How often the portals are fetched.",
+              "auto_download": "Note: Eltern-Portal treats downloading a parent letter as acknowledging receipt.",
+              "analyze_days": "On the first import only messages from this period are analysed; older ones are archived as read.",
+              "lookback_days": "How far back messages are taken from the portal."
+            }
+          },
+          "dashboard": {
+            "name": "Dashboard",
+            "description": "\"Schule\" dashboard in the sidebar",
+            "data": {
+              "dashboard": "“Schule” dashboard"
+            },
+            "data_description": {
+              "dashboard": "Tabs: “Overview” with calendar and Schulmanager plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it."
+            }
+          }
         }
       },
       "add_portal": {

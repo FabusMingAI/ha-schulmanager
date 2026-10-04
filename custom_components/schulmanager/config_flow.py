@@ -16,6 +16,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
 
 from .const import (
@@ -224,9 +225,11 @@ class SchulmanagerOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            # Abschnitte liefern verschachtelte Werte; gespeichert wird weiterhin flach
+            user_input = _flatten(user_input)
             langs = [x for x in SUMMARY_LANGUAGES if x in (user_input.get(CONF_SUMMARY_LANGUAGES) or [])]
             if len(langs) > MAX_SUMMARY_LANGUAGES:
-                errors[CONF_SUMMARY_LANGUAGES] = "too_many_languages"
+                errors["base"] = "too_many_languages"
             else:
                 user_input[CONF_SUMMARY_LANGUAGES] = langs or list(DEFAULT_SUMMARY_LANGUAGES)
                 return self.async_create_entry(data=user_input)
@@ -308,7 +311,9 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="settings", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="settings", data_schema=_sectioned(schema), errors=errors
+        )
 
     async def async_step_add_portal(
         self, user_input: dict[str, Any] | None = None
@@ -364,3 +369,40 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                 }
             ),
         )
+
+
+# Einstellungen in einklappbaren Abschnitten: (Schlüssel, Felder, zugeklappt)
+SETTINGS_SECTIONS: list[tuple[str, list[str], bool]] = [
+    ("ki", [CONF_AI_ENTITY, CONF_SUMMARY_LANGUAGES], False),
+    ("benachrichtigungen", [CONF_NOTIFY, CONF_DIGEST_ENABLED, CONF_DIGEST_TIME, CONF_REMINDER_TIME, CONF_REMINDER_DAYS], False),
+    ("termine", [CONF_APPOINTMENT_KINDS, CONF_OWN_CLASS_ONLY], False),
+    ("sprachansagen", [CONF_TTS_TARGETS, CONF_TTS_ENGINE, CONF_TTS_START, CONF_TTS_END], True),
+    ("abruf", [CONF_SCAN_INTERVAL, CONF_AUTO_DOWNLOAD, CONF_ANALYZE_DAYS, CONF_LOOKBACK_DAYS], True),
+    ("dashboard", [CONF_DASHBOARD], True),
+]
+
+
+def _sectioned(flat: vol.Schema) -> vol.Schema:
+    """Flaches Schema in Abschnitte aufteilen (Felder ohne Abschnitt bleiben oben)."""
+    fields = dict(flat.schema)
+    out: dict[Any, Any] = {}
+    used: set[str] = set()
+    for name, keys, collapsed in SETTINGS_SECTIONS:
+        part = {m: v for m, v in fields.items() if str(m.schema) in keys}
+        if not part:
+            continue
+        used.update(str(m.schema) for m in part)
+        out[vol.Optional(name, default={})] = section(vol.Schema(part), {"collapsed": collapsed})
+    rest = {m: v for m, v in fields.items() if str(m.schema) not in used}
+    return vol.Schema({**rest, **out})
+
+
+def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
+    names = {name for name, _keys, _c in SETTINGS_SECTIONS}
+    flat: dict[str, Any] = {}
+    for key, value in user_input.items():
+        if key in names and isinstance(value, dict):
+            flat.update(value)
+        else:
+            flat[key] = value
+    return flat

@@ -10,6 +10,7 @@ import os
 import re
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -77,6 +78,11 @@ from .const import (
     DEFAULT_TTS_END,
     DEFAULT_TTS_START,
     DOMAIN,
+    LANGUAGE_NAMES,
+    TRANSLATE_MAX_TRIES,
+    TRANSLATE_NOTIFY_MIN,
+    TRANSLATE_RETRY,
+    TRANSLATE_SECONDS_PER_ITEM,
     EVENT_CATEGORIES,
     EVENT_NEW_ITEM,
     EVENT_SUBSTITUTION,
@@ -174,6 +180,7 @@ class SchulManager:
         self._lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._worker: asyncio.Task | None = None
+        self._translate_batch: dict[str, Any] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
 
     # ------------------------------------------------------------------
@@ -325,7 +332,7 @@ class SchulManager:
             self.last_errors = errors
             self.last_update = dt_util.now()
             self._changed()
-            if self._pending():
+            if self._pending() or self._missing_translations():
                 self._queue_event.set()
 
     def _need_download(self, item: PortalItem) -> bool:
@@ -613,32 +620,44 @@ class SchulManager:
         )
 
     def _missing_translations(self) -> list[dict[str, Any]]:
-        """Ausgewertete Mitteilungen, denen eine der gewählten Sprachen fehlt."""
+        """Ausgewertete Mitteilungen, denen eine der gewählten Sprachen fehlt.
+
+        Fehlgeschlagene Übersetzungen werden nach ``TRANSLATE_RETRY`` erneut versucht,
+        höchstens ``TRANSLATE_MAX_TRIES``-mal; eine geänderte Sprachauswahl beginnt von vorn.
+        """
         if not self.opt(CONF_AI_ENTITY):
             return []
         langs = self.summary_languages
+        now = dt_util.now()
         out = []
         for item in self.items.values():
             a = item.get("analysis", {})
             if a.get("status") != "fertig" or not a.get("summary"):
                 continue
             have = set(a.get("summaries") or {}) or {"de"}
-            missing = [lang for lang in langs if lang not in have]
-            tried = set(a.get("translate_tried") or [])
-            if missing and not set(missing) <= tried:
-                out.append(item)
+            if all(lang in have for lang in langs):
+                continue
+            failed = a.get("translate_failed")
+            if failed and failed.get("langs") == langs:
+                if failed.get("count", 0) >= TRANSLATE_MAX_TRIES:
+                    continue
+                at = dt_util.parse_datetime(failed.get("at") or "")
+                if at and now - at < TRANSLATE_RETRY:
+                    continue
+            out.append(item)
         return sorted(out, key=lambda i: i.get("sent") or "", reverse=True)
 
-    async def _translate(self, item: dict[str, Any]) -> None:
+    async def _translate(self, item: dict[str, Any]) -> bool:
         """Fehlende Sprachen der Zusammenfassung ergänzen – ohne Aufgaben neu zu erzeugen."""
         a = item["analysis"]
+        a.pop("translate_tried", None)  # Feld aus 0.8.1 (kein erneuter Versuch) ablösen
         summaries = dict(a.get("summaries") or {})
         if not summaries:
             # vor 0.8.0 ausgewertet: Zusammenfassung ist deutsch
             summaries = {"de": a["summary"]}
         source = next(iter(summaries))
-        missing = [lang for lang in self.summary_languages if lang not in summaries]
-        a["translate_tried"] = sorted(set(a.get("translate_tried") or []) | set(missing))
+        langs = self.summary_languages
+        missing = [lang for lang in langs if lang not in summaries]
         try:
             summaries.update(
                 await async_translate_summary(
@@ -648,6 +667,78 @@ class SchulManager:
         except AnalyzeError as err:
             LOGGER.debug("Übersetzung von %s fehlgeschlagen: %s", item["uid"], err)
         a["summaries"] = summaries
+        if all(lang in summaries for lang in langs):
+            a.pop("translate_failed", None)
+            return True
+        prev = a.get("translate_failed") or {}
+        count = prev.get("count", 0) + 1 if prev.get("langs") == langs else 1
+        a["translate_failed"] = {"langs": langs, "count": count, "at": dt_util.now().isoformat()}
+        return False
+
+    @property
+    def translation_progress(self) -> dict[str, Any] | None:
+        """Fortschritt der laufenden Übersetzung (für Karte und Sensor) oder None."""
+        batch = self._translate_batch
+        if not batch:
+            return None
+        return {
+            "done": batch["done"] + batch["failed"],
+            "total": batch["total"],
+            "languages": [LANGUAGE_NAMES[lang] for lang in batch["new_langs"]],
+        }
+
+    def _translation_notice(self, text: str) -> None:
+        persistent_notification.async_create(
+            self.hass, text, title="Schulmanager", notification_id=f"{DOMAIN}_uebersetzung"
+        )
+
+    async def _translate_missing(self) -> None:
+        todo = self._missing_translations()
+        if not todo:
+            return
+        langs = self.summary_languages
+        new_langs = sorted(
+            {
+                lang
+                for i in todo
+                for lang in langs
+                if lang not in (i["analysis"].get("summaries") or {"de": ""})
+            },
+            key=langs.index,
+        )
+        self._translate_batch = {"total": len(todo), "done": 0, "failed": 0, "new_langs": new_langs}
+        names = ", ".join(LANGUAGE_NAMES[lang] for lang in new_langs)
+        notify = len(todo) >= TRANSLATE_NOTIFY_MIN
+        if notify:
+            minutes = max(1, round(len(todo) * TRANSLATE_SECONDS_PER_ITEM / 60))
+            self._translation_notice(
+                f"Die KI-Zusammenfassungen von {len(todo)} Mitteilungen werden ins {names} "
+                f"übersetzt (ca. {minutes} Min.). Aufgaben bleiben dabei unverändert."
+            )
+        self._changed()
+        try:
+            for item in todo:
+                if self._pending():
+                    break  # neue Mitteilungen haben Vorrang
+                try:
+                    ok = await self._translate(item)
+                except Exception:  # noqa: BLE001
+                    LOGGER.exception("Übersetzung von %s fehlgeschlagen", item["uid"])
+                    ok = False
+                self._translate_batch["done" if ok else "failed"] += 1
+                self._changed()
+                await asyncio.sleep(1)
+        finally:
+            batch, self._translate_batch = self._translate_batch, None
+            self._changed()
+        if notify:
+            text = f"Fertig: {batch['done']} Zusammenfassungen ins {names} übersetzt."
+            if batch["failed"]:
+                text += f" {batch['failed']} fehlgeschlagen – neuer Versuch in einigen Stunden."
+            left = batch["total"] - batch["done"] - batch["failed"]
+            if left > 0:
+                text = f"Übersetzung unterbrochen (neue Mitteilungen gehen vor), {left} folgen gleich."
+            self._translation_notice(text)
 
     async def _analysis_worker(self) -> None:
         while True:
@@ -655,16 +746,10 @@ class SchulManager:
             self._queue_event.clear()
             await self._work_queue()
             # danach fehlende Sprachen der Zusammenfassung nachtragen (neue Mitteilungen haben Vorrang)
-            while not self._pending() and (todo := self._missing_translations()):
-                item = todo[0]
-                try:
-                    await self._translate(item)
-                except Exception:  # noqa: BLE001
-                    LOGGER.exception("Übersetzung von %s fehlgeschlagen", item["uid"])
-                    item["analysis"]["translate_tried"] = list(self.summary_languages)
-                self._changed()
-                await asyncio.sleep(1)
+            await self._translate_missing()
             await self._work_queue()
+            if self._missing_translations():
+                self._queue_event.set()
 
     async def _work_queue(self) -> None:
         while pending := self._pending():
@@ -1084,6 +1169,33 @@ class SchulManager:
                 )
         return out
 
+    def published(self, t_or_item: dict[str, Any]) -> date | None:
+        """Erscheinungsdatum im Portal; bei Aufgaben das der zugehörigen Mitteilung.
+
+        Eigene Aufgaben ohne Mitteilung nutzen ihr Anlagedatum.
+        """
+        source = t_or_item
+        if "kind" not in t_or_item:  # Aufgabe -> Mitteilung, aus der sie stammt
+            source = self.items.get(t_or_item.get("item_uid") or "") or t_or_item
+        raw = source.get("sent") or source.get("created")
+        try:
+            return date.fromisoformat(str(raw)[:10]) if raw else None
+        except ValueError:
+            return None
+
+    def date_prefix(self, day: date | None, full: bool = False) -> str:
+        """„29.09.“ – mit Jahr in Dialogen und für Mitteilungen aus einem früheren Schuljahr."""
+        if day is None:
+            return ""
+        if full or school_year(day) != school_year(dt_util.now().date()):
+            return day.strftime("%d.%m.%Y")
+        return day.strftime("%d.%m.")
+
+    def dated(self, text: str, source: dict[str, Any]) -> str:
+        """Text mit vorangestelltem Erscheinungsdatum, z. B. „29.09. · Skilager“."""
+        prefix = self.date_prefix(self.published(source))
+        return f"{prefix} · {text}" if prefix else text
+
     def task_label(self, t: dict[str, Any]) -> str:
         label = t["title"]
         if t.get("amount"):
@@ -1431,12 +1543,15 @@ class SchulManager:
             lines = [f"{icons[s['ampel']]} {child['name']}"]
             for t in s["overdue"] + s["due_soon"] + s["due_week"]:
                 days = (date.fromisoformat(t["due"]) - today).days
-                lines.append(f"  • {self.task_label(t)} – {_days_text(days)}")
+                lines.append(f"  • {self.dated(self.task_label(t), t)} – {_days_text(days)}")
             undated = [t for t in s["open_tasks"] if not t.get("due")]
             if undated:
                 lines.append(f"  • {len(undated)} weitere Aufgabe(n) ohne Frist")
             if s["unread"]:
-                lines.append(f"  📬 {len(s['unread'])} ungelesen: " + "; ".join(i["title"] for i in s["unread"][:3]))
+                lines.append(
+                    f"  📬 {len(s['unread'])} ungelesen: "
+                    + "; ".join(self.dated(i["title"], i) for i in s["unread"][:3])
+                )
             for ev in self.child_events(key):
                 start = ev["start"]
                 day = start.date() if isinstance(start, datetime) else start

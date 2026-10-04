@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 – 2026-10-04
+
+- New: the **date a message appeared in Eltern-Portal** is shown in front of every task title – in the card lists, the message and task dialogs (with year), the morning summary and the to-do lists. Own tasks show the day they were added. Display only; stored titles stay unchanged. Closes #5. / Neu: Erscheinungsdatum im Portal vor jedem Aufgabentitel, in Dialogen, Tagesübersicht und To-do-Listen.
+- New: **settings in collapsible sections** (AI & languages, notifications, appointments & classes open; voice announcements, fetching, dashboard collapsed) with a short explanation for every field. Stored options are unchanged. Closes #4. / Neu: Einstellungen in einklappbaren Abschnitten mit Erklärtexten.
+- New: **translation progress** – a progress line in the card, a Home Assistant notification on start and finish (from 5 translations) and the sensor attribute `uebersetzung_ausstehend`. Closes #3. / Neu: Fortschritt der Übersetzung in Karte, Benachrichtigung und Sensor.
+- Fix: a failed summary translation is retried after 6 hours, up to 3 attempts; changing the language selection starts over. Closes #2. / Behoben: Fehlgeschlagene Übersetzungen werden erneut versucht.
+
 ## 0.8.1 – 2026-10-04
 
 - AI summary: missing languages are added by translating only the existing summary in the background – for messages analysed before 0.8.0 and whenever a language is added in the settings. Tasks, appointments, status and comments are never touched (a full re-analysis could reword task titles and create duplicates). / KI-Zusammenfassung: Fehlende Sprachen werden im Hintergrund nur übersetzt – ohne Aufgaben neu zu erzeugen.

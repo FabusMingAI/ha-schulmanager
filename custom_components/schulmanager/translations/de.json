@@ -52,34 +52,92 @@
       },
       "settings": {
         "title": "Einstellungen",
-        "data": {
-          "ai_task_entity": "KI-Dienst für die Auswertung (AI-Task-Entität)",
-          "notify_services": "Push-Benachrichtigungen an (notify-Dienste, z. B. mobile_app_…)",
-          "digest_enabled": "Morgens Tagesübersicht schicken",
-          "digest_time": "Uhrzeit Tagesübersicht",
-          "reminder_time": "Uhrzeit für Frist-Erinnerungen",
-          "reminder_days": "Erinnern … Tage vor Frist (kommagetrennt)",
-          "tts_targets": "Sprachansagen auf (Assist-Satelliten / Lautsprecher)",
-          "tts_engine": "TTS-Dienst (nur für Lautsprecher nötig)",
-          "tts_start": "Ansagen frühestens um",
-          "tts_end": "Ansagen spätestens um",
-          "scan_interval": "Portal abrufen alle",
-          "auto_download": "Anhänge/PDFs automatisch ablegen",
-          "analyze_days": "Beim ersten Import auswerten: die letzten",
-          "lookback_days": "Mitteilungen aus dem Portal lesen: die letzten",
-          "dashboard": "Dashboard „Schule“",
-          "appointment_kinds": "Termine aus dem Portal anzeigen",
-          "own_class_only": "Nur Termine der eigenen Klasse",
-          "summary_languages": "Sprachen der KI-Zusammenfassung"
-        },
-        "data_description": {
-          "ai_task_entity": "Liest Aufgaben, Fristen, Beträge und Termine aus Briefen und PDFs. Ohne KI greift eine einfache Regel-Erkennung.",
-          "reminder_days": "Beispiel 3,1,0 = drei Tage vorher, am Vortag und am Tag selbst. Überfällige Aufgaben werden täglich erinnert.",
-          "auto_download": "Hinweis: Das Eltern-Portal wertet das Herunterladen eines Elternbriefs als Empfangsbestätigung.",
-          "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast.",
-          "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests.",
-          "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar.",
-          "summary_languages": "Bis zu 4 Sprachen; jede wird in der Zusammenfassung ein eigener Reiter. Die erste gewählte Sprache gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache, wird im Hintergrund nur die Zusammenfassung übersetzt – Aufgaben bleiben unverändert."
+        "description": "Häufig genutzte Bereiche stehen offen, seltene sind zugeklappt.",
+        "sections": {
+          "ki": {
+            "name": "KI & Sprachen",
+            "description": "Auswertung der Mitteilungen und Sprachen der Zusammenfassung",
+            "data": {
+              "ai_task_entity": "KI-Dienst für die Auswertung (AI-Task-Entität)",
+              "summary_languages": "Sprachen der KI-Zusammenfassung"
+            },
+            "data_description": {
+              "ai_task_entity": "Liest Aufgaben, Fristen, Beträge und Termine aus Briefen und PDFs. Ohne KI greift eine einfache Regel-Erkennung.",
+              "summary_languages": "Bis zu 4 Sprachen; jede wird in der Zusammenfassung ein eigener Reiter. Die erste gewählte Sprache gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache, wird im Hintergrund nur die Zusammenfassung übersetzt – Aufgaben bleiben unverändert."
+            }
+          },
+          "benachrichtigungen": {
+            "name": "Benachrichtigungen & Erinnerungen",
+            "description": "Push aufs Handy, Tagesübersicht und Frist-Erinnerungen",
+            "data": {
+              "notify_services": "Push-Benachrichtigungen an (notify-Dienste, z. B. mobile_app_…)",
+              "digest_enabled": "Morgens Tagesübersicht schicken",
+              "digest_time": "Uhrzeit Tagesübersicht",
+              "reminder_time": "Uhrzeit für Frist-Erinnerungen",
+              "reminder_days": "Erinnern … Tage vor Frist (kommagetrennt)"
+            },
+            "data_description": {
+              "notify_services": "Die Handys, die neue Mitteilungen, Erinnerungen und die Tagesübersicht als Push bekommen.",
+              "digest_enabled": "Nur wenn etwas ansteht: Ampel je Kind, Fristen, Ungelesenes, Termine und Vertretungen von heute.",
+              "digest_time": "Uhrzeit der Tagesübersicht.",
+              "reminder_time": "Zu dieser Uhrzeit kommen die Erinnerungen an Fristen.",
+              "reminder_days": "Beispiel 3,1,0 = drei Tage vorher, am Vortag und am Tag selbst. Überfällige Aufgaben werden täglich erinnert."
+            }
+          },
+          "termine": {
+            "name": "Termine & Klassen",
+            "description": "Welche Termine in Kalender, Terminliste und Stundenplan erscheinen",
+            "data": {
+              "appointment_kinds": "Termine aus dem Portal anzeigen",
+              "own_class_only": "Nur Termine der eigenen Klasse"
+            },
+            "data_description": {
+              "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests.",
+              "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar."
+            }
+          },
+          "sprachansagen": {
+            "name": "Sprachansagen",
+            "description": "Ansagen über Assist-Satelliten oder Lautsprecher",
+            "data": {
+              "tts_targets": "Sprachansagen auf (Assist-Satelliten / Lautsprecher)",
+              "tts_engine": "TTS-Dienst (nur für Lautsprecher nötig)",
+              "tts_start": "Ansagen frühestens um",
+              "tts_end": "Ansagen spätestens um"
+            },
+            "data_description": {
+              "tts_targets": "Bei dringenden Mitteilungen und Fristen heute/morgen. Leer lassen für keine Ansagen.",
+              "tts_engine": "Nur für Lautsprecher nötig; Assist-Satelliten sagen direkt an.",
+              "tts_start": "Vorher keine Ansagen.",
+              "tts_end": "Danach keine Ansagen."
+            }
+          },
+          "abruf": {
+            "name": "Abruf & Ablage",
+            "description": "Wie oft und wie weit zurück das Portal gelesen wird",
+            "data": {
+              "scan_interval": "Portal abrufen alle",
+              "auto_download": "Anhänge/PDFs automatisch ablegen",
+              "analyze_days": "Beim ersten Import auswerten: die letzten",
+              "lookback_days": "Mitteilungen aus dem Portal lesen: die letzten"
+            },
+            "data_description": {
+              "scan_interval": "Wie oft die Portale abgerufen werden.",
+              "auto_download": "Hinweis: Das Eltern-Portal wertet das Herunterladen eines Elternbriefs als Empfangsbestätigung.",
+              "analyze_days": "Beim ersten Import werden nur Mitteilungen dieses Zeitraums ausgewertet, der Rest kommt als gelesen ins Archiv.",
+              "lookback_days": "Wie weit zurück Mitteilungen aus dem Portal übernommen werden."
+            }
+          },
+          "dashboard": {
+            "name": "Dashboard",
+            "description": "Dashboard „Schule“ in der Seitenleiste",
+            "data": {
+              "dashboard": "Dashboard „Schule“"
+            },
+            "data_description": {
+              "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast."
+            }
+          }
         }
       },
       "add_portal": {

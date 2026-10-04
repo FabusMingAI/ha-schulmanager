@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "schulmanager"
@@ -62,6 +63,11 @@ DEFAULT_SUMMARY_LANGUAGES: Final = ["de", "en"]
 MAX_SUMMARY_LANGUAGES: Final = 4
 LANGUAGE_NAMES: Final = {"de": "Deutsch", "en": "English", "es": "Español", "ca": "Català"}
 LANGUAGE_PROMPT_NAMES: Final = {"de": "Deutsch", "en": "Englisch", "es": "Spanisch", "ca": "Katalanisch"}
+# Nachträgliche Übersetzung der Zusammenfassung
+TRANSLATE_RETRY: Final = timedelta(hours=6)  # erneuter Versuch nach einem Fehlschlag
+TRANSLATE_MAX_TRIES: Final = 3
+TRANSLATE_NOTIFY_MIN: Final = 5  # ab so vielen Mitteilungen Benachrichtigung bei Start/Ende
+TRANSLATE_SECONDS_PER_ITEM: Final = 5  # Schätzung für die Dauer
 
 # --- Datenmodell ---
 KIND_LETTER: Final = "elternbrief"

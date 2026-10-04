@@ -444,9 +444,11 @@ async def test_options_flow(hass: HomeAssistant, media_dir) -> None:
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {"notify_services": ["mobile_app_handy_2"], "reminder_days": "2,0", "digest_time": "07:00:00"},
+        {"benachrichtigungen": {"notify_services": ["mobile_app_handy_2"], "reminder_days": "2,0", "digest_time": "07:00:00"}},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    # gespeichert wird weiterhin flach, nicht nach Abschnitten
+    assert "benachrichtigungen" not in entry.options and entry.options["digest_time"] == "07:00:00"
     await hass.async_block_till_done()
     assert entry.options["notify_services"] == ["mobile_app_handy_2"]
     assert entry.runtime_data.opt("reminder_days") == "2,0"
@@ -913,7 +915,7 @@ async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> 
         result = await hass.config_entries.options.async_init(entry.entry_id)
         result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"appointment_kinds": ["schulaufgabe", "schule"]}
+            result["flow_id"], {"termine": {"appointment_kinds": ["schulaufgabe", "schule"]}}
         )
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1064,7 +1066,8 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
         result = await hass.config_entries.options.async_init(entry.entry_id)
         result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
         result = await hass.config_entries.options.async_configure(
-            result["flow_id"], {"own_class_only": False, "summary_languages": []}
+            result["flow_id"],
+            {"ki": {"ai_task_entity": "ai_task.claude", "summary_languages": []}, "termine": {"own_class_only": False}},
         )
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1126,7 +1129,7 @@ async def test_translate_missing_summaries(hass: HomeAssistant, media_dir) -> No
         # Sprachen erweitern -> nur Übersetzung, keine neue Auswertung
         result = await hass.config_entries.options.async_init(entry.entry_id)
         result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
-        await hass.config_entries.options.async_configure(result["flow_id"], {"ai_task_entity": "ai_task.claude", "summary_languages": ["de", "en", "es"]})
+        await hass.config_entries.options.async_configure(result["flow_id"], {"ki": {"ai_task_entity": "ai_task.claude", "summary_languages": ["de", "en", "es"]}})
         await hass.async_block_till_done()
         m = entry.runtime_data
         for _ in range(60):
@@ -1145,4 +1148,202 @@ async def test_translate_missing_summaries(hass: HomeAssistant, media_dir) -> No
         assert m.tasks[tid]["status"] == "erledigt" and m.tasks[tid]["comment"] == "überwiesen"
         # kein zweiter Versuch, wenn schon alles da ist
         assert m._missing_translations() == []
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_translation_retry_and_progress(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    """#2: fehlgeschlagene Übersetzungen erneut versuchen; #3: Fortschritt und Benachrichtigung."""
+    from unittest.mock import MagicMock
+
+    today = dt_util.now().date()
+    state = {"fail_next": 0}
+
+    async def fake_ai(call: ServiceCall):
+        text = call.data["instructions"]
+        if text.startswith("Übersetze"):
+            if state["fail_next"]:
+                state["fail_next"] -= 1
+                return {"data": "keine JSON-Antwort"}
+            return {"data": {"en": "English summary."}}
+        return {"data": {"zusammenfassung": "Deutsche Zusammenfassung.", "kategorie": "info",
+                         "dringlichkeit": "niedrig", "aufgaben": [], "termine": []}}
+
+    hass.services.async_register("ai_task", "generate_data", fake_ai, supports_response=SupportsResponse.ONLY)
+
+    async def fake_fetch(self, need_download=None):
+        return _fake_result(today, with_pdf=False)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"ai_task_entity": "ai_task.claude", "summary_languages": ["de"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    notices = MagicMock()
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch), \
+         patch("custom_components.schulmanager.manager.TRANSLATE_NOTIFY_MIN", 1), \
+         patch("custom_components.schulmanager.manager.persistent_notification.async_create", notices):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        analysed = [i for i in m.items.values() if i["analysis"].get("summary")]
+        for _ in range(40):
+            analysed = [i for i in m.items.values() if i["analysis"].get("status") == "fertig"]
+            if len(analysed) >= 2:
+                break
+            await asyncio.sleep(0.05)
+        assert len(analysed) >= 2
+
+        # Fortschritt für Karte und Sensor
+        m._translate_batch = {"total": 4, "done": 1, "failed": 1, "new_langs": ["ca"]}
+        assert m.translation_progress == {"done": 2, "total": 4, "languages": ["Català"]}
+        client = await hass_ws_client(hass)
+        await client.send_json({"id": 1, "type": "schulmanager/data"})
+        assert (await client.receive_json())["result"]["translation"]["total"] == 4
+        m._translate_batch = None
+
+        # Englisch dazu: eine Übersetzung schlägt fehl
+        state["fail_next"] = 1
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {"ki": {"ai_task_entity": "ai_task.claude", "summary_languages": ["de", "en"]}}
+        )
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        items = [i for i in m.items.values() if i["analysis"].get("summary")]
+        for _ in range(80):
+            if m._translate_batch is None and all(
+                "en" in (i["analysis"].get("summaries") or {}) or i["analysis"].get("translate_failed") for i in items
+            ):
+                break
+            await asyncio.sleep(0.05)
+        failed = [i for i in items if i["analysis"].get("translate_failed")]
+        assert len(failed) == 1 and failed[0]["analysis"]["translate_failed"]["count"] == 1
+        assert m._missing_translations() == []  # Wartezeit läuft
+        texts = [c.args[1] for c in notices.call_args_list]
+        assert any("übersetzt (ca." in t and "English" in t for t in texts)
+        assert any(t.startswith("Fertig:") and "1 fehlgeschlagen" in t for t in texts)
+        sensor = hass.states.get("sensor.schulmanager_letzter_abruf")
+        assert sensor.attributes["uebersetzung_ausstehend"] == 0
+
+        # nach der Wartezeit: neuer Versuch klappt
+        item = failed[0]
+        item["analysis"]["translate_failed"]["at"] = (dt_util.now() - timedelta(hours=7)).isoformat()
+        assert m._missing_translations() == [item]
+        m._queue_event.set()
+        for _ in range(60):
+            if "en" in (item["analysis"].get("summaries") or {}):
+                break
+            await asyncio.sleep(0.05)
+        assert item["analysis"]["summaries"]["en"] == "English summary."
+        assert "translate_failed" not in item["analysis"]
+
+        # nach 3 Fehlschlägen kein weiterer Versuch – außer die Sprachauswahl ändert sich
+        item["analysis"]["summaries"].pop("en")
+        item["analysis"]["translate_failed"] = {"langs": ["de", "en"], "count": 3, "at": (dt_util.now() - timedelta(days=2)).isoformat()}
+        assert m._missing_translations() == []
+        item["analysis"]["translate_failed"]["langs"] = ["de"]
+        assert m._missing_translations() == [item]
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
+    """#4: Einstellungen in einklappbaren Abschnitten, gespeichert wird flach."""
+    from custom_components.schulmanager.config_flow import SETTINGS_SECTIONS
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "demo", "school_name": "Demo", "username": "x", "password": "p"}]},
+        options={"reminder_days": "1,0", "summary_languages": ["de", "ca"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
+    schema = result["data_schema"].schema
+    names = [str(k) for k in schema]
+    assert names == [n for n, _keys, _c in SETTINGS_SECTIONS]
+    sec = {str(k): v for k, v in schema.items()}
+    assert sec["sprachansagen"].options["collapsed"] is True and sec["ki"].options["collapsed"] is False
+    # gespeicherte Werte erscheinen als Vorgabe im richtigen Abschnitt
+    bell = {str(k): k for k in sec["benachrichtigungen"].schema.schema}
+    assert bell["reminder_days"].default() == "1,0"
+    # jede Option steckt in genau einem Abschnitt und hat Texte in beiden Sprachen
+    all_keys = [k for _n, keys, _c in SETTINGS_SECTIONS for k in keys]
+    assert len(all_keys) == len(set(all_keys))
+    for lang in ("de", "en"):
+        tr = json.load(open(f"custom_components/schulmanager/translations/{lang}.json"))
+        sections = tr["options"]["step"]["settings"]["sections"]
+        for name, keys, _c in SETTINGS_SECTIONS:
+            assert sections[name]["name"]
+            assert set(keys) <= set(sections[name]["data"]) and set(keys) <= set(sections[name]["data_description"])
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"dashboard": {"dashboard": "single"}, "abruf": {"scan_interval": 60}}
+    )
+    await hass.async_block_till_done()
+    assert entry.options["dashboard"] == "single" and entry.options["scan_interval"] == 60
+    assert entry.options["reminder_days"] == "1,0" and entry.options["summary_languages"] == ["de", "ca"]
+    assert not any(n in entry.options for n, _k, _c in SETTINGS_SECTIONS if n != "dashboard")
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_published_date_prefix(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    """#5: Erscheinungsdatum im Portal vor dem Betreff (Tagesübersicht, Aufgaben, To-do-Liste)."""
+    today = dt_util.now().date()
+    sent = today - timedelta(days=1)
+    prefix = sent.strftime("%d.%m.")
+
+    async def fake_fetch(self, need_download=None):
+        return _fake_result(today)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        for _ in range(40):
+            if any(t.get("type") == "zahlung" for t in m.tasks.values()):
+                break
+            await asyncio.sleep(0.05)
+        pay = next(t for t in m.tasks.values() if t.get("type") == "zahlung")
+        title_before, ids_before = pay["title"], set(m.tasks)
+
+        # Tagesübersicht
+        assert f"{prefix} · {m.task_label(pay)}" in m.digest_text()
+
+        # eigene Aufgabe: Anlagedatum
+        own = m.add_task("anna", "Turnbeutel mitgeben")
+        assert m.dated("x", own) == f"{today.strftime('%d.%m.')} · x"
+        # früheres Schuljahr mit Jahr
+        assert m.date_prefix(today - timedelta(days=400)).count(".") == 2
+
+        # Karte
+        client = await hass_ws_client(hass)
+        await client.send_json({"id": 1, "type": "schulmanager/data"})
+        res = (await client.receive_json())["result"]
+        t = next(x for x in res["children"][0]["tasks"] if x["id"] == pay["id"])
+        assert t["published"] == sent.isoformat() and t["title"] == title_before
+
+        # To-do-Liste mit Datum; Umbenennen übernimmt den Titel ohne Datum
+        items = await hass.services.async_call(
+            "todo", "get_items", {"entity_id": "todo.schule_anna_aufgaben"}, blocking=True, return_response=True
+        )
+        summary = next(i["summary"] for i in items["todo.schule_anna_aufgaben"]["items"] if i["uid"] == pay["id"])
+        assert f"{prefix} · " in summary
+        await hass.services.async_call(
+            "todo", "update_item",
+            {"entity_id": "todo.schule_anna_aufgaben", "item": pay["id"], "rename": summary.replace("bezahlen", "überweisen")},
+            blocking=True,
+        )
+        assert prefix not in m.tasks[pay["id"]]["title"] and "überweisen" in m.tasks[pay["id"]]["title"]
+        assert set(m.tasks) >= ids_before
     await hass.config_entries.async_unload(entry.entry_id)

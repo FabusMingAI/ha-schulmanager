@@ -7,7 +7,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.8.0";
+  const VERSION = "0.9.0";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -16,6 +16,20 @@
     return `${d}.${m}.${y}`;
   };
   const fmtShort = (iso) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.` : "");
+  // Erscheinungsdatum im Portal: „29.09.“, mit Jahr in Dialogen und für frühere Schuljahre
+  const schoolYear = (iso) => {
+    const y = Number(iso.slice(0, 4));
+    return Number(iso.slice(5, 7)) >= 8 ? y : y - 1;
+  };
+  const todayIso = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const fmtPub = (iso, full) => {
+    if (!iso) return "";
+    return full || schoolYear(iso) !== schoolYear(todayIso()) ? fmtDate(iso) : fmtShort(iso);
+  };
+  const datedTitle = (iso, title, full) => (iso ? `${fmtPub(iso, full)} · ${title}` : title);
   const daysText = (days) => {
     if (days === null || days === undefined) return "";
     if (days === 0) return "heute";
@@ -118,6 +132,9 @@
     .ltabs + .summary { border-top-left-radius:0; }
     .pv.fs iframe { height: 100vh; border-radius:0; margin:0; }
     .row .stx { font-size:.8em; color: var(--warning-color,#e08a00); margin-left:4px; }
+    .info.tr { padding-top: 0; }
+    .bar2 { height:4px; border-radius:2px; background: var(--divider-color); margin-top:4px; overflow:hidden; }
+    .bar2 i { display:block; height:100%; background: var(--primary-color); }
     .grp { padding: 10px 16px 2px; font-size:.8em; text-transform:uppercase; letter-spacing:.04em; color: var(--secondary-text-color); }
     pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size:.92em; margin: 6px 0 0; max-height: 50vh; overflow:auto; }
     iframe { width:100%; height: 65vh; border:1px solid var(--divider-color); border-radius:8px; margin-top:8px; background:#fff; }
@@ -296,7 +313,11 @@
       if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch – die Daten erscheinen gleich automatisch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else if (!this._data.children.length) html += `<div class="empty">Keine Kinder gefunden.</div>`;
-      else for (const c of this._data.children) html += this._childHtml(c);
+      else {
+        const tr = this._data.translation;
+        if (tr && tr.total) html += `<div class="info tr">🌐 Zusammenfassungen werden übersetzt${tr.languages && tr.languages.length ? ` (${esc(tr.languages.join(", "))})` : ""}: ${tr.done} von ${tr.total}<div class="bar2"><i style="width:${Math.round((100 * tr.done) / tr.total)}%"></i></div></div>`;
+        for (const c of this._data.children) html += this._childHtml(c);
+      }
       html += `</ha-card>`;
       root.innerHTML = html;
       if (keepDialog) root.appendChild(keepDialog);
@@ -369,7 +390,7 @@
             : "";
           return `<div class="row ${t.status === "erledigt" ? "done" : ""}" data-task="${esc(t.id)}">
               <ha-icon class="st ${esc(t.status)}" icon="${st[2]}" title="${st[1]}"></ha-icon>
-              <div class="main"><div class="t">${esc(t.icon)} ${esc(t.title)}${t.has_files ? " 📎" : ""}</div>
+              <div class="main"><div class="t">${esc(t.icon)} ${esc(datedTitle(t.published, t.title))}${t.has_files ? " 📎" : ""}</div>
               ${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div>${due}</div>`;
         })
         .join("");
@@ -574,7 +595,7 @@
         ${t.item ? `<div class="sec"><div class="lbl">Quelle</div>${this._sourceHtml(t.item, { openText: !t.item.files.length })}</div>` : `<div class="sec sub">Eigene Aufgabe (ohne Mitteilung).</div>`}
         ${others.length ? `<div class="sec"><div class="lbl">Weitere Aufgaben aus dieser Mitteilung</div>${this._taskList(others, "")}</div>` : ""}
       `;
-      this._showDialog(`${esc(t.icon)} ${esc(t.title)}${t.child_name ? ` <span class="sub">· ${esc(t.child_name)}</span>` : ""}`, body, (ov) => {
+      this._showDialog(`${esc(t.icon)} ${esc(datedTitle(t.published, t.title, true))}${t.child_name ? ` <span class="sub">· ${esc(t.child_name)}</span>` : ""}`, body, (ov) => {
         ov.querySelectorAll("[data-status]").forEach((b) =>
           b.addEventListener("click", async () => {
             await this._call("update_task", { task_id: t.id, status: b.dataset.status });
@@ -621,7 +642,7 @@
           <button class="btn mark">${i.read ? "Als ungelesen markieren" : "Als gelesen markieren"}</button>
           <button class="btn re">🤖 Neu auswerten</button>
         </div>`;
-      this._showDialog(`${i.urgency === "hoch" && status !== "erledigt" ? "🔴 " : ""}${esc(i.title)}`, body, (ov) => {
+      this._showDialog(`${i.urgency === "hoch" && status !== "erledigt" ? "🔴 " : ""}${esc(datedTitle(i.sent && i.sent.slice(0, 10), i.title, true))}`, body, (ov) => {
         ov.querySelectorAll("[data-istatus]").forEach((b) =>
           b.addEventListener("click", async () => {
             const next = b.dataset.istatus;

@@ -20,7 +20,9 @@ from .entity import SchulEntity
 from .manager import SchulManager
 
 _ICONS = "|".join(re.escape(i) for i in TASK_TYPE_ICONS.values())
-_RE_DECOR = re.compile(rf"^(?:⏳\s*)?(?:{_ICONS})\s*|\s*\([\d.,]+\s*€\)$")
+_RE_DECOR = re.compile(
+    rf"^(?:⏳\s*)?(?:(?:{_ICONS})\s*)?(?:\d{{2}}\.\d{{2}}\.(?:\d{{4}})?\s*·\s*)?|\s*\([\d.,]+\s*€\)$"
+)
 
 
 async def async_setup_entry(
@@ -55,7 +57,7 @@ class SchulTodo(SchulEntity, TodoListEntity):
             out.append(
                 TodoItem(
                     uid=t["id"],
-                    summary=f"{'⏳ ' if t['status'] == STATUS_PROGRESS else ''}{TASK_TYPE_ICONS.get(t['type'], '✅')} {m.task_label(t)}",
+                    summary=f"{'⏳ ' if t['status'] == STATUS_PROGRESS else ''}{TASK_TYPE_ICONS.get(t['type'], '✅')} {m.dated(m.task_label(t), t)}",
                     status=TodoItemStatus.COMPLETED
                     if t["status"] == STATUS_DONE
                     else TodoItemStatus.NEEDS_ACTION,

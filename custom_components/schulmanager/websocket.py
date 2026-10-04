@@ -107,6 +107,7 @@ def _task_light(m, t: dict[str, Any]) -> dict[str, Any]:
         "item_uid": t.get("item_uid"),
         "item_title": item.get("title") if item else None,
         "has_files": bool(item and item.get("files")),
+        "published": (p := m.published(t)) and p.isoformat(),
     }
 
 
@@ -227,6 +228,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
             "errors": m.last_errors,
             "legend": _legend(),
             "languages": [[code, LANGUAGE_NAMES[code]] for code in m.summary_languages],
+            "translation": m.translation_progress,
             "today": today.isoformat(),
         },
     )

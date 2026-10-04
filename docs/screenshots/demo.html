@@ -127,7 +127,7 @@
   // Aufgabe für den Detail-Dialog (card=task)
   const TASK = {
     id: "t9", child: "anna", child_name: "Anna", icon: "💶", title: "Skilager anzahlen", type: "zahlung",
-    status: "in_arbeit", due: "2026-10-09", days: 4, source: "ki",
+    status: "in_arbeit", due: "2026-10-09", days: 4, source: "ki", published: "2026-09-29",
     amount_text: "120,00 €", payee: "Förderverein Beispiel-Gymnasium", iban: "DE00 0000 0000 0000 0000 00", reference: "Skilager Anna 7B",
     details: "Anzahlung für das Skilager im Januar. Restbetrag folgt im Dezember.",
     comment: "Überweisung vorbereitet", comment_at: "2026-10-04",
@@ -137,8 +137,8 @@
       files: [{ name: "2026-09-29 Elternbrief - Skilager.pdf", url: "#", content_type: "application/pdf" }],
       url: "#", body: "", text: "",
       tasks: [
-        { id: "t9", title: "Skilager anzahlen", icon: "💶", status: "in_arbeit", due: "2026-10-09", days: 4 },
-        { id: "t8", title: "Einverständniserklärung unterschreiben", icon: "✍️", status: "offen", due: "2026-10-07", days: 2 },
+        { id: "t9", title: "Skilager anzahlen", icon: "💶", status: "in_arbeit", due: "2026-10-09", days: 4, published: "2026-09-29" },
+        { id: "t8", title: "Einverständniserklärung unterschreiben", icon: "✍️", status: "offen", due: "2026-10-07", days: 2, published: "2026-09-29" },
       ],
     },
   };
@@ -157,7 +157,7 @@
     files: [{ name: "2026-09-29 Elternbrief - Skilager.pdf", url: "#", content_type: "application/pdf" }],
     url: "#", body: "", text: "",
     tasks: [
-      { id: "t9", title: "Skilager anzahlen", icon: "💶", status: "in_arbeit", due: "2026-10-09", days: 4, amount_text: "120,00 €" },
+      { id: "t9", title: "Skilager anzahlen", icon: "💶", status: "in_arbeit", due: "2026-10-09", days: 4, amount_text: "120,00 €", published: "2026-09-29" },
       { id: "t8", title: "Einverständniserklärung unterschreiben", icon: "✍️", status: "offen", due: "2026-10-07", days: 2 },
     ],
   };

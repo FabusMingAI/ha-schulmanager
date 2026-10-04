@@ -124,9 +124,29 @@
   if (q.get("w")) document.documentElement.style.setProperty("--w", q.get("w") + "px");
   const children = card === "termine" ? [anna, max] : [anna];
 
+  // Aufgabe für den Detail-Dialog (card=task)
+  const TASK = {
+    id: "t9", child: "anna", child_name: "Anna", icon: "💶", title: "Skilager anzahlen", type: "zahlung",
+    status: "in_arbeit", due: "2026-10-09", days: 4, source: "ki",
+    amount_text: "120,00 €", payee: "Förderverein Beispiel-Gymnasium", iban: "DE00 0000 0000 0000 0000 00", reference: "Skilager Anna 7B",
+    details: "Anzahlung für das Skilager im Januar. Restbetrag folgt im Dezember.",
+    comment: "Überweisung vorbereitet", comment_at: "2026-10-04",
+    item: {
+      uid: "i9", kind_label: "Elternbrief", sent: "2026-09-29", sender: "", title: "Skilager der 7. Klassen",
+      summary: "Skilager 18.–23.01. in den Alpen. Anzahlung 120 € bis 09.10., Einverständniserklärung bis 07.10. unterschrieben zurück.",
+      files: [{ name: "2026-09-29 Elternbrief - Skilager.pdf", url: "#", content_type: "application/pdf" }],
+      url: "#", body: "", text: "",
+      tasks: [
+        { id: "t9", title: "Skilager anzahlen", icon: "💶", status: "in_arbeit", due: "2026-10-09", days: 4 },
+        { id: "t8", title: "Einverständniserklärung unterschreiben", icon: "✍️", status: "offen", due: "2026-10-07", days: 2 },
+      ],
+    },
+  };
+
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
-    callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, last_update: null, errors: {} } : {},
+    callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, last_update: null, errors: {} }
+      : msg.type === "schulmanager/task" ? TASK : {},
     callService: async () => {},
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },
   };
@@ -134,7 +154,7 @@
   const s = document.createElement("script");
   s.src = "../../custom_components/schulmanager/www/schulmanager-card.js";
   s.onload = () => {
-    const el = document.createElement("schulmanager-" + card);
+    const el = document.createElement(card === "task" ? "schulmanager-card" : "schulmanager-" + card);
     el.setConfig({});
     document.getElementById("wrap").appendChild(el);
     el.hass = window.hass;

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 – 2026-10-04
+
+- Dashboard "Schule", tab *Overview*: the right-hand "Schulmanager" panel (last fetch, refresh, send summary) is replaced by **each child's timetable** with substitutions, exams and tests. Refresh and summary stay available as actions `schulmanager.refresh` / `schulmanager.send_digest`, and the last fetch as `sensor.schulmanager_letzter_abruf`. The dashboard updates by itself after the restart unless it was changed by hand (then: action `schulmanager.rebuild_dashboard`). / Dashboard „Schule“, Reiter *Übersicht*: Statt der Karte „Schulmanager“ steht rechts jetzt der **Stundenplan je Kind** mit Vertretungen, Schulaufgaben und Tests. Abrufen und Tagesübersicht bleiben als Aktionen erhalten.
+- Docs: new screenshots with made-up demo data (timetable day/week view, appointments, task details), reproducible via `docs/screenshots/`. / Doku: neue Screenshots mit Demo-Daten.
+
 ## 0.7.0 – 2026-10-04
 
 - New: portal appointments are classified like in Eltern-Portal – **exams** (*Schulaufgabe*, 📝), **tests** (*Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe*, ✏️) and **school appointments** (🏫). By default only exams and tests are shown; school appointments can be switched on under Configure → Settings → "Portal appointments to show". / Neu: Portal-Termine nach Art wie im Eltern-Portal; standardmäßig nur Schulaufgaben und Tests, Termine der Schule per Einstellung.

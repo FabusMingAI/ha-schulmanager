@@ -600,8 +600,12 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     titles = [v["title"] for v in cfg["views"]]
     assert titles[0] == "Übersicht" and len(titles) == 1 + len(m.children), titles
     overview = json.dumps(cfg["views"][0])
-    assert "custom:schulmanager-termine" in overview and "Schulmanager" in overview
-    # keine Zeilen je Kind mehr in der Schulmanager-Karte der Übersicht
+    assert "custom:schulmanager-termine" in overview
+    # rechte Spalte: Stundenplan je Kind statt der Schulmanager-Karte (seit 0.7.1)
+    right = cfg["views"][0]["sections"][1]["cards"]
+    plans = [c["child"] for c in right if c["type"] == "custom:schulmanager-stundenplan"]
+    assert plans == list(m.children), right
+    assert all(c["type"] != "entities" for c in right)
     assert "sensor.schule_erika_status" not in overview
     assert cfg["views"][1]["sections"][0]["cards"][0] == {
         "type": "custom:schulmanager-card", "child": "erika", "grid_options": {"columns": 12}

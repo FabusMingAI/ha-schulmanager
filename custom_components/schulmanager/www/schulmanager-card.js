@@ -6,7 +6,7 @@
  *   child: anna          # optional, ohne Angabe: alle Kinder
  */
 (() => {
-  const VERSION = "0.7.0";
+  const VERSION = "0.7.1";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {

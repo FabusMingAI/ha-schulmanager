@@ -181,10 +181,19 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                     ],
                 },
                 {
+                    # Rechte Spalte: Stundenplan je Kind (seit 0.7.1 statt der Schulmanager-Karte)
                     "type": "grid",
                     "cards": [
-                        {"type": "heading", "heading": "Schulmanager", "icon": "mdi:school"},
-                        _schulmanager_card(hass, manager, links=True, title=False),
+                        card
+                        for key, child in children.items()
+                        for card in (
+                            {
+                                "type": "heading",
+                                "heading": f"Stundenplan {child['name']}",
+                                "icon": "mdi:timetable",
+                            },
+                            _stundenplan(key),
+                        )
                     ],
                 },
             ],

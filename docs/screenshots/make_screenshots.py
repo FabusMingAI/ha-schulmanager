@@ -24,6 +24,7 @@ SHOTS = [
     ("stundenplan.png", "stundenplan", 380, "day"),
     ("stundenplan-woche.png", "stundenplan", 640, "week"),
     ("termine.png", "termine", 400, "hover"),
+    ("task-dialog.png", "task", 390, "dialog"),
 ]
 
 
@@ -47,13 +48,15 @@ def main() -> None:
     css = font_css(args.font_dir)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(args=["--lang=de-DE"], env={"LANG": "de_DE.UTF-8", "LANGUAGE": "de"})
         for name, card, width, action in SHOTS:
-            page = browser.new_page(device_scale_factor=2, viewport={"width": width + 120, "height": 1400})
+            page = browser.new_page(locale="de-DE", device_scale_factor=2, viewport={"width": width + 120, "height": 1400})
             page.goto(f"{(HERE / 'demo.html').as_uri()}?card={card}&w={width}&theme={args.theme}")
             if css:
                 page.add_style_tag(content=css)
-            card_el = page.locator(f"schulmanager-{card}")
+            if action == "dialog":  # Dialog füllt das Fenster wie am Handy
+                page.set_viewport_size({"width": width, "height": 844})
+            card_el = page.locator("schulmanager-card" if card == "task" else f"schulmanager-{card}")
             card_el.locator("ha-card").wait_for()
             page.wait_for_function("() => !window.cardEl.shadowRoot.textContent.includes('Lade')")
             if action == "day":
@@ -62,8 +65,16 @@ def main() -> None:
                 card_el.locator("[data-week]").click()
             elif action == "hover":
                 card_el.locator('[data-ev="anna:e5"]').hover()
+            elif action == "dialog":
+                page.evaluate("window.cardEl._openTask('t9')")
+                card_el.locator(".ov").wait_for()
             page.evaluate("document.fonts.ready")
             page.wait_for_timeout(300)
+            if action == "dialog":
+                page.screenshot(path=str(OUT / name))
+                print("geschrieben:", OUT / name)
+                page.close()
+                continue
             box = page.locator("#wrap").bounding_box()
             clip = {"x": box["x"] - 8, "y": box["y"] - 8, "width": box["width"] + 16, "height": box["height"] + 16}
             if action == "hover":  # Tooltip darf über die Karte hinausragen

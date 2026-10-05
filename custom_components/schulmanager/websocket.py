@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
@@ -27,6 +29,20 @@ from .const import (
 )
 
 MAX_DONE_DAYS = 45
+REPO_URL = "https://github.com/FabusMingAI/ha-schulmanager"
+NEW_ITEMS_MAX = 10
+NEW_RECENT_DAYS = 3
+
+
+def _read_version() -> str | None:
+    try:
+        return json.loads((Path(__file__).parent / "manifest.json").read_text("utf-8")).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+# Modul wird von Home Assistant im Import-Executor geladen – hier darf gelesen werden
+VERSION = _read_version()
 AGENDA_PAST_DAYS = 1
 AGENDA_DAYS = 90
 
@@ -165,6 +181,72 @@ def _item_full(hass: HomeAssistant, m, i: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _next_school_day(today: date) -> date:
+    day = today + timedelta(days=1)
+    while day.isoweekday() > 5:
+        day += timedelta(days=1)
+    return day
+
+
+def _day_overview(m, key: str, events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Was ist heute neu bzw. steht heute/am nächsten Schultag an (für die Kopfzeile)."""
+    today = dt_util.now().date()
+    nxt = _next_school_day(today)
+    t_iso, n_iso = today.isoformat(), nxt.isoformat()
+
+    recent = today - timedelta(days=NEW_RECENT_DAYS)
+
+    def fresh(obj: dict[str, Any]) -> bool:
+        # heute angelegt und kürzlich im Portal erschienen – sonst würde der Erst-Import
+        # (Mitteilungen der letzten 120 Tage) einen ganzen Tag lang als „neu“ zählen
+        pub = m.published(obj)
+        return str(obj.get("created") or "")[:10] == t_iso and (pub is None or pub >= recent)
+
+    new_items = [i for i in m.child_items(key) if not i.get("read") or fresh(i)]
+    new_tasks, due = [], []
+    for t in m.child_tasks(key):
+        if fresh(t):
+            new_tasks.append(_task_light(m, t))
+        if t.get("due") and t["due"] <= n_iso:
+            due.append(_task_light(m, t))
+    changes = []
+    for d in m.child_substitutions(key):
+        if d["date"] not in (t_iso, n_iso):
+            continue
+        for e in d["entries"]:
+            changes.append(
+                {
+                    "date": d["date"],
+                    "uid": e.get("uid"),
+                    "kind": e.get("kind") or "vertretung",
+                    "lesson": e.get("lesson"),
+                    "subject": e.get("subject"),
+                    "old_subject": e.get("old_subject"),
+                    "substitute": e.get("substitute"),
+                    "room": e.get("room"),
+                    "info": e.get("info"),
+                    "text": m.substitution_text(e),
+                }
+            )
+    upcoming = [
+        e
+        for e in events
+        if e["category"] in ("schulaufgabe", "test", "portal", "termin")
+        and e["date"] <= n_iso
+        and (e["until"] or e["date"]) >= t_iso
+    ]
+    return {
+        "today": t_iso,
+        "next_day": n_iso,
+        "new_items": [_item_light(m, i) for i in new_items[:NEW_ITEMS_MAX]],
+        "new_items_total": len(new_items),
+        "new_tasks": new_tasks,
+        "due": due,
+        "changes": changes,
+        "events": upcoming,
+    }
+
+
 @websocket_api.websocket_command(
     {vol.Required("type"): "schulmanager/data", vol.Optional("child"): str}
 )
@@ -187,6 +269,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 if done_day and (today - done_day.date()).days > MAX_DONE_DAYS:
                     continue
             tasks.append(_task_light(m, t))
+        events = _agenda(m, key)
         children.append(
             {
                 "key": key,
@@ -201,7 +284,8 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 "payments_text": fmt_eur(s["payments_total"]) if s["payments_total"] else None,
                 "tasks": tasks,
                 "items": [_item_light(m, i) for i in m.child_items(key)[:60]],
-                "events": _agenda(m, key),
+                "events": events,
+                "day": _day_overview(m, key, events),
                 "timetable": m.data["timetable"].get(key, {}).get("lessons", []),
                 "sicknotes": m.child_sicknotes(key)[:30],
                 "substitutions": {
@@ -230,6 +314,8 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
             "languages": [[code, LANGUAGE_NAMES[code]] for code in m.summary_languages],
             "translation": m.translation_progress,
             "today": today.isoformat(),
+            "version": VERSION,
+            "repo_url": REPO_URL,
         },
     )
 

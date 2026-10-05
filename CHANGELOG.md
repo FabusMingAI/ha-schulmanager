@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0 – 2026-10-05
+
+- New: **"Today" header** on the overview of the "Schule" dashboard (card `custom:schulmanager-heute`): per child the new messages, deadlines until the next school day, new tasks, timetable changes for today and the next school day, exams/tests and appointments – each entry opens its message, task or the list of changes. Children with nothing new show "✓ Nichts Neues". / Neu: Tagesüberblick je Kind oben auf der Übersicht, alle Einträge anklickbar.
+- New: the header shows, right-aligned next to "⚙️ Einstellungen", **when Eltern-Portal was last fetched** (with ↻ to fetch now and a warning on fetch errors) and the **installed version** with a link to its release on GitHub. / Neu: letzter Abruf und Version mit Link zu GitHub in der Kopfzeile.
+- Fix: text in the message and task dialogs can be **selected and copied** again. The dialog is no longer redrawn while text is selected or when nothing changed, releasing the mouse outside the dialog no longer closes it, and new "📋 kopieren" buttons copy the summary or the text (also without HTTPS). / Behoben: Text in den Dialogen lässt sich wieder markieren und kopieren; neue Kopieren-Knöpfe.
+
 ## 0.9.1 – 2026-10-04
 
 - Fix: the settings dialog (sections, new in 0.9.0) showed empty fields instead of the stored settings, so saving it could overwrite them. Stored values are shown again; sections that are not sent keep their values. / Behoben: Das Einstellungsfenster zeigte in 0.9.0 leere Felder statt der gespeicherten Einstellungen – Speichern hätte sie überschrieben.

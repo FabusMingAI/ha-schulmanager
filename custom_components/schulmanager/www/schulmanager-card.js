@@ -3,11 +3,12 @@
  *   type: custom:schulmanager-card         # Aufgaben & Mitteilungen
  *   type: custom:schulmanager-termine      # Termine & Fristen mit Legende
  *   type: custom:schulmanager-stundenplan  # Stundenplan mit Vertretungen
+ *   type: custom:schulmanager-heute        # Neuigkeiten des Tages je Kind (header: true = mit Titelzeile)
  *   child: anna          # optional, ohne Angabe: alle Kinder
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.9.0";
+  const VERSION = "0.10.0";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -53,6 +54,35 @@
   const AMPEL = { rot: "Dringend", gelb: "Etwas offen", gruen: "Alles erledigt" };
   const LANG_ORDER = ["de", "en", "es", "ca"];
   const LANG_NAMES = { de: "Deutsch", en: "English", es: "Español", ca: "Català" };
+  // In die Zwischenablage kopieren – auch ohne HTTPS (dort fehlt navigator.clipboard)
+  const copyText = async (text) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      /* weiter mit dem Fallback */
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      ok = false;
+    }
+    ta.remove();
+    return ok;
+  };
+  const navigate = (path) => {
+    history.pushState(null, "", path);
+    window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+  };
   const isPdf = (f) => (f.content_type || "").includes("pdf") || String(f.name || "").toLowerCase().endsWith(".pdf");
 
   const STYLE = `
@@ -93,6 +123,8 @@
     .foot a { color: var(--primary-color); cursor:pointer; text-decoration:none; }
 
     .ov { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; display:flex; align-items:center; justify-content:center; }
+    .dlg { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; cursor: auto; }
+    .dlg button, .dlg .seg, .dlg .ltabs, .dlg summary, .dlg .copy { -webkit-user-select: none; user-select: none; }
     .dlg { background: var(--card-background-color, #fff); color: var(--primary-text-color); width: min(760px, 96vw); max-height: 92vh; overflow:auto; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
     @media (max-width: 600px) {
       .dlg { width:100vw; max-height:100vh; height:100vh; height:100dvh; border-radius:0; }
@@ -117,6 +149,7 @@
     .grid .k { color: var(--secondary-text-color); }
     .grid > span { overflow-wrap:anywhere; min-width:0; }
     .copy { cursor:pointer; color: var(--primary-color); margin-left:6px; font-size:.85em; }
+    .cpb { border:none; background:none; cursor:pointer; color: var(--primary-color); font: inherit; font-size:.82em; padding:2px 0; margin-top:4px; }
     input[type=date] { -webkit-appearance:none; appearance:none; display:block; min-height:42px; max-width:100%; }
     textarea, input[type=date] { width:100%; box-sizing:border-box; font: inherit; color: var(--primary-text-color); background: var(--secondary-background-color); border:1px solid var(--divider-color); border-radius:8px; padding:8px; }
     textarea { min-height: 80px; resize: vertical; }
@@ -301,14 +334,33 @@
         }, wait);
       }
       this._render();
-      if (refreshDialog && this._dialog && !this._editing) this._reopen();
+      if (refreshDialog && this._dialog && !this._editing && !this._hasSelection()) this._reopen();
+    }
+
+    // Inhalt der Karte ersetzen, ohne den offenen Dialog aus dem DOM zu nehmen –
+    // sonst geht bei jeder Aktualisierung eine Textmarkierung im Dialog verloren.
+    _setContent(html) {
+      const root = this.shadowRoot;
+      let c = root.getElementById("sm-c");
+      if (!c) {
+        const ov = root.querySelector(".ov");
+        root.innerHTML = `<style>${STYLE}</style><div id="sm-c"></div>`;
+        if (ov) root.appendChild(ov);
+        c = root.getElementById("sm-c");
+      }
+      c.innerHTML = html;
+      return c;
+    }
+
+    // Ist im Dialog gerade Text markiert?
+    _hasSelection() {
+      const sel = (this.shadowRoot.getSelection && this.shadowRoot.getSelection()) || window.getSelection();
+      return !!(sel && !sel.isCollapsed && String(sel).trim());
     }
 
     // ------------------------------------------------------------ Liste
     _render() {
-      const root = this.shadowRoot;
-      const keepDialog = root.querySelector(".ov");
-      let html = `<style>${STYLE}</style><ha-card>`;
+      let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
       if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch – die Daten erscheinen gleich automatisch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
@@ -319,8 +371,7 @@
         for (const c of this._data.children) html += this._childHtml(c);
       }
       html += `</ha-card>`;
-      root.innerHTML = html;
-      if (keepDialog) root.appendChild(keepDialog);
+      const root = this._setContent(html);
       root.querySelectorAll("[data-tab]").forEach((el) =>
         el.addEventListener("click", () => {
           this._tab[el.dataset.child] = el.dataset.tab;
@@ -425,19 +476,34 @@
 
     _showDialog(title, bodyHtml, bind) {
       let ov = this.shadowRoot.querySelector(".ov");
+      const html = `<div class="dlg" role="dialog" aria-modal="true">
+          <div class="dh"><h2>${title}</h2><button class="x" title="Schließen">×</button></div>
+          <div class="db">${bodyHtml}</div>
+          <div class="df"><button class="btn primary close2">Schließen</button></div></div>`;
+      // unveränderter Inhalt: nichts neu zeichnen (Markierung, aufgeklappte Texte und PDF bleiben)
+      if (ov && ov._html === html) return;
       const scroll = ov ? ov.querySelector(".dlg").scrollTop : 0;
+      const opened = ov ? [...ov.querySelectorAll("details")].map((d) => d.open) : null;
       if (!ov) {
         ov = document.createElement("div");
         ov.className = "ov";
         this.shadowRoot.appendChild(ov);
       }
-      ov.innerHTML = `<div class="dlg" role="dialog" aria-modal="true">
-          <div class="dh"><h2>${title}</h2><button class="x" title="Schließen">×</button></div>
-          <div class="db">${bodyHtml}</div>
-          <div class="df"><button class="btn primary close2">Schließen</button></div></div>`;
+      ov.innerHTML = html;
+      ov._html = html;
+      if (opened) ov.querySelectorAll("details").forEach((d, i) => {
+        if (i < opened.length) d.open = opened[i];
+      });
       ov.querySelector(".dlg").scrollTop = scroll;
+      // nur schließen, wenn Klick im dunklen Bereich beginnt und endet – nicht beim
+      // Markieren von Text, das außerhalb des Dialogs losgelassen wird
+      // (Block statt Ausdruck: ein Rückgabewert false würde das Markieren verhindern)
+      ov.onmousedown = (ev) => {
+        ov._down = ev.target === ov;
+      };
       ov.onclick = (ev) => {
-        if (ev.target === ov) this._closeDialog();
+        if (ev.target === ov && ov._down !== false) this._closeDialog();
+        ov._down = undefined;
       };
       ov.querySelector(".x").onclick = () => this._closeDialog();
       ov.querySelector(".close2").onclick = () => this._closeDialog();
@@ -448,13 +514,23 @@
         });
       }
       ov.querySelectorAll("[data-copy]").forEach((el) =>
-        el.addEventListener("click", () => {
-          navigator.clipboard?.writeText(el.dataset.copy);
-          el.textContent = "kopiert ✓";
+        el.addEventListener("click", async () => {
+          const ok = await copyText(el.dataset.copy);
+          el.textContent = ok ? "kopiert ✓" : "nicht möglich – bitte markieren";
+        })
+      );
+      ov.querySelectorAll("[data-copyfrom]").forEach((el) =>
+        el.addEventListener("click", async () => {
+          const src = ov.querySelector(el.dataset.copyfrom);
+          const text = src ? src.innerText.replace(/^🤖\s*/, "") : "";
+          const ok = await copyText(text);
+          el.textContent = ok ? "📋 kopiert ✓" : "📋 nicht möglich – bitte markieren";
         })
       );
       ov.querySelectorAll("[data-task]").forEach((el) =>
-        el.addEventListener("click", () => this._openTask(el.dataset.task))
+        el.addEventListener("click", () => {
+          if (!this._hasSelection()) this._openTask(el.dataset.task);
+        })
       );
       ov.querySelectorAll("[data-preview]").forEach((el) =>
         el.addEventListener("click", () => {
@@ -494,8 +570,8 @@
             ${item.url ? `<a class="btn" href="${esc(item.url)}" target="_blank" rel="noopener">↗ Im Eltern-Portal</a>` : ""}
           </div>
           <div class="pv">${opts.preview && pdf ? `<iframe src="${esc(pdf.url)}" title="Vorschau"></iframe>` : ""}</div>
-          ${text ? `<details ${opts.openText ? "open" : ""}><summary>Text der Mitteilung</summary><pre>${esc(text)}</pre></details>` : ""}
-          ${fileText ? `<details><summary>Text aus der PDF</summary><pre>${esc(fileText)}</pre></details>` : ""}
+          ${text ? `<details ${opts.openText ? "open" : ""}><summary>Text der Mitteilung</summary><pre class="tx-body">${esc(text)}</pre><button class="cpb" data-copyfrom=".tx-body">📋 Text kopieren</button></details>` : ""}
+          ${fileText ? `<details><summary>Text aus der PDF</summary><pre class="tx-file">${esc(fileText)}</pre><button class="cpb" data-copyfrom=".tx-file">📋 Text kopieren</button></details>` : ""}
         </div>`;
     }
 
@@ -550,12 +626,12 @@
     // KI-Zusammenfassung mit einem Reiter je Sprache (Einstellung „Sprachen der KI-Zusammenfassung“)
     _summaryHtml(item) {
       const langs = Object.keys(item.summaries || {}).sort((a, b) => LANG_ORDER.indexOf(a) - LANG_ORDER.indexOf(b));
-      if (!langs.length) return item.summary ? `<div class="summary">🤖 ${esc(item.summary)}</div>` : "";
+      if (!langs.length) return item.summary ? `<div class="summary sm-only">🤖 ${esc(item.summary)}</div><button class="cpb" data-copyfrom=".sm-only">📋 Zusammenfassung kopieren</button>` : "";
       this._lang = this._lang && langs.includes(this._lang) ? this._lang : langs[0];
       const tabs = langs.length > 1
         ? `<div class="ltabs">${langs.map((l) => `<button class="ltab ${l === this._lang ? "on" : ""}" data-lang="${esc(l)}">${esc(LANG_NAMES[l] || l)}</button>`).join("")}</div>`
         : "";
-      return `${tabs}${langs.map((l) => `<div class="summary" data-langbox="${esc(l)}" ${l === this._lang ? "" : "hidden"}>🤖 ${esc(item.summaries[l])}</div>`).join("")}`;
+      return `${tabs}${langs.map((l) => `<div class="summary" data-langbox="${esc(l)}" ${l === this._lang ? "" : "hidden"}>🤖 ${esc(item.summaries[l])}</div>`).join("")}<button class="cpb" data-copyfrom="[data-langbox]:not([hidden])">📋 Zusammenfassung kopieren</button>`;
     }
 
     async _openTask(id, silent) {
@@ -793,16 +869,13 @@
     }
 
     _render() {
-      const root = this.shadowRoot;
-      const keepDialog = root.querySelector(".ov");
-      let html = `<style>${STYLE}</style><ha-card>`;
+      let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
       if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else html += this._agendaHtml();
       html += `</ha-card>`;
-      root.innerHTML = html;
-      if (keepDialog) root.appendChild(keepDialog);
+      this._setContent(html);
       this._bindAgenda();
     }
 
@@ -871,7 +944,7 @@
     }
 
     _bindAgenda() {
-      const root = this.shadowRoot;
+      const root = this.shadowRoot.getElementById("sm-c");
       root.querySelectorAll("[data-range]").forEach((el) =>
         el.addEventListener("click", () => {
           this._range = el.dataset.range;
@@ -941,17 +1014,14 @@
     }
 
     _render() {
-      const root = this.shadowRoot;
-      const keepDialog = root.querySelector(".ov");
-      let html = `<style>${STYLE}</style><ha-card>`;
+      let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
       if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else if (!this._data.children.length) html += `<div class="empty">Keine Kinder gefunden.</div>`;
       else for (const c of this._data.children) html += this._planHtml(c);
       html += `</ha-card>`;
-      root.innerHTML = html;
-      if (keepDialog) root.appendChild(keepDialog);
+      const root = this._setContent(html);
       root.querySelectorAll("[data-day]").forEach((el) =>
         el.addEventListener("click", () => {
           this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.day };
@@ -1109,6 +1179,213 @@
     }
   }
 
+
+  // ================================================================
+  // Kopfzeile „Heute“: letzter Abruf, Version, Neuigkeiten je Kind
+  // ================================================================
+  const HEUTE_STYLE = `
+    .hd { padding: 12px 0 6px; }
+    .top { display:flex; align-items:center; gap:12px; padding: 0 16px 8px; flex-wrap:wrap; }
+    .top img { width:40px; height:40px; flex:none; }
+    .top .tt { flex: 1 1 14em; min-width:0; }
+    .top .ttl { font-size:1.5em; font-weight:500; line-height:1.2; }
+    .top .meta { margin-left:auto; text-align:right; font-size:.85em; color: var(--secondary-text-color); display:flex; flex-wrap:wrap; gap:4px 12px; justify-content:flex-end; align-items:center; }
+    .top .meta a, .lnk { color: var(--primary-color); text-decoration:none; cursor:pointer; }
+    .top .meta a:hover, .lnk:hover { text-decoration:underline; }
+    .top .meta .err { color: var(--error-color,#db4437); }
+    .rf { border:none; background:none; cursor:pointer; color: var(--primary-color); font: inherit; padding:0 2px; }
+    .dch { display:flex; align-items:flex-start; gap:10px; padding: 8px 16px 4px; border-top:1px solid var(--divider-color); }
+    .dch .who2 { display:flex; align-items:center; gap:8px; min-width: 7.5em; font-weight:500; padding-top:2px; }
+    .dch .body { flex:1; min-width:0; }
+    .dch .chips { padding:0; }
+    .chip.blue { background: rgba(3,169,244,.14); color: var(--primary-color); }
+    .chip.orange { background: rgba(255,166,0,.18); color: var(--warning-color,#e08a00); }
+    .chip.ok { background: rgba(67,160,71,.14); color: var(--success-color,#43a047); }
+    .dl { list-style:none; margin:6px 0 4px; padding:0; }
+    .dl li { padding:3px 0; font-size:.92em; display:flex; gap:6px; align-items:baseline; min-width:0; }
+    .dl li .lnk, .dl li .tx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .dl li .lnk.unread { font-weight:600; }
+    .dl li .w { color: var(--secondary-text-color); font-size:.85em; white-space:nowrap; flex:none; }
+    .dl li .w.red { color: var(--error-color,#db4437); font-weight:600; }
+    .dl li.entfall .lnk { color: var(--error-color,#db4437); }
+    .more { font-size:.85em; }
+    @media (max-width: 600px) {
+      .top .meta { margin-left:0; justify-content:flex-start; text-align:left; width:100%; }
+      .dch { flex-direction:column; gap:2px; }
+    }
+  `;
+  const CHANGE_ICON = { entfall: "❌", vertretung: "🔁", raum: "🚪" };
+  const LIST_MAX = 6;
+
+  class SchulmanagerHeuteCard extends SchulmanagerCard {
+    getCardSize() {
+      return 3;
+    }
+
+    getGridOptions() {
+      return { columns: 12, min_columns: 6 };
+    }
+
+    _stamp(iso) {
+      if (!iso) return "noch kein Abruf";
+      const d = new Date(iso);
+      if (isNaN(d)) return "";
+      const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      const day = isoDay(d);
+      const today = isoDay(new Date());
+      if (day === today) return `heute ${hm}`;
+      if (day === addDays(today, -1)) return `gestern ${hm}`;
+      return `${fmtShort(day)} ${hm}`;
+    }
+
+    _render() {
+      const cfg = this._config;
+      let html = `<style>${HEUTE_STYLE}</style><ha-card class="hd">`;
+      const d = this._data;
+      if (cfg.header !== false && cfg.header !== undefined) html += this._topHtml(d);
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      else if (!d) html += `<div class="empty">Lade …</div>`;
+      else for (const c of d.children) html += this._dayHtml(c, d);
+      html += `</ha-card>`;
+      const root = this._setContent(html);
+      this._bindHeute(root);
+    }
+
+    _topHtml(d) {
+      const cfg = this._config;
+      const isAdmin = !this._hass || !this._hass.user || this._hass.user.is_admin;
+      const meta = [];
+      if (d) {
+        const errs = (d.errors || []).length;
+        meta.push(
+          `<span title="Letzter Abruf aus dem Eltern-Portal">Stand: ${esc(this._stamp(d.last_update))}` +
+            `<button class="rf" data-refresh title="Portale jetzt abrufen">${this._refreshing ? "…" : "↻"}</button></span>`
+        );
+        if (errs) meta.push(`<span class="err" title="${esc((d.errors || []).join("\n"))}">⚠️ ${errs} Fehler beim Abruf</span>`);
+        if (d.version) {
+          const url = `${d.repo_url || "https://github.com/FabusMingAI/ha-schulmanager"}/releases/tag/v${d.version}`;
+          meta.push(`<a href="${esc(url)}" target="_blank" rel="noopener" title="Schulmanager auf GitHub">v${esc(d.version)} ↗</a>`);
+        }
+      }
+      if (isAdmin && cfg.settings_path !== false) meta.push(`<a data-nav="${esc(cfg.settings_path || "/config/integrations/integration/schulmanager")}">⚙️ Einstellungen</a>`);
+      return `<div class="top">
+          ${cfg.icon ? `<img src="${esc(cfg.icon)}" alt="">` : ""}
+          <div class="tt"><div class="ttl">${esc(cfg.title || "Schulmanager")}</div>
+            <div class="sub">${esc(cfg.subtitle || "")}${cfg.subtitle ? " · " : ""}Eltern-Portal, Aufgaben und Fristen</div></div>
+          <div class="meta">${meta.join("")}</div>
+        </div>`;
+    }
+
+    _dayHtml(c, d) {
+      const day = c.day || {};
+      const today = day.today || d.today;
+      const label = (iso) => dayLabel(iso, today).split(" · ")[0];
+      const low = (iso) => label(iso).replace(/^(Heute|Morgen)$/, (w) => w.toLowerCase());
+      const items = day.new_items || [];
+      const due = day.due || [];
+      const dueIds = new Set(due.map((t) => t.id));
+      const newTasks = (day.new_tasks || []).filter((t) => !dueIds.has(t.id));
+      const changes = day.changes || [];
+      const events = day.events || [];
+      const overdue = due.filter((t) => t.days !== null && t.days < 0).length;
+      const chips = [];
+      const nItems = day.new_items_total || items.length;
+      if (nItems) chips.push(`<span class="chip blue">📬 ${nItems} ${nItems === 1 ? "neue Mitteilung" : "neue Mitteilungen"}</span>`);
+      if (overdue) chips.push(`<span class="chip red">⏰ ${overdue} überfällig</span>`);
+      if (due.length - overdue) chips.push(`<span class="chip red">⏰ ${due.length - overdue} ${due.length - overdue === 1 ? "Frist" : "Fristen"} bis ${low(day.next_day)}</span>`);
+      if (newTasks.length) chips.push(`<span class="chip">🆕 ${newTasks.length} ${newTasks.length === 1 ? "neue Aufgabe" : "neue Aufgaben"}</span>`);
+      if (changes.length) {
+        const per = [day.today, day.next_day].map((iso) => [iso, changes.filter((e) => e.date === iso).length]).filter(([, n]) => n);
+        chips.push(`<span class="chip orange lnk" data-changes="${esc(c.key)}" title="Änderungen anzeigen">🔁 ${changes.length} ${changes.length === 1 ? "Stundenplanänderung" : "Stundenplanänderungen"} (${per.map(([iso, n]) => `${low(iso)} ${n}`).join(", ")})</span>`);
+      }
+      const exams = events.filter((e) => e.category === "schulaufgabe" || e.category === "test");
+      if (exams.length) chips.push(`<span class="chip">📝 ${exams.length} ${exams.length === 1 ? "Schulaufgabe/Test" : "Schulaufgaben/Tests"}</span>`);
+      const other = events.length - exams.length;
+      if (other) chips.push(`<span class="chip">📅 ${other} ${other === 1 ? "Termin" : "Termine"}</span>`);
+      if (!chips.length) chips.push(`<span class="chip ok">✓ Nichts Neues</span>`);
+
+      // Einträge, jeweils verlinkt
+      const rows = [];
+      for (const i of items)
+        rows.push(`<li><span>${i.urgency === "hoch" ? "🔴" : "📬"}</span><a class="lnk ${i.read ? "" : "unread"}" data-item="${esc(i.uid)}" title="${esc(i.summary || i.title)}">${esc(i.title)}</a><span class="w">${esc(i.kind_label)}${i.sent ? " · " + fmtShort(i.sent) : ""}</span></li>`);
+      for (const t of due)
+        rows.push(`<li><span>${esc(t.icon)}</span><a class="lnk" data-task="${esc(t.id)}">${esc(t.title)}</a><span class="w red">${esc(daysText(t.days))}${t.amount_text ? " · " + esc(t.amount_text) : ""}</span></li>`);
+      for (const t of newTasks)
+        rows.push(`<li><span>🆕</span><a class="lnk" data-task="${esc(t.id)}">${esc(t.title)}</a><span class="w">${t.due ? "fällig " + fmtShort(t.due) : "ohne Frist"}</span></li>`);
+      for (const e of changes)
+        rows.push(`<li class="${esc(e.kind)}"><span>${CHANGE_ICON[e.kind] || "🔁"}</span><a class="lnk" data-changes="${esc(c.key)}">${esc(label(e.date))}${e.lesson ? ", " + esc(e.lesson) + ". Std." : ""}: ${esc(changeText(e))}</a></li>`);
+      for (const e of events) {
+        const link = e.task_id ? `data-task="${esc(e.task_id)}"` : e.item_uid ? `data-item="${esc(e.item_uid)}"` : "";
+        const when = `${label(e.date)}${e.time ? " " + e.time : ""}`;
+        rows.push(`<li><span>${esc(e.icon)}</span>${link ? `<a class="lnk" ${link} title="${esc(clip(e.hover))}">${esc(e.title)}</a>` : `<span class="tx" title="${esc(clip(e.hover))}">${esc(e.title)}</span>`}<span class="w">${esc(when)}</span></li>`);
+      }
+      const more = (this._more || {})[c.key];
+      const shown = more ? rows : rows.slice(0, LIST_MAX);
+      const rest = rows.length - shown.length;
+      const extra = nItems - items.length;
+      return `<div class="dch">
+          <div class="who2"><span class="dot ${esc(c.ampel)}" title="${esc(AMPEL[c.ampel] || "")}"></span>${esc(c.name)}</div>
+          <div class="body">
+            <div class="chips">${chips.join("")}</div>
+            ${shown.length ? `<ul class="dl">${shown.join("")}</ul>` : ""}
+            ${rest > 0 ? `<a class="lnk more" data-more="${esc(c.key)}">+ ${rest} weitere anzeigen</a>` : more && rows.length > LIST_MAX ? `<a class="lnk more" data-more="${esc(c.key)}">weniger anzeigen</a>` : ""}
+            ${extra > 0 && (more || rest <= 0) ? `<div class="sub more">… und ${extra} ältere ungelesene Mitteilungen im Reiter ${esc(c.name)}</div>` : ""}
+          </div>
+        </div>`;
+    }
+
+    _bindHeute(root) {
+      root.querySelectorAll("[data-item]").forEach((el) => el.addEventListener("click", () => this._openItem(el.dataset.item)));
+      root.querySelectorAll("[data-task]").forEach((el) => el.addEventListener("click", () => this._openTask(el.dataset.task)));
+      root.querySelectorAll("[data-changes]").forEach((el) => el.addEventListener("click", () => this._openChanges(el.dataset.changes)));
+      root.querySelectorAll("[data-more]").forEach((el) =>
+        el.addEventListener("click", () => {
+          this._more = { ...(this._more || {}), [el.dataset.more]: !(this._more || {})[el.dataset.more] };
+          this._render();
+        })
+      );
+      root.querySelectorAll("[data-nav]").forEach((el) => el.addEventListener("click", () => navigate(el.dataset.nav)));
+      root.querySelectorAll("[data-refresh]").forEach((el) =>
+        el.addEventListener("click", async () => {
+          if (this._refreshing) return;
+          this._refreshing = true;
+          this._render();
+          try {
+            await this._call("refresh", {});
+          } finally {
+            this._refreshing = false;
+            this._load();
+          }
+        })
+      );
+    }
+
+    _reopen() {
+      if (this._dialog && this._dialog.type === "changes") this._openChanges(this._dialog.id);
+      else super._reopen();
+    }
+
+    _openChanges(key) {
+      const c = ((this._data && this._data.children) || []).find((x) => x.key === key);
+      if (!c) return;
+      this._dialog = { type: "changes", id: key };
+      const day = c.day || {};
+      const today = day.today || this._data.today;
+      const byDate = {};
+      for (const e of day.changes || []) (byDate[e.date] = byDate[e.date] || []).push(e);
+      let body = "";
+      for (const iso of Object.keys(byDate).sort()) {
+        body += `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}</div>`;
+        for (const e of byDate[iso].sort((a, b) => (Number((a.lesson || "").match(/\d+/)) || 0) - (Number((b.lesson || "").match(/\d+/)) || 0))) {
+          body += `<div class="les ${esc(e.kind)}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${esc(e.kind)}">${KIND_LABEL[e.kind] || esc(e.kind)}</span></div><div class="chg">${esc(changeText(e))}</div></div><span class="rm">${esc(room(e.room))}</span></div>`;
+        }
+      }
+      if (!body) body = `<div class="empty">Keine Änderungen für heute und den nächsten Schultag.</div>`;
+      body += `<div class="info">Den ganzen Vertretungsplan zeigt der Stundenplan im Reiter ${esc(c.name)}.</div>`;
+      this._showDialog(`🔁 Stundenplanänderungen <span class="sub">· ${esc(c.name)}</span>`, body);
+    }
+  }
+
   const define = (tag, cls, name, description) => {
     if (customElements.get(tag)) return;
     customElements.define(tag, cls);
@@ -1117,6 +1394,7 @@
   };
   define("schulmanager-card", SchulmanagerCard, "Schulmanager", "Aufgaben und Mitteilungen aus dem Eltern-Portal – klickbar mit Status, Kommentar und PDF.");
   define("schulmanager-termine", SchulmanagerTermineCard, "Schulmanager: Termine", "Termine, Fristen und Vertretungen mit KI-Kurzbeschreibung und Legende.");
+  define("schulmanager-heute", SchulmanagerHeuteCard, "Schulmanager: Heute", "Kopfzeile mit letztem Abruf, Version und den Neuigkeiten des Tages je Kind – alles anklickbar.");
   define("schulmanager-stundenplan", SchulmanagerStundenplanCard, "Schulmanager: Stundenplan", "Stundenplan mit Vertretungen und Ausfällen.");
   console.info(`%c SCHULMANAGER-CARD %c ${VERSION} `, "background:#03a9f4;color:#fff", "");
 })();

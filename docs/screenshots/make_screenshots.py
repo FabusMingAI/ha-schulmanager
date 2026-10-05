@@ -26,6 +26,7 @@ SHOTS = [
     ("termine.png", "termine", 400, "hover"),
     ("task-dialog.png", "task", 390, "dialog"),
     ("item-dialog.png", "item", 390, "dialog"),
+    ("heute.png", "heute", 900, "none"),
 ]
 
 
@@ -51,7 +52,7 @@ def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--lang=de-DE"], env={"LANG": "de_DE.UTF-8", "LANGUAGE": "de"})
         for name, card, width, action in SHOTS:
-            page = browser.new_page(locale="de-DE", device_scale_factor=2, viewport={"width": width + 120, "height": 1400})
+            page = browser.new_page(locale="de-DE", timezone_id="Europe/Berlin", device_scale_factor=2, viewport={"width": width + 120, "height": 1400})
             page.goto(f"{(HERE / 'demo.html').as_uri()}?card={card}&w={width}&theme={args.theme}")
             if css:
                 page.add_style_tag(content=css)

@@ -8,7 +8,7 @@
   Rendert die Lovelace-Karten des Schulmanagers ohne Home Assistant mit erfundenen
   Demo-Daten (keine echten Namen, Lehrkräfte, Schulen oder Räume). Grundlage für die
   Screenshots in docs/images – siehe make_screenshots.py.
-  Aufruf: demo.html?card=stundenplan|termine&view=day|week&theme=light|dark
+  Aufruf: demo.html?card=stundenplan|termine|heute|task|item&view=day|week&theme=light|dark
 -->
 <style>
   :root {
@@ -109,6 +109,24 @@
     ],
   };
 
+  // Tagesüberblick für die Kopfzeile (card=heute)
+  anna.day = {
+    today: TODAY, next_day: "2026-10-06", new_items_total: 2,
+    new_items: [
+      { uid: "i9", title: "Skilager der 7. Klassen", kind_label: "Elternbrief", sent: "2026-10-05", read: false, urgency: "mittel",
+        summary: "Skilager 18.–23.01., Anzahlung 120 € bis 09.10." },
+      { uid: "i10", title: "Hausaufgabenheft vergessen", kind_label: "Nachricht", sent: "2026-10-05", read: true, urgency: "niedrig" },
+    ],
+    new_tasks: [{ id: "t9", title: "Skilager anzahlen", icon: "💶", status: "offen", due: "2026-10-09", days: 4 }],
+    due: [{ id: "t8", title: "Einverständniserklärung unterschreiben", icon: "✍️", status: "offen", due: "2026-10-06", days: 1 }],
+    changes: [{ date: "2026-10-05", lesson: "4", kind: "raum", subject: "B", room: "C104", info: "" }],
+    events: [],
+  };
+  max.day = {
+    today: TODAY, next_day: "2026-10-06", new_items_total: 0, new_items: [], new_tasks: [], due: [], changes: [], events: [],
+  };
+  max.ampel = "gruen";
+
   const LEGEND = {
     schulaufgabe: ["📝","Schulaufgabe"], test: ["✏️","Test / Kurzarbeit / Stegreifaufgabe"], portal: ["🏫","Termin der Schule"],
     termin: ["📅","Termin aus einer Mitteilung"], entfall: ["❌","Stunde entfällt"], vertretung: ["🔁","Vertretung / Änderung"],
@@ -122,7 +140,7 @@
   const theme = q.get("theme") || "light";
   document.documentElement.dataset.theme = theme;
   if (q.get("w")) document.documentElement.style.setProperty("--w", q.get("w") + "px");
-  const children = card === "termine" ? [anna, max] : [anna];
+  const children = card === "termine" || card === "heute" ? [anna, max] : [anna];
 
   // Aufgabe für den Detail-Dialog (card=task)
   const TASK = {
@@ -164,9 +182,11 @@
 
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
-    callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, last_update: null, errors: {} }
+    callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, errors: [],
+        last_update: `${TODAY}T08:15:00+02:00`, version: "0.10.0", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
       : msg.type === "schulmanager/task" ? TASK : msg.type === "schulmanager/item" ? ITEM : {},
     callService: async () => {},
+    user: { is_admin: true },
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },
   };
 
@@ -174,7 +194,9 @@
   s.src = "../../custom_components/schulmanager/www/schulmanager-card.js";
   s.onload = () => {
     const el = document.createElement(card === "task" || card === "item" ? "schulmanager-card" : "schulmanager-" + card);
-    el.setConfig(q.get("view") ? { view: q.get("view") } : {});
+    el.setConfig(card === "heute"
+      ? { header: true, subtitle: "Anna & Max", icon: "../../custom_components/schulmanager/brand/icon.png" }
+      : q.get("view") ? { view: q.get("view") } : {});
     document.getElementById("wrap").appendChild(el);
     el.hass = window.hass;
     window.cardEl = el;

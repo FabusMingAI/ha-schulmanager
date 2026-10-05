@@ -25,7 +25,15 @@ Der Schulmanager holt alle Mitteilungen aus dem **[Eltern-Portal](https://www.el
 
 ## Die Karten
 
-Die Integration lädt drei Karten automatisch und baut sie ins Dashboard „Schule“ ein. HACS-Frontend-Ressourcen braucht es nicht. Alle drei Karten nehmen optional `child: <kind>`, ohne Angabe zeigen sie alle Kinder.
+Die Integration lädt vier Karten automatisch und baut sie ins Dashboard „Schule“ ein. HACS-Frontend-Ressourcen braucht es nicht. Alle Karten nehmen optional `child: <kind>`, ohne Angabe zeigen sie alle Kinder.
+
+### Was ist heute neu – `custom:schulmanager-heute`
+
+<p align="left"><img src="docs/images/heute.png" width="640" alt="Kopfzeile mit letztem Abruf, Version und Neuigkeiten je Kind"></p>
+
+- Steht oben auf der Übersicht des Dashboards. Rechtsbündig: **wann zuletzt aus dem Eltern-Portal abgerufen wurde** (↻ ruft sofort ab, ⚠️ zeigt Fehler beim Abruf), die **installierte Version** mit Link zum Release auf GitHub und „⚙️ Einstellungen“.
+- Je Kind eine Zeile mit Ampel und Chips für **neue Mitteilungen** (ungelesen oder heute eingegangen), **Fristen bis zum nächsten Schultag** (und Überfälliges), **neue Aufgaben**, **Stundenplanänderungen** heute und am nächsten Schultag, **Schulaufgaben/Tests** und **Termine**. Darunter die Einträge selbst – jeder öffnet die Mitteilung, die Aufgabe oder die Liste der Änderungen. Gibt es nichts: „✓ Nichts Neues“.
+- Optionen: `header: true` zeigt die Titelzeile, außerdem `subtitle`, `icon`, `settings_path`.
 
 ### Aufgaben & Mitteilungen – `custom:schulmanager-card`
 
@@ -38,6 +46,7 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 - **Aufgabe antippen** öffnet die Details: Status **Offen / In Arbeit / Erledigt**, Fälligkeit ändern, eigener **Kommentar**, Zahlungsdaten mit „kopieren“ für IBAN und Verwendungszweck, dazu die **Quelle** mit KI-Zusammenfassung, Originaltext, PDF und Link ins Eltern-Portal.
 - **Mitteilung antippen** zeigt Text, PDF und die daraus entstandenen Aufgaben und markiert die Mitteilung als gelesen. Auch Mitteilungen haben den Status **Offen / In Arbeit / Erledigt**: Erledigte wandern in den Reiter **Erledigt** (und gelten als gelesen), Mitteilungen in Arbeit tragen ⏳.
 - Die **KI-Zusammenfassung** hat einen Reiter je Sprache, die in den Einstellungen gewählt ist (Deutsch, Englisch, Spanisch, Katalanisch).
+- **Text kopieren:** Alles in den Dialogen lässt sich markieren; „📋 … kopieren“ kopiert die KI-Zusammenfassung oder den Text der Mitteilung bzw. PDF, „kopieren“ neben IBAN und Verwendungszweck nur diesen Wert.
 - **PDFs:** „Drucken“ öffnet den Druckdialog des Browsers, „Vollbild“ zeigt das PDF bildschirmfüllend (am Handy ohne Vollbild-Unterstützung öffnet es sich in einem neuen Tab).
 - „In Arbeit“ zählt weiter als offen: Die Aufgabe bleibt in Ampel und Erinnerungen und steht in der To-do-Liste mit ⏳.
 
@@ -93,7 +102,7 @@ Den Ordner `custom_components/schulmanager` nach `/config/custom_components/schu
    - **Termine aus dem Portal anzeigen**: Standard sind nur Schulaufgaben und Tests (Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe). „Termine der Schule“ (Ferien, Sekretariat, Veranstaltungen …) lassen sich dazuschalten.
    - **Nur Termine der eigenen Klasse** (Standard: an): blendet Einträge aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen, z. B. „Schullandheim 5b+5c“ oder „Grundwissenstest Jgst. 10“. Termine ohne Klassenangabe bleiben sichtbar.
    - **Sprachen der KI-Zusammenfassung**: Häkchen bei Deutsch, Englisch, Spanisch und/oder Katalanisch (bis zu 4, Standard Deutsch und Englisch). Jede Sprache wird ein eigener Reiter in der Zusammenfassung; die erste gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache (auch nach dem Hinzufügen einer Sprache), übersetzt die KI im Hintergrund nur die Zusammenfassung – Aufgaben, Termine und Status bleiben unverändert. Ab 5 Übersetzungen kommt eine Benachrichtigung in Home Assistant beim Start (mit geschätzter Dauer) und am Ende; eine fehlgeschlagene Übersetzung wird nach 6 Stunden erneut versucht, höchstens dreimal.
-4. **Dashboard**: Der Schulmanager legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, oben ein Link „⚙️ Einstellungen“ direkt zu den Einstellungen der Integration) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
+4. **Dashboard**: Der Schulmanager legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, oben der Tagesüberblick je Kind mit letztem Abruf, Version und Link „⚙️ Einstellungen“) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
 
 Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur die der letzten 21 Tage (und alle noch unbestätigten Briefe) werden ausgewertet und als ungelesen markiert, der Rest landet als gelesen im Archiv. Es gibt einmalig eine kurze Einrichtungs-Push statt einer Flut.
 

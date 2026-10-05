@@ -61,19 +61,20 @@ SETTINGS_PATH = f"/config/integrations/integration/{DOMAIN}"
 
 
 def _header(names: list[str]) -> dict[str, Any]:
-    subtitle = " & ".join(names) if names else "Eltern-Portal"
-    return {
-        "layout": "responsive",
-        "card": {
-            "type": "markdown",
-            "text_only": True,
-            "content": (
-                f'# <img src="{LOCAL_ICON_URL}" width="44" height="44"> Schulmanager\n'
-                f"{subtitle} · Eltern-Portal, Aufgaben und Fristen · "
-                f"[⚙️ Einstellungen]({SETTINGS_PATH})"
-            ),
-        },
+    """Kopf der Übersicht: Titel, letzter Abruf, Version und Tagesüberblick je Kind.
+
+    Seit 0.10.0 eine eigene Karte statt Markdown, damit Abrufzeit und Neuigkeiten
+    live aktualisiert werden und die Einträge anklickbar sind.
+    """
+    card: dict[str, Any] = {
+        "type": "custom:schulmanager-heute",
+        "header": True,
+        "settings_path": SETTINGS_PATH,
+        "icon": LOCAL_ICON_URL,
     }
+    if names:
+        card["subtitle"] = " & ".join(names)
+    return {"layout": "start", "card": card}
 
 
 def _schulmanager_card(

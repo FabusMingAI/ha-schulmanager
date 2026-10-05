@@ -61,14 +61,12 @@ SETTINGS_PATH = f"/config/integrations/integration/{DOMAIN}"
 
 
 def _header(names: list[str]) -> dict[str, Any]:
-    """Kopf der Übersicht: Titel, letzter Abruf, Version und Tagesüberblick je Kind.
+    """Kopf der Übersicht: Titel, letzter Abruf, Version und Link zu den Einstellungen.
 
-    Seit 0.10.0 eine eigene Karte statt Markdown, damit Abrufzeit und Neuigkeiten
-    live aktualisiert werden und die Einträge anklickbar sind.
+    Eigene Karte statt Markdown, damit die Abrufzeit live aktualisiert wird.
     """
     card: dict[str, Any] = {
-        "type": "custom:schulmanager-heute",
-        "header": True,
+        "type": "custom:schulmanager-header",
         "settings_path": SETTINGS_PATH,
         "icon": LOCAL_ICON_URL,
     }

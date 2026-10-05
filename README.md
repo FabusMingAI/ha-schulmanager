@@ -34,13 +34,12 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 The integration loads four cards automatically and places them in the "Schule" dashboard; no HACS frontend resources are needed. All of them accept an optional `child: <name>`; without it they show all children.
 
-### What's new today – `custom:schulmanager-heute`
+### Header – `custom:schulmanager-header`
 
-<p align="left"><img src="docs/images/heute.png" width="640" alt="Header with last fetch, version and what's new per child"></p>
+<p align="left"><img src="docs/images/header.png" width="640" alt="Header with last fetch, version and settings link"></p>
 
 - Sits at the top of the dashboard overview. Right-aligned: **when Eltern-Portal was last fetched** (↻ fetches now, ⚠️ shows fetch errors), the **installed version** with a link to its GitHub release and "⚙️ Einstellungen".
-- One line per child with the traffic light and chips for **new messages** (unread or arrived today), **deadlines until the next school day** (and overdue ones), **new tasks**, **timetable changes** today and on the next school day, **exams/tests** and **appointments**. Below, the entries themselves – each one opens its message, task or the list of changes. Nothing new: "✓ Nichts Neues".
-- Options: `header: true` shows the title line, `subtitle`, `icon`, `settings_path`.
+- Options: `subtitle`, `icon`, `settings_path`.
 
 ### Tasks & messages – `custom:schulmanager-card`
 
@@ -103,7 +102,7 @@ Copy `custom_components/schulmanager` to `/config/custom_components/schulmanager
 1. **Settings → Devices & services → Add integration → Schulmanager**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.
 3. **Configure → Settings** – grouped into collapsible sections (*KI & Sprachen*, *Benachrichtigungen & Erinnerungen*, *Termine & Klassen* open; *Sprachansagen*, *Abruf & Ablage*, *Dashboard* collapsed), every field with a short explanation: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, **which portal appointments to show** (default: exams and tests; optionally also school appointments), **only appointments of the child's class** (default on: hides entries such as "Schullandheim 5b+5c" or "Jgst. 10" that name only other classes or grades) and the **languages of the AI summary** (checkboxes for German, English, Spanish, Catalan, up to 4; default German and English; the first one is used for push notifications). If an already analysed message lacks a language – also after you add one – the AI translates just the summary in the background; tasks, appointments and status stay untouched. With 5 or more translations you get a Home Assistant notification when they start (with an estimated duration) and when they are done; a failed translation is retried after 6 hours, up to 3 attempts.
-4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, plus the "today" header with what's new per child, the last fetch, the version and a "⚙️ Einstellungen" link) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
+4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, plus a header with the last fetch, the version and a "⚙️ Einstellungen" link) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
 
 On the first run the last 120 days are imported; only the last 21 days (and all unconfirmed letters) are analysed and marked unread, older items go to the archive as read.
 

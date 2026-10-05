@@ -3,12 +3,12 @@
  *   type: custom:schulmanager-card         # Aufgaben & Mitteilungen
  *   type: custom:schulmanager-termine      # Termine & Fristen mit Legende
  *   type: custom:schulmanager-stundenplan  # Stundenplan mit Vertretungen
- *   type: custom:schulmanager-heute        # Neuigkeiten des Tages je Kind (header: true = mit Titelzeile)
+ *   type: custom:schulmanager-header       # Kopfzeile: letzter Abruf, Version, Einstellungen
  *   child: anna          # optional, ohne Angabe: alle Kinder
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.10.0";
+  const VERSION = "0.10.1";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -1181,45 +1181,27 @@
 
 
   // ================================================================
-  // Kopfzeile „Heute“: letzter Abruf, Version, Neuigkeiten je Kind
+  // Kopfzeile der Übersicht: Titel, letzter Abruf, Version, Einstellungen
   // ================================================================
-  const HEUTE_STYLE = `
-    .hd { padding: 12px 0 6px; }
+  const HEADER_STYLE = `
+    .hd { padding: 12px 0 4px; }
     .top { display:flex; align-items:center; gap:12px; padding: 0 16px 8px; flex-wrap:wrap; }
     .top img { width:40px; height:40px; flex:none; }
     .top .tt { flex: 1 1 14em; min-width:0; }
     .top .ttl { font-size:1.5em; font-weight:500; line-height:1.2; }
     .top .meta { margin-left:auto; text-align:right; font-size:.85em; color: var(--secondary-text-color); display:flex; flex-wrap:wrap; gap:4px 12px; justify-content:flex-end; align-items:center; }
-    .top .meta a, .lnk { color: var(--primary-color); text-decoration:none; cursor:pointer; }
-    .top .meta a:hover, .lnk:hover { text-decoration:underline; }
+    .top .meta a { color: var(--primary-color); text-decoration:none; cursor:pointer; }
+    .top .meta a:hover { text-decoration:underline; }
     .top .meta .err { color: var(--error-color,#db4437); }
     .rf { border:none; background:none; cursor:pointer; color: var(--primary-color); font: inherit; padding:0 2px; }
-    .dch { display:flex; align-items:flex-start; gap:10px; padding: 8px 16px 4px; border-top:1px solid var(--divider-color); }
-    .dch .who2 { display:flex; align-items:center; gap:8px; min-width: 7.5em; font-weight:500; padding-top:2px; }
-    .dch .body { flex:1; min-width:0; }
-    .dch .chips { padding:0; }
-    .chip.blue { background: rgba(3,169,244,.14); color: var(--primary-color); }
-    .chip.orange { background: rgba(255,166,0,.18); color: var(--warning-color,#e08a00); }
-    .chip.ok { background: rgba(67,160,71,.14); color: var(--success-color,#43a047); }
-    .dl { list-style:none; margin:6px 0 4px; padding:0; }
-    .dl li { padding:3px 0; font-size:.92em; display:flex; gap:6px; align-items:baseline; min-width:0; }
-    .dl li .lnk, .dl li .tx { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-    .dl li .lnk.unread { font-weight:600; }
-    .dl li .w { color: var(--secondary-text-color); font-size:.85em; white-space:nowrap; flex:none; }
-    .dl li .w.red { color: var(--error-color,#db4437); font-weight:600; }
-    .dl li.entfall .lnk { color: var(--error-color,#db4437); }
-    .more { font-size:.85em; }
     @media (max-width: 600px) {
       .top .meta { margin-left:0; justify-content:flex-start; text-align:left; width:100%; }
-      .dch { flex-direction:column; gap:2px; }
     }
   `;
-  const CHANGE_ICON = { entfall: "❌", vertretung: "🔁", raum: "🚪" };
-  const LIST_MAX = 6;
 
-  class SchulmanagerHeuteCard extends SchulmanagerCard {
+  class SchulmanagerHeaderCard extends SchulmanagerCard {
     getCardSize() {
-      return 3;
+      return 1;
     }
 
     getGridOptions() {
@@ -1240,110 +1222,29 @@
 
     _render() {
       const cfg = this._config;
-      let html = `<style>${HEUTE_STYLE}</style><ha-card class="hd">`;
       const d = this._data;
-      if (cfg.header !== false && cfg.header !== undefined) html += this._topHtml(d);
-      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
-      else if (!d) html += `<div class="empty">Lade …</div>`;
-      else for (const c of d.children) html += this._dayHtml(c, d);
-      html += `</ha-card>`;
-      const root = this._setContent(html);
-      this._bindHeute(root);
-    }
-
-    _topHtml(d) {
-      const cfg = this._config;
       const isAdmin = !this._hass || !this._hass.user || this._hass.user.is_admin;
       const meta = [];
       if (d) {
-        const errs = (d.errors || []).length;
+        const errs = d.errors || [];
         meta.push(
           `<span title="Letzter Abruf aus dem Eltern-Portal">Stand: ${esc(this._stamp(d.last_update))}` +
             `<button class="rf" data-refresh title="Portale jetzt abrufen">${this._refreshing ? "…" : "↻"}</button></span>`
         );
-        if (errs) meta.push(`<span class="err" title="${esc((d.errors || []).join("\n"))}">⚠️ ${errs} Fehler beim Abruf</span>`);
+        if (errs.length) meta.push(`<span class="err" title="${esc(errs.join("\n"))}">⚠️ ${errs.length} Fehler beim Abruf</span>`);
         if (d.version) {
           const url = `${d.repo_url || "https://github.com/FabusMingAI/ha-schulmanager"}/releases/tag/v${d.version}`;
           meta.push(`<a href="${esc(url)}" target="_blank" rel="noopener" title="Schulmanager auf GitHub">v${esc(d.version)} ↗</a>`);
         }
       }
       if (isAdmin && cfg.settings_path !== false) meta.push(`<a data-nav="${esc(cfg.settings_path || "/config/integrations/integration/schulmanager")}">⚙️ Einstellungen</a>`);
-      return `<div class="top">
+      const html = `<style>${HEADER_STYLE}</style><ha-card class="hd"><div class="top">
           ${cfg.icon ? `<img src="${esc(cfg.icon)}" alt="">` : ""}
           <div class="tt"><div class="ttl">${esc(cfg.title || "Schulmanager")}</div>
             <div class="sub">${esc(cfg.subtitle || "")}${cfg.subtitle ? " · " : ""}Eltern-Portal, Aufgaben und Fristen</div></div>
           <div class="meta">${meta.join("")}</div>
-        </div>`;
-    }
-
-    _dayHtml(c, d) {
-      const day = c.day || {};
-      const today = day.today || d.today;
-      const label = (iso) => dayLabel(iso, today).split(" · ")[0];
-      const low = (iso) => label(iso).replace(/^(Heute|Morgen)$/, (w) => w.toLowerCase());
-      const items = day.new_items || [];
-      const due = day.due || [];
-      const dueIds = new Set(due.map((t) => t.id));
-      const newTasks = (day.new_tasks || []).filter((t) => !dueIds.has(t.id));
-      const changes = day.changes || [];
-      const events = day.events || [];
-      const overdue = due.filter((t) => t.days !== null && t.days < 0).length;
-      const chips = [];
-      const nItems = day.new_items_total || items.length;
-      if (nItems) chips.push(`<span class="chip blue">📬 ${nItems} ${nItems === 1 ? "neue Mitteilung" : "neue Mitteilungen"}</span>`);
-      if (overdue) chips.push(`<span class="chip red">⏰ ${overdue} überfällig</span>`);
-      if (due.length - overdue) chips.push(`<span class="chip red">⏰ ${due.length - overdue} ${due.length - overdue === 1 ? "Frist" : "Fristen"} bis ${low(day.next_day)}</span>`);
-      if (newTasks.length) chips.push(`<span class="chip">🆕 ${newTasks.length} ${newTasks.length === 1 ? "neue Aufgabe" : "neue Aufgaben"}</span>`);
-      if (changes.length) {
-        const per = [day.today, day.next_day].map((iso) => [iso, changes.filter((e) => e.date === iso).length]).filter(([, n]) => n);
-        chips.push(`<span class="chip orange lnk" data-changes="${esc(c.key)}" title="Änderungen anzeigen">🔁 ${changes.length} ${changes.length === 1 ? "Stundenplanänderung" : "Stundenplanänderungen"} (${per.map(([iso, n]) => `${low(iso)} ${n}`).join(", ")})</span>`);
-      }
-      const exams = events.filter((e) => e.category === "schulaufgabe" || e.category === "test");
-      if (exams.length) chips.push(`<span class="chip">📝 ${exams.length} ${exams.length === 1 ? "Schulaufgabe/Test" : "Schulaufgaben/Tests"}</span>`);
-      const other = events.length - exams.length;
-      if (other) chips.push(`<span class="chip">📅 ${other} ${other === 1 ? "Termin" : "Termine"}</span>`);
-      if (!chips.length) chips.push(`<span class="chip ok">✓ Nichts Neues</span>`);
-
-      // Einträge, jeweils verlinkt
-      const rows = [];
-      for (const i of items)
-        rows.push(`<li><span>${i.urgency === "hoch" ? "🔴" : "📬"}</span><a class="lnk ${i.read ? "" : "unread"}" data-item="${esc(i.uid)}" title="${esc(i.summary || i.title)}">${esc(i.title)}</a><span class="w">${esc(i.kind_label)}${i.sent ? " · " + fmtShort(i.sent) : ""}</span></li>`);
-      for (const t of due)
-        rows.push(`<li><span>${esc(t.icon)}</span><a class="lnk" data-task="${esc(t.id)}">${esc(t.title)}</a><span class="w red">${esc(daysText(t.days))}${t.amount_text ? " · " + esc(t.amount_text) : ""}</span></li>`);
-      for (const t of newTasks)
-        rows.push(`<li><span>🆕</span><a class="lnk" data-task="${esc(t.id)}">${esc(t.title)}</a><span class="w">${t.due ? "fällig " + fmtShort(t.due) : "ohne Frist"}</span></li>`);
-      for (const e of changes)
-        rows.push(`<li class="${esc(e.kind)}"><span>${CHANGE_ICON[e.kind] || "🔁"}</span><a class="lnk" data-changes="${esc(c.key)}">${esc(label(e.date))}${e.lesson ? ", " + esc(e.lesson) + ". Std." : ""}: ${esc(changeText(e))}</a></li>`);
-      for (const e of events) {
-        const link = e.task_id ? `data-task="${esc(e.task_id)}"` : e.item_uid ? `data-item="${esc(e.item_uid)}"` : "";
-        const when = `${label(e.date)}${e.time ? " " + e.time : ""}`;
-        rows.push(`<li><span>${esc(e.icon)}</span>${link ? `<a class="lnk" ${link} title="${esc(clip(e.hover))}">${esc(e.title)}</a>` : `<span class="tx" title="${esc(clip(e.hover))}">${esc(e.title)}</span>`}<span class="w">${esc(when)}</span></li>`);
-      }
-      const more = (this._more || {})[c.key];
-      const shown = more ? rows : rows.slice(0, LIST_MAX);
-      const rest = rows.length - shown.length;
-      const extra = nItems - items.length;
-      return `<div class="dch">
-          <div class="who2"><span class="dot ${esc(c.ampel)}" title="${esc(AMPEL[c.ampel] || "")}"></span>${esc(c.name)}</div>
-          <div class="body">
-            <div class="chips">${chips.join("")}</div>
-            ${shown.length ? `<ul class="dl">${shown.join("")}</ul>` : ""}
-            ${rest > 0 ? `<a class="lnk more" data-more="${esc(c.key)}">+ ${rest} weitere anzeigen</a>` : more && rows.length > LIST_MAX ? `<a class="lnk more" data-more="${esc(c.key)}">weniger anzeigen</a>` : ""}
-            ${extra > 0 && (more || rest <= 0) ? `<div class="sub more">… und ${extra} ältere ungelesene Mitteilungen im Reiter ${esc(c.name)}</div>` : ""}
-          </div>
-        </div>`;
-    }
-
-    _bindHeute(root) {
-      root.querySelectorAll("[data-item]").forEach((el) => el.addEventListener("click", () => this._openItem(el.dataset.item)));
-      root.querySelectorAll("[data-task]").forEach((el) => el.addEventListener("click", () => this._openTask(el.dataset.task)));
-      root.querySelectorAll("[data-changes]").forEach((el) => el.addEventListener("click", () => this._openChanges(el.dataset.changes)));
-      root.querySelectorAll("[data-more]").forEach((el) =>
-        el.addEventListener("click", () => {
-          this._more = { ...(this._more || {}), [el.dataset.more]: !(this._more || {})[el.dataset.more] };
-          this._render();
-        })
-      );
+        </div></ha-card>`;
+      const root = this._setContent(html);
       root.querySelectorAll("[data-nav]").forEach((el) => el.addEventListener("click", () => navigate(el.dataset.nav)));
       root.querySelectorAll("[data-refresh]").forEach((el) =>
         el.addEventListener("click", async () => {
@@ -1359,32 +1260,9 @@
         })
       );
     }
-
-    _reopen() {
-      if (this._dialog && this._dialog.type === "changes") this._openChanges(this._dialog.id);
-      else super._reopen();
-    }
-
-    _openChanges(key) {
-      const c = ((this._data && this._data.children) || []).find((x) => x.key === key);
-      if (!c) return;
-      this._dialog = { type: "changes", id: key };
-      const day = c.day || {};
-      const today = day.today || this._data.today;
-      const byDate = {};
-      for (const e of day.changes || []) (byDate[e.date] = byDate[e.date] || []).push(e);
-      let body = "";
-      for (const iso of Object.keys(byDate).sort()) {
-        body += `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}</div>`;
-        for (const e of byDate[iso].sort((a, b) => (Number((a.lesson || "").match(/\d+/)) || 0) - (Number((b.lesson || "").match(/\d+/)) || 0))) {
-          body += `<div class="les ${esc(e.kind)}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${esc(e.kind)}">${KIND_LABEL[e.kind] || esc(e.kind)}</span></div><div class="chg">${esc(changeText(e))}</div></div><span class="rm">${esc(room(e.room))}</span></div>`;
-        }
-      }
-      if (!body) body = `<div class="empty">Keine Änderungen für heute und den nächsten Schultag.</div>`;
-      body += `<div class="info">Den ganzen Vertretungsplan zeigt der Stundenplan im Reiter ${esc(c.name)}.</div>`;
-      this._showDialog(`🔁 Stundenplanänderungen <span class="sub">· ${esc(c.name)}</span>`, body);
-    }
   }
+  // 0.10.0 hieß die Karte „schulmanager-heute“ – Name bleibt für bestehende Dashboards gültig
+  class SchulmanagerHeuteCard extends SchulmanagerHeaderCard {}
 
   const define = (tag, cls, name, description) => {
     if (customElements.get(tag)) return;
@@ -1394,7 +1272,8 @@
   };
   define("schulmanager-card", SchulmanagerCard, "Schulmanager", "Aufgaben und Mitteilungen aus dem Eltern-Portal – klickbar mit Status, Kommentar und PDF.");
   define("schulmanager-termine", SchulmanagerTermineCard, "Schulmanager: Termine", "Termine, Fristen und Vertretungen mit KI-Kurzbeschreibung und Legende.");
-  define("schulmanager-heute", SchulmanagerHeuteCard, "Schulmanager: Heute", "Kopfzeile mit letztem Abruf, Version und den Neuigkeiten des Tages je Kind – alles anklickbar.");
+  define("schulmanager-header", SchulmanagerHeaderCard, "Schulmanager: Kopfzeile", "Titel mit letztem Abruf aus dem Eltern-Portal, Version und Link zu den Einstellungen.");
+  if (!customElements.get("schulmanager-heute")) customElements.define("schulmanager-heute", SchulmanagerHeuteCard);
   define("schulmanager-stundenplan", SchulmanagerStundenplanCard, "Schulmanager: Stundenplan", "Stundenplan mit Vertretungen und Ausfällen.");
   console.info(`%c SCHULMANAGER-CARD %c ${VERSION} `, "background:#03a9f4;color:#fff", "");
 })();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1 – 2026-10-05
+
+- Removed: the daily overview per child from 0.10.0 (new messages, deadlines, timetable changes … above the cards) is gone again. The header keeps the last fetch, the version with its GitHub link and "⚙️ Einstellungen"; the card is now called `custom:schulmanager-header` (the old name `custom:schulmanager-heute` still works). / Entfernt: der Tagesüberblick je Kind aus 0.10.0. Die Kopfzeile mit letztem Abruf, Version und Einstellungen bleibt.
+
 ## 0.10.0 – 2026-10-05
 
 - New: **"Today" header** on the overview of the "Schule" dashboard (card `custom:schulmanager-heute`): per child the new messages, deadlines until the next school day, new tasks, timetable changes for today and the next school day, exams/tests and appointments – each entry opens its message, task or the list of changes. Children with nothing new show "✓ Nichts Neues". / Neu: Tagesüberblick je Kind oben auf der Übersicht, alle Einträge anklickbar.

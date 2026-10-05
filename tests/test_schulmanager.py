@@ -518,17 +518,11 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
     res = (await ws.receive_json())["result"]
     child = res["children"][0]
     assert child["name"] == "Anna" and child["tasks"]
-    # Kopfzeile: Version, letzter Abruf und Tagesüberblick
+    # Kopfzeile: Version und letzter Abruf; kein Tagesüberblick mehr (seit 0.10.1)
     manifest = json.loads(pathlib.Path("custom_components/schulmanager/manifest.json").read_text())
     assert res["version"] == manifest["version"] and res["repo_url"].startswith("https://github.com/")
     assert res["last_update"]
-    day = child["day"]
-    assert day["today"] == today.isoformat()
-    new_titles = {i["title"] for i in day["new_items"]}
-    assert {"Klassenfahrt Berchtesgaden 8b", "Mathe-Hausaufgaben"} <= new_titles
-    assert "Alter Brief" not in new_titles  # Erst-Import ins Archiv zählt nicht als neu
-    assert day["new_items_total"] == len(day["new_items"])
-    assert any(t["amount"] for t in day["new_tasks"])
+    assert "day" not in child
     task = next(t for t in child["tasks"] if t["amount"])
     await ws.send_json({"id": 3, "type": "schulmanager/task", "task_id": task["id"]})
     detail = (await ws.receive_json())["result"]
@@ -1090,7 +1084,7 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
         # Einstellungen von der Startseite erreichbar
         cfg = dash_mod.build_config(hass, m, "tabs")
         head = cfg["views"][0]["header"]["card"]
-        assert head["type"] == "custom:schulmanager-heute" and head["header"] is True
+        assert head["type"] == "custom:schulmanager-header"
         assert head["settings_path"] == "/config/integrations/integration/schulmanager"
     await hass.config_entries.async_unload(entry.entry_id)
 

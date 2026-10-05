@@ -26,7 +26,7 @@ SHOTS = [
     ("termine.png", "termine", 400, "hover"),
     ("task-dialog.png", "task", 390, "dialog"),
     ("item-dialog.png", "item", 390, "dialog"),
-    ("heute.png", "heute", 900, "none"),
+    ("header.png", "header", 900, "none"),
 ]
 
 

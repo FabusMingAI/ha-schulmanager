@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.10.1";
+  const VERSION = "0.11.0";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -188,6 +188,12 @@
     .ev .t { line-height:1.4; }
     .ev .hv { display:none; font-size:.85em; color: var(--secondary-text-color); margin-top:2px; }
     .ev.open .hv { display:block; }
+    .ev .arc { flex:none; width:1.9em; height:1.9em; padding:0; border:1px solid var(--divider-color); background: var(--card-background-color, #fff); border-radius:50%; font-size:.8em; line-height:1; cursor:pointer; visibility:hidden; margin-top:1px; }
+    .ev.archived .arc { visibility:visible; }
+    .ev:hover .arc, .ev.open .arc, .ev .arc:focus { visibility:visible; }
+    .ev .arc:hover { border-color: var(--primary-color); color: var(--primary-color); }
+    @media (hover: none) { .ev .arc { visibility:visible; } }
+    .ev.archived .t { color: var(--secondary-text-color); }
     .ev .who { font-size:.75em; padding:1px 7px; border-radius:9px; color:#fff; flex:none; margin-top:2px; }
     .ev.entfall .t { color: var(--error-color,#db4437); }
     .ev.vertretung .t, .ev.raum .t { color: var(--warning-color,#e08a00); }
@@ -887,22 +893,24 @@
       d.children.forEach((c, i) => (colors[c.key] = CHILD_COLORS[i % CHILD_COLORS.length]));
       this._events = {};
       let events = [];
+      const archived = [];
       for (const c of d.children) for (const e of c.events || []) {
         const key = `${c.key}:${e.uid}`;
         this._events[key] = { ...e, child: c.key, child_name: c.name };
-        events.push(this._events[key]);
+        (e.archived ? archived : events).push(this._events[key]);
       }
       const range = this._range || "2w";
+      const archiveView = range === "archive";
       const limit = range === "2w" ? addDays(today, 14) : addDays(today, 400);
-      const shown = events.filter((e) => e.date <= limit);
-      const hidden = events.length - shown.length;
+      const shown = archiveView ? archived.slice() : events.filter((e) => e.date <= limit);
+      const hidden = archiveView ? 0 : events.length - shown.length;
       shown.sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")) || a.title.localeCompare(b.title));
       const groups = [];
-      const over = shown.filter((e) => (e.until || e.date) < today && e.task_id);
+      const over = archiveView ? [] : shown.filter((e) => (e.until || e.date) < today && e.task_id);
       if (over.length) groups.push(["over", "Überfällig", over]);
       const byDay = {};
       for (const e of shown) {
-        if ((e.until || e.date) < today && e.task_id) continue;
+        if (!archiveView && (e.until || e.date) < today && e.task_id) continue;
         const day = e.date < today && e.until ? today : e.date;
         (byDay[day] = byDay[day] || []).push(e);
       }
@@ -910,19 +918,24 @@
       let html = `<div class="bar">
           <button class="pill ${range === "2w" ? "on" : ""}" data-range="2w">Nächste 2 Wochen</button>
           <button class="pill ${range === "all" ? "on" : ""}" data-range="all">Alle${range === "2w" && hidden ? ` (+${hidden})` : ""}</button>
+          <button class="pill ${archiveView ? "on" : ""}" data-range="archive" title="Archivierte Termine und Fristen anzeigen">📦 Archiv${archived.length ? ` (${archived.length})` : ""}</button>
         </div>`;
-      if (!groups.length) html += `<div class="empty">Keine Termine ${range === "2w" ? "in den nächsten zwei Wochen" : "geplant"} 🎉</div>`;
+      if (!groups.length) html += archiveView
+        ? `<div class="empty">Das Archiv ist leer. Einträge lassen sich mit 📦 hierher schieben.</div>`
+        : `<div class="empty">Keine Termine ${range === "2w" ? "in den nächsten zwei Wochen" : "geplant"} 🎉</div>`;
       for (const [key, label, list] of groups) {
         html += `<div class="day ${key === today ? "today" : key === "over" ? "over" : ""}">${esc(label)}</div>`;
         for (const e of list) {
           const sub = e.category === "entfall" || e.category === "vertretung" || e.category === "raum" ? e.category : "";
           const time = e.time ? e.time : e.until ? "bis " + fmtShort(e.until) : "";
-          html += `<div class="ev ${sub}" data-ev="${esc(e.child + ":" + e.uid)}">
+          const evKey = esc(e.child + ":" + e.uid);
+          html += `<div class="ev ${sub} ${e.archived ? "archived" : ""}" data-ev="${evKey}">
               <span class="ic">${esc(e.icon)}</span>
               <span class="tm">${esc(time)}</span>
               <div class="main"><div class="t">${esc(e.title)}</div>
                 <div class="hv">${esc(clip(e.hover))}</div></div>
               ${multi ? `<span class="who" style="background:${colors[e.child]}">${esc(e.child_name)}</span>` : ""}
+              <button class="arc" data-arc="${evKey}" title="${e.archived ? "Reaktivieren: zurück in die Termine & Fristen" : "Archivieren: ins Archiv schieben"}" aria-label="${e.archived ? "Reaktivieren" : "Archivieren"}">${e.archived ? "↩️" : "📦"}</button>
             </div>`;
         }
       }
@@ -951,6 +964,13 @@
           this._render();
         })
       );
+      root.querySelectorAll("[data-arc]").forEach((el) =>
+        el.addEventListener("click", (m) => {
+          m.stopPropagation();
+          this._hideTip();
+          this._toggleArchive(el.dataset.arc, el);
+        })
+      );
       const touch = window.matchMedia && window.matchMedia("(hover: none)").matches;
       root.querySelectorAll("[data-ev]").forEach((el) => {
         const ev = this._events[el.dataset.ev];
@@ -971,6 +991,24 @@
           else el.classList.toggle("open");
         });
       });
+    }
+
+    async _toggleArchive(key, btn) {
+      const ev = this._events && this._events[key];
+      if (!ev) return;
+      const archive = !ev.archived;
+      if (btn) btn.disabled = true;
+      try {
+        await this._call(archive ? "archive_event" : "unarchive_event", { child: ev.child, event_id: ev.uid });
+        // sofort umsortieren, die Daten vom Server folgen über das Abo
+        const c = this._data && this._data.children.find((x) => x.key === ev.child);
+        const e = c && (c.events || []).find((x) => x.uid === ev.uid);
+        if (e) e.archived = archive;
+        this._render();
+      } catch (err) {
+        if (btn) btn.disabled = false;
+        alert(`Schulmanager: ${err && err.message ? err.message : err}`);
+      }
     }
 
     _showTip(ev, m) {

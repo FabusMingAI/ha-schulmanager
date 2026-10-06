@@ -76,8 +76,10 @@ def _agenda(m, key: str) -> list[dict[str, Any]]:
     today = dt_util.now().date()
     first, last = today - timedelta(days=AGENDA_PAST_DAYS), today + timedelta(days=AGENDA_DAYS)
     out = []
+    archived = m.archived_events(key)
     for e in m.child_events(key, subst_from=today):
         ev = _event_light(e)
+        ev["archived"] = e["uid"] in archived
         overdue_task = bool(ev["task_id"])  # offene Fristen bleiben sichtbar
         if date.fromisoformat(ev["date"]) > last or (
             date.fromisoformat(ev["until"] or ev["date"]) < first and not overdue_task

@@ -22,7 +22,7 @@ from homeassistant.core import (
     ServiceResponse,
     SupportsResponse,
 )
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
@@ -312,6 +312,18 @@ def _register_services(hass: HomeAssistant) -> None:
     async def reanalyze(call: ServiceCall) -> None:
         await get_manager(hass).async_reanalyze(call.data[ATTR_ITEM])
 
+    async def archive_event(call: ServiceCall) -> None:
+        try:
+            get_manager(hass).set_event_archived(call.data[ATTR_CHILD], call.data["event_id"], True)
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+
+    async def unarchive_event(call: ServiceCall) -> None:
+        try:
+            get_manager(hass).set_event_archived(call.data[ATTR_CHILD], call.data["event_id"], False)
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+
     async def rebuild_dashboard(call: ServiceCall) -> None:
         await dashboard.async_apply(hass, get_manager(hass), force=True)
 
@@ -425,6 +437,9 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, "reanalyze", reanalyze, schema=vol.Schema({vol.Required(ATTR_ITEM): cv.string})
     )
+    event_schema = vol.Schema({vol.Required(ATTR_CHILD): cv.string, vol.Required("event_id"): cv.string})
+    hass.services.async_register(DOMAIN, "archive_event", archive_event, schema=event_schema)
+    hass.services.async_register(DOMAIN, "unarchive_event", unarchive_event, schema=event_schema)
     hass.services.async_register(DOMAIN, "send_digest", send_digest)
     hass.services.async_register(DOMAIN, "rebuild_dashboard", rebuild_dashboard)
     hass.services.async_register(

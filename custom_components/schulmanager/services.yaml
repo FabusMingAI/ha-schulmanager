@@ -94,6 +94,26 @@ reanalyze:
       required: true
       selector:
         text:
+archive_event:
+  fields:
+    child:
+      required: true
+      selector:
+        text:
+    event_id:
+      required: true
+      selector:
+        text:
+unarchive_event:
+  fields:
+    child:
+      required: true
+      selector:
+        text:
+    event_id:
+      required: true
+      selector:
+        text:
 send_digest:
 send_reminders:
 get_overview:

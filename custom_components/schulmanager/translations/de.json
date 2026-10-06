@@ -361,6 +361,34 @@
           "description": "Details zur Aufgabe."
         }
       }
+    },
+    "archive_event": {
+      "name": "Termin archivieren",
+      "description": "Einen Eintrag aus „Termine & Fristen“ ins Archiv schieben.",
+      "fields": {
+        "child": {
+          "name": "Kind",
+          "description": "Schlüssel des Kindes, z. B. hannes."
+        },
+        "event_id": {
+          "name": "Termin-ID",
+          "description": "uid des Eintrags, z. B. frist-… oder vertretung-…"
+        }
+      }
+    },
+    "unarchive_event": {
+      "name": "Termin reaktivieren",
+      "description": "Einen archivierten Eintrag aus „Termine & Fristen“ zurückholen.",
+      "fields": {
+        "child": {
+          "name": "Kind",
+          "description": "Schlüssel des Kindes, z. B. hannes."
+        },
+        "event_id": {
+          "name": "Termin-ID",
+          "description": "uid des Eintrags, z. B. frist-… oder vertretung-…"
+        }
+      }
     }
   },
   "selector": {

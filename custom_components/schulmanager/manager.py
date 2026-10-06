@@ -243,6 +243,7 @@ class SchulManager:
             "substitutions": stored.get("substitutions", {}),
             "subs_seen": stored.get("subs_seen", {}),
             "sicknotes": stored.get("sicknotes", {}),
+            "archived": stored.get("archived", {}),
         }
 
     async def async_start(self) -> None:
@@ -331,6 +332,8 @@ class SchulManager:
                 await self._merge(result)
             self.last_errors = errors
             self.last_update = dt_util.now()
+            if not errors:
+                self._prune_archived()
             self._changed()
             if self._pending() or self._missing_translations():
                 self._queue_event.set()
@@ -957,6 +960,39 @@ class SchulManager:
     # ------------------------------------------------------------------
     # Auswertung für Sensoren / Dashboard
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Archiv für Termine & Fristen
+    # ------------------------------------------------------------------
+    def archived_events(self, child: str) -> dict[str, str]:
+        """Archivierte Termine eines Kindes: uid -> Zeitpunkt der Archivierung."""
+        return self.data["archived"].get(child, {})
+
+    def set_event_archived(self, child: str, uid: str, archived: bool = True) -> None:
+        """Einen Termin bzw. eine Frist ins Archiv schieben oder zurückholen."""
+        if child not in self.children:
+            raise ValueError(f"Unbekanntes Kind: {child}")
+        store = self.data["archived"].setdefault(child, {})
+        if archived:
+            store[uid] = dt_util.now().isoformat()
+        else:
+            store.pop(uid, None)
+        if not store:
+            self.data["archived"].pop(child, None)
+        self._changed()
+
+    def _prune_archived(self) -> None:
+        """Archiv-Einträge entfernen, deren Termin es nicht mehr gibt."""
+        for child in list(self.data["archived"]):
+            if child not in self.children:
+                self.data["archived"].pop(child)
+                continue
+            current = {e["uid"] for e in self.child_events(child)}
+            store = self.data["archived"][child]
+            for uid in [u for u in store if u not in current]:
+                store.pop(uid)
+            if not store:
+                self.data["archived"].pop(child)
+
     def child_tasks(self, child: str, include_done: bool = False) -> list[dict[str, Any]]:
         tasks = [
             t

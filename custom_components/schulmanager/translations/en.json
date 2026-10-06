@@ -361,6 +361,34 @@
           "description": "Task details."
         }
       }
+    },
+    "archive_event": {
+      "name": "Archive entry",
+      "description": "Move an entry of “Termine & Fristen” to the archive.",
+      "fields": {
+        "child": {
+          "name": "Child",
+          "description": "Key of the child, e.g. hannes."
+        },
+        "event_id": {
+          "name": "Entry ID",
+          "description": "uid of the entry, e.g. frist-… or vertretung-…"
+        }
+      }
+    },
+    "unarchive_event": {
+      "name": "Restore entry",
+      "description": "Bring an archived entry of “Termine & Fristen” back.",
+      "fields": {
+        "child": {
+          "name": "Child",
+          "description": "Key of the child, e.g. hannes."
+        },
+        "event_id": {
+          "name": "Entry ID",
+          "description": "uid of the entry, e.g. frist-… or vertretung-…"
+        }
+      }
     }
   },
   "selector": {

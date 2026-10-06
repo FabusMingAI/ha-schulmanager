@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 – unreleased
+
+- New: **archive in "Termine & Fristen"**. Every entry gets a **📦** button (on hover, always visible on phones); archived entries move to the new **📦 Archiv** view right of "Alle", where **↩️** brings them back. Works on the overview and on each child's tab, stored in Home Assistant (same on all devices). Deadlines stay open tasks with reminders; the calendar is unchanged. New actions `schulmanager.archive_event` and `schulmanager.unarchive_event`. / Neu: Archiv für Termine & Fristen mit Archivieren und Reaktivieren, auf der Übersicht und in den Kinder-Reitern.
+
 ## 0.10.1 – 2026-10-05
 
 - Removed: the daily overview per child from 0.10.0 (new messages, deadlines, timetable changes … above the cards) is gone again. The header keeps the last fetch, the version with its GitHub link and "⚙️ Einstellungen"; the card is now called `custom:schulmanager-header` (the old name `custom:schulmanager-heute` still works). / Entfernt: der Tagesüberblick je Kind aus 0.10.0. Die Kopfzeile mit letztem Abruf, Version und Einstellungen bleibt.

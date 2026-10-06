@@ -1375,3 +1375,63 @@ async def test_published_date_prefix(hass: HomeAssistant, media_dir, hass_ws_cli
         assert prefix not in m.tasks[pay["id"]]["title"] and "überweisen" in m.tasks[pay["id"]]["title"]
         assert set(m.tasks) >= ids_before
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_archive_events(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    """Termine & Fristen: archivieren, reaktivieren, bleibt gespeichert, wird aufgeräumt."""
+    await async_setup_component(hass, "http", {})
+    today = dt_util.now().date()
+
+    async def fake_fetch(self, need_download=None):
+        return _fake_result(today)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        ws = await hass_ws_client(hass)
+
+        async def events() -> list[dict]:
+            await ws.send_json({"id": events.n, "type": "schulmanager/data"})
+            events.n += 1
+            return (await ws.receive_json())["result"]["children"][0]["events"]
+
+        events.n = 1
+        evs = await events()
+        assert evs and not any(e["archived"] for e in evs)
+        uid = evs[0]["uid"]
+        child = "anna"
+
+        await hass.services.async_call(DOMAIN, "archive_event", {"child": child, "event_id": uid}, blocking=True)
+        evs = await events()
+        assert next(e for e in evs if e["uid"] == uid)["archived"]
+        assert sum(e["archived"] for e in evs) == 1
+        m = entry.runtime_data
+        assert uid in m.data["archived"][child]
+
+        # bleibt nach einem Abruf erhalten, weil es den Termin noch gibt
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        assert uid in m.archived_events(child)
+
+        # unbekanntes Kind -> Fehler
+        with pytest.raises(Exception):
+            await hass.services.async_call(DOMAIN, "archive_event", {"child": "nobody", "event_id": uid}, blocking=True)
+
+        # Reaktivieren
+        await hass.services.async_call(DOMAIN, "unarchive_event", {"child": child, "event_id": uid}, blocking=True)
+        assert not any(e["archived"] for e in await events())
+        assert child not in m.data["archived"]
+
+        # verschwundene Termine werden beim nächsten fehlerfreien Abruf aus dem Archiv entfernt
+        await hass.services.async_call(DOMAIN, "archive_event", {"child": child, "event_id": "gibt-es-nicht"}, blocking=True)
+        assert "gibt-es-nicht" in m.archived_events(child)
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        assert "gibt-es-nicht" not in m.archived_events(child)
+    await hass.config_entries.async_unload(entry.entry_id)

@@ -60,7 +60,8 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="left"><img src="docs/images/termine.png" width="320" alt="Appointments with AI summary on hover"></p>
 
-- All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks** and **all**.
+- All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks**, **all** and **📦 Archiv**.
+- **Archive entries you no longer need:** hover an entry (on phones the button is always shown) and click **📦**. It disappears from the list and moves to **📦 Archiv** (right of **Alle**, with the number of archived entries). There, **↩️** brings it back. Works on the overview and on every child's tab; the archive is stored in Home Assistant, so it is the same on all devices. Archiving only hides the entry in the card – deadlines stay open tasks and keep their reminders, the calendar is unchanged. Entries that no longer exist are removed from the archive automatically.
 - **Hover an entry** to see the AI's short summary (tap once on phones). Clicking a deadline or an appointment taken from a letter opens its details.
 - A **legend** at the bottom explains the icons: 📝 exam (*Schulaufgabe*), ✏️ test / short test / pop quiz, 🏫 school appointment, 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, 🤒 sick note, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
 
@@ -132,6 +133,7 @@ Entity IDs follow your Home Assistant language (shown here for German).
 | `schulmanager.update_item` | `item_id` and `status` (`offen`, `in_arbeit`, `erledigt`) of a message |
 | `schulmanager.add_task` | Add your own task |
 | `schulmanager.reanalyze` | Let the AI analyse a message again |
+| `schulmanager.archive_event` / `schulmanager.unarchive_event` | `child` and `event_id` (uid of an entry in "Termine & Fristen"): move it to the archive or bring it back |
 | `schulmanager.send_digest` / `schulmanager.send_reminders` | Send summary or reminders now |
 | `schulmanager.rebuild_dashboard` | Regenerate the "Schule" dashboard |
 | `schulmanager.get_overview` | Returns everything as a response – e.g. for an Assist script "What's up at school?" |

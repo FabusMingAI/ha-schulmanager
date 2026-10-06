@@ -53,7 +53,8 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 <p align="left"><img src="docs/images/termine.png" width="320" alt="Termine mit Kurzbeschreibung"></p>
 
-- Alle Termine, Fristen und Änderungen aus dem Vertretungsplan nach Tagen sortiert, Überfälliges oben. Umschalten zwischen **Nächste 2 Wochen** und **Alle**.
+- Alle Termine, Fristen und Änderungen aus dem Vertretungsplan nach Tagen sortiert, Überfälliges oben. Umschalten zwischen **Nächste 2 Wochen**, **Alle** und **📦 Archiv**.
+- **Erledigtes archivieren:** Maus auf einen Eintrag (am Handy ist der Knopf immer sichtbar) und auf **📦** klicken. Der Eintrag verschwindet aus der Liste und landet im **📦 Archiv** (rechts neben **Alle**, mit Anzahl). Dort holt **↩️** ihn zurück. Funktioniert auf der Übersicht und in jedem Kinder-Reiter; das Archiv liegt in Home Assistant und ist auf allen Geräten gleich. Archivieren blendet nur in der Karte aus – Fristen bleiben offene Aufgaben mit Erinnerung, der Kalender bleibt unverändert. Einträge, die es nicht mehr gibt, verschwinden automatisch aus dem Archiv.
 - **Maus auf einen Eintrag** zeigt die Kurzbeschreibung der KI (am Handy einmal antippen). Ein Klick auf eine Frist oder einen Termin aus einem Brief öffnet die Details.
 - Unten erklärt eine **Legende** die Icons: 📝 Schulaufgabe, ✏️ Test / Kurzarbeit / Stegreifaufgabe, 🏫 Termin der Schule, 📅 Termin aus einer Mitteilung, ❌ Stunde entfällt, 🔁 Vertretung, 🚪 Raumänderung, 🤒 Krankmeldung und die Fristen nach Art (💶 Zahlung, ✍️ Unterschrift, ↩️ Rückmeldung, 🎒 Mitbringen, 📖 Lesen, ✅ Aufgabe). Bei mehreren Kindern hat jedes eine eigene Farbe.
 
@@ -130,6 +131,7 @@ Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur 
 | `schulmanager.update_item` | `item_id` und `status` (`offen`, `in_arbeit`, `erledigt`) einer Mitteilung |
 | `schulmanager.add_task` | `child`, `title`, optional `due`, `amount`, `details`, `type` |
 | `schulmanager.reanalyze` | eine Mitteilung neu von der KI auswerten lassen |
+| `schulmanager.archive_event` / `schulmanager.unarchive_event` | `child` und `event_id` (uid eines Eintrags in „Termine & Fristen“): ins Archiv schieben bzw. zurückholen |
 | `schulmanager.send_digest` / `send_reminders` | Übersicht oder Erinnerungen sofort schicken |
 | `schulmanager.rebuild_dashboard` | Dashboard „Schule“ neu erzeugen |
 | `schulmanager.get_overview` | liefert alles als Antwort, z. B. für ein Assist-Skript „Was ist für die Schule zu tun?“ |

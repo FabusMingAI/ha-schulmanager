@@ -228,7 +228,13 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                         {
                             "date": d["date"],
                             "entries": [
-                                {**e, "text": m.substitution_text(e)} for e in d["entries"]
+                                {
+                                    **e,
+                                    "text": m.substitution_text(e, child=key),
+                                    "teacher_label": m.teacher_label(key, e.get("teacher")),
+                                    "substitute_label": m.teacher_label(key, e.get("substitute")),
+                                }
+                                for e in d["entries"]
                             ],
                         }
                         for d in m.child_substitutions(key)

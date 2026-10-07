@@ -10,6 +10,7 @@ import os
 import re
 from typing import Any
 
+import aiohttp
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
@@ -18,7 +19,6 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     HomeAssistantError,
 )
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_track_time_change,
@@ -27,6 +27,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
+from homeassistant.util.ssl import get_default_context
 
 from .analyzer import (
     AnalyzeError,
@@ -47,6 +48,14 @@ from .const import (
     CONF_APPOINTMENT_KINDS,
     CONF_OWN_CLASS_ONLY,
     CONF_SUMMARY_LANGUAGES,
+    CONF_TEACHER_NAMES,
+    DEFAULT_TEACHER_NAMES,
+    FETCH_ATTEMPTS,
+    FETCH_RETRY_DELAY,
+    FETCH_TIMEOUT,
+    TEACHER_NAMES_ABBR,
+    TEACHER_NAMES_NAME,
+    TEACHERS_MAX_AGE,
     DEFAULT_APPOINTMENT_KINDS,
     DEFAULT_OWN_CLASS_ONLY,
     AMPEL_RED,
@@ -176,7 +185,6 @@ class SchulManager:
         self.data: dict[str, Any] = {}
         self.last_update: datetime | None = None
         self.last_errors: list[str] = []
-        self._sessions: dict[str, Any] = {}
         self._lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._worker: asyncio.Task | None = None
@@ -244,6 +252,8 @@ class SchulManager:
             "subs_seen": stored.get("subs_seen", {}),
             "sicknotes": stored.get("sicknotes", {}),
             "archived": stored.get("archived", {}),
+            # Stundenplankürzel je Schule: {school: {"updated": iso, "list": {kürzel: name}}}
+            "teachers": stored.get("teachers", {}),
         }
 
     async def async_start(self) -> None:
@@ -302,20 +312,8 @@ class SchulManager:
             errors: list[str] = []
             for portal in self.entry.data.get(CONF_PORTALS, []):
                 school = portal[CONF_SCHOOL]
-                session = self._sessions.get(school)
-                if session is None:
-                    session = self._sessions[school] = async_create_clientsession(
-                        self.hass
-                    )
-                api = SchulPortal(
-                    session,
-                    school,
-                    portal["username"],
-                    portal["password"],
-                    int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)),
-                )
                 try:
-                    result = await api.async_fetch(self._need_download)
+                    result = await self._async_fetch_portal(portal)
                 except PortalAuthError as err:
                     msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
                     if initial:
@@ -329,6 +327,7 @@ class SchulManager:
                     errors.append(msg)
                     continue
                 errors.extend(f"{school}: {e}" for e in result.errors)
+                self._store_teachers(result)
                 await self._merge(result)
             self.last_errors = errors
             self.last_update = dt_util.now()
@@ -337,6 +336,111 @@ class SchulManager:
             self._changed()
             if self._pending() or self._missing_translations():
                 self._queue_event.set()
+
+    async def _async_fetch_portal(self, portal: dict[str, Any]) -> PortalResult:
+        """Ein Portal abrufen, mit eigener Verbindung und einem Wiederholversuch.
+
+        Jeder Abruf bekommt eine frische Sitzung mit eigenem Verbindungspool.
+        Früher teilten sich beide Schulen (und ganz Home Assistant) einen Pool;
+        das Portal schließt ruhende Keep-Alive-Verbindungen nach einigen
+        Minuten, und die Wiederverwendung beim nächsten Abruf scheiterte dann
+        mit "Server disconnected" (#8). Ein zweiter Versuch fängt kurze
+        Aussetzer des Portals ab.
+        """
+        school = portal[CONF_SCHOOL]
+        for attempt in range(1, FETCH_ATTEMPTS + 1):
+            connector = aiohttp.TCPConnector(
+                ssl=get_default_context(), limit_per_host=2
+            )
+            async with aiohttp.ClientSession(
+                connector=connector,
+                # kein Gesamtlimit: der erste Abruf lädt viele PDFs
+                timeout=aiohttp.ClientTimeout(
+                    total=None, sock_connect=30, sock_read=FETCH_TIMEOUT
+                ),
+            ) as session:
+                api = SchulPortal(
+                    session,
+                    school,
+                    portal["username"],
+                    portal["password"],
+                    int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)),
+                )
+                try:
+                    return await api.async_fetch(
+                        self._need_download, teachers=self._teachers_due(school)
+                    )
+                except PortalConnectionError as err:
+                    if attempt >= FETCH_ATTEMPTS:
+                        raise
+                    LOGGER.info(
+                        "%s: Portal nicht erreichbar (%s), neuer Versuch",
+                        school,
+                        err or type(err).__name__,
+                    )
+            await asyncio.sleep(FETCH_RETRY_DELAY)
+        raise AssertionError("unreachable")
+
+    # ------------------------------------------------------------------
+    # Lehrkräfte: Stundenplankürzel -> Name (#9)
+    # ------------------------------------------------------------------
+    def _teachers_due(self, school: str) -> bool:
+        """Liste neu lesen? Höchstens einmal am Tag und nur, wenn Namen gewünscht."""
+        if self.opt(CONF_TEACHER_NAMES, DEFAULT_TEACHER_NAMES) == TEACHER_NAMES_ABBR:
+            return False
+        updated = self.data["teachers"].get(school, {}).get("updated")
+        if not updated:
+            return True
+        try:
+            return dt_util.now() - datetime.fromisoformat(updated) >= TEACHERS_MAX_AGE
+        except ValueError:
+            return True
+
+    def _store_teachers(self, result: PortalResult) -> None:
+        teachers = getattr(result, "teachers", None)
+        if teachers is None:  # nicht abgerufen oder Fehler: alte Liste bleibt
+            return
+        known = self.data["teachers"].get(result.school, {}).get("list") or {}
+        self.data["teachers"][result.school] = {
+            "updated": dt_util.now().isoformat(),
+            # leere Antwort (Seite gerade anders/leer) überschreibt keine bekannte Liste
+            "list": dict(teachers) if teachers or not known else known,
+        }
+
+    def teacher_names(self, child: str | None) -> dict[str, str]:
+        """Kürzel -> Name für die Schule eines Kindes."""
+        school = self.children.get(child or "", {}).get("school")
+        return self.data["teachers"].get(school or "", {}).get("list") or {}
+
+    def teacher_label(self, child: str | None, value: str | None) -> str:
+        """Kürzel (auch mehrere, kommagetrennt) laut Einstellung anzeigen.
+
+        Unbekannte Kürzel bleiben unverändert stehen.
+        """
+        if not value:
+            return value or ""
+        mode = self.opt(CONF_TEACHER_NAMES, DEFAULT_TEACHER_NAMES)
+        names = self.teacher_names(child)
+        if mode == TEACHER_NAMES_ABBR or not names:
+            return value
+        parts = []
+        for abbr in value.split(", "):
+            name = names.get(abbr.strip())
+            if not name:
+                parts.append(abbr)
+            elif mode == TEACHER_NAMES_NAME:
+                parts.append(name)
+            else:
+                parts.append(f"{abbr} ({name})")
+        return ", ".join(parts)
+
+    def teacher_name(self, child: str | None, value: str | None) -> str | None:
+        """Nur die Namen (für Sensor-Attribute); None, wenn keiner bekannt ist."""
+        if not value:
+            return None
+        names = self.teacher_names(child)
+        found = [names[a] for a in value.split(", ") if a in names]
+        return ", ".join(found) or None
 
     def _need_download(self, item: PortalItem) -> bool:
         if not self.opt(CONF_AUTO_DOWNLOAD, DEFAULT_AUTO_DOWNLOAD):
@@ -1186,11 +1290,13 @@ class SchulManager:
                     entry = {"start": start, "end": max(stop, start + timedelta(minutes=5))}
                 else:
                     entry = {"start": day, "end": day + timedelta(days=1)}
-                text = self.substitution_text(e)
+                text = self.substitution_text(e, child=child)
                 hover = [text]
                 if e.get("teacher"):
                     label = "Lehrkräfte" if ", " in e["teacher"] else "Lehrkraft"
-                    hover.append(f"{label} laut Plan: {e['teacher']}")
+                    hover.append(
+                        f"{label} laut Plan: {self.teacher_label(child, e['teacher'])}"
+                    )
                 out.append(
                     {
                         "uid": f"vertretung-{e['uid']}",
@@ -1355,7 +1461,9 @@ class SchulManager:
             if include_past or date.fromisoformat(d["date"]) >= today
         ]
 
-    def substitution_text(self, e: dict[str, Any], with_teacher: bool = True) -> str:
+    def substitution_text(
+        self, e: dict[str, Any], with_teacher: bool = True, child: str | None = None
+    ) -> str:
         lesson = f"{e['lesson']}. Std." if e.get("lesson") else ""
         subj = e.get("subject") or e.get("old_subject") or ""
         head = " ".join(x for x in (lesson, subj) if x)
@@ -1372,7 +1480,7 @@ class SchulManager:
         else:
             text = f"{head}: Vertretung"
             if with_teacher and e.get("substitute"):
-                text += f" {e['substitute']}"
+                text += f" {self.teacher_label(child, e['substitute'])}"
             if e.get("room"):
                 text += f", Raum {e['room']}"
         if e.get("old_subject"):
@@ -1388,7 +1496,7 @@ class SchulManager:
         today = dt_util.now().date()
         lines = []
         for day, e in sorted(fresh, key=lambda x: (x[0], x[1].get("lesson") or "")):
-            lines.append(f"{_day_label(date.fromisoformat(day), today)}: {self.substitution_text(e)}")
+            lines.append(f"{_day_label(date.fromisoformat(day), today)}: {self.substitution_text(e, child=child)}")
         await self._notify(
             f"🔁 Vertretungsplan {name}",
             "\n".join(lines[:8]) + (f"\n… und {len(lines) - 8} weitere" if len(lines) > 8 else ""),

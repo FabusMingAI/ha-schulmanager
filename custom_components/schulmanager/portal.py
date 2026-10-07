@@ -5,7 +5,8 @@ Schulmanager braucht und die Bibliothek nicht liefert:
 
 * stabile IDs für Nachrichten und Aushänge,
 * Download-Links von Elternbrief-PDFs und Nachrichten-Anhängen,
-* das Herunterladen der Dateien innerhalb derselben Portal-Sitzung.
+* das Herunterladen der Dateien innerhalb derselben Portal-Sitzung,
+* die Stundenplankürzel der Lehrkräfte (Service → Schulinformationen).
 """
 
 from __future__ import annotations
@@ -38,6 +39,8 @@ from .const import (
 )
 
 MAX_FILE_SIZE = 25 * 1024 * 1024
+# Seite mit den Stundenplankürzeln der Lehrkräfte (Abschnitt in den Schulinformationen)
+TEACHERS_PATH = "service/schulinformationen"
 # Bereiche, die nicht jede Schule anbietet: Netzwerkfehler dort brechen den Abruf nicht ab
 OPTIONAL_SECTIONS = frozenset({"lesson", "substitution", "sicknote"})
 
@@ -112,6 +115,8 @@ class PortalResult:
     base_url: str
     children: list[PortalChild]
     errors: list[str] = field(default_factory=list)
+    # Stundenplankürzel -> Name; None = nicht abgerufen oder Fehler
+    teachers: dict[str, str] | None = None
 
 
 def school_from_input(value: str) -> str:
@@ -352,12 +357,25 @@ class SchulPortal(ElternPortalAPI):
             return f"{name}: {err}"
         return None
 
+    async def async_teachers_online(self) -> dict[str, str]:
+        """Stundenplankürzel der Lehrkräfte (leer, wenn die Schule sie nicht zeigt)."""
+        async with self._session.get(parse.urljoin(self.base_url, TEACHERS_PATH)) as resp:
+            resp.raise_for_status()
+            html = await resp.text()
+        return parse_teachers(html, self._beautiful_soup_parser) or {}
+
     async def async_fetch(
-        self, need_download: Callable[[PortalItem], bool] | None = None
+        self,
+        need_download: Callable[[PortalItem], bool] | None = None,
+        teachers: bool = False,
     ) -> PortalResult:
-        """Alles abrufen und gewünschte Anhänge in derselben Sitzung laden."""
+        """Alles abrufen und gewünschte Anhänge in derselben Sitzung laden.
+
+        ``teachers`` liest zusätzlich die Stundenplankürzel der Lehrkräfte.
+        """
         errors: list[str] = []
         children: list[PortalChild] = []
+        teacher_list: dict[str, str] | None = None
         self._keep_session = True
         try:
             if self._demo:
@@ -366,6 +384,16 @@ class SchulPortal(ElternPortalAPI):
             else:
                 await self.async_base_online()
                 await self.async_login_online()
+                if teachers:
+                    try:
+                        teacher_list = await self.async_teachers_online()
+                    except Exception as err:  # noqa: BLE001 - optional, Abruf läuft weiter
+                        LOGGER.info(
+                            "%s: Lehrkräfte-Kürzel nicht lesbar: %s", self.school, err
+                        )
+                        errors.append(
+                            f"lehrkraefte: {err or type(err).__name__}"
+                        )
 
             for self._student in self.students:
                 st = self._student
@@ -442,6 +470,7 @@ class SchulPortal(ElternPortalAPI):
             base_url=self.base_url,
             children=children,
             errors=errors,
+            teachers=teacher_list,
         )
 
     def _collect_items(self) -> list[PortalItem]:
@@ -690,6 +719,66 @@ def parse_substitutions(html: str, parser: str = "html.parser") -> dict[str, Any
     return result
 
 
+_HEADINGS = ("h1", "h2", "h3", "h4", "h5")
+
+
+def parse_teachers(html: str, parser: str = "html.parser") -> dict[str, str] | None:
+    """Stundenplankürzel der Lehrkräfte aus den Schulinformationen.
+
+    Aufbau im Portal: Überschrift "Stundenplankürzel der Lehrkräfte", danach je
+    Lehrkraft eine ``div.row`` mit dem Kürzel in ``<b>`` (doppelt, für breite und
+    schmale Bildschirme) und dem Namen in ``div.col-md-6``. Gibt ``None`` zurück,
+    wenn die Seite keinen solchen Abschnitt hat.
+    """
+    soup = bs4.BeautifulSoup(html, parser)
+    head = next(
+        (
+            h
+            for h in soup.find_all(_HEADINGS)
+            if re.search(r"k[uü]e?rzel", h.get_text(), re.I)
+            and re.search(r"lehr", h.get_text(), re.I)
+        ),
+        None,
+    )
+    if head is None:
+        return None
+    out: dict[str, str] = {}
+
+    def add(abbr: str, name: str) -> None:
+        abbr = re.sub(r"\s+", " ", abbr).strip().rstrip(":")
+        name = re.sub(r"\s+", " ", name).strip(" :-–")
+        if abbr and name and name != abbr and abbr not in out:
+            out[abbr] = name
+
+    # Tabellen-Variante (falls ein Portal die Liste als Tabelle zeigt)
+    table = head.find_next("table")
+    container = head.find_parent(class_="row") or head.parent
+    if container is not None and container.name != "body":
+        for row in container.find_next_siblings():
+            if row.find(_HEADINGS) or row.name in _HEADINGS:
+                break
+            bold = row.find("b")
+            if bold is None:
+                continue
+            abbr = bold.get_text()
+            value = row.select_one(".col-md-6, .col-md-8, .col-sm-8, .col-xs-8")
+            if value is not None:
+                name = value.get_text(" ")
+            else:
+                for b in row.find_all("b"):
+                    b.decompose()
+                name = row.get_text(" ")
+            add(abbr, name)
+    if not out and table is not None:
+        nxt = table.find_previous(_HEADINGS)
+        if nxt is head:
+            for tr in table.find_all("tr"):
+                cells = [c.get_text(" ") for c in tr.find_all(["td", "th"])]
+                if len(cells) >= 2 and not re.search(r"k[uü]rzel", cells[0], re.I):
+                    add(cells[0], cells[1])
+    return out
+
+
 async def async_validate(
     session: aiohttp.ClientSession, school: str, username: str, password: str
 ) -> str:
@@ -710,6 +799,7 @@ __all__ = [
     "appointment_kind",
     "appointment_subject",
     "parse_substitutions",
+    "parse_teachers",
     "parse_timetable",
     "school_from_input",
     "pyelternportal",

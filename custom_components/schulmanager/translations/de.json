@@ -86,14 +86,16 @@
           },
           "termine": {
             "name": "Termine & Klassen",
-            "description": "Welche Termine in Kalender, Terminliste und Stundenplan erscheinen",
+            "description": "Welche Termine in Kalender, Terminliste und Stundenplan erscheinen und wie Lehrkräfte angezeigt werden",
             "data": {
               "appointment_kinds": "Termine aus dem Portal anzeigen",
-              "own_class_only": "Nur Termine der eigenen Klasse"
+              "own_class_only": "Nur Termine der eigenen Klasse",
+              "teacher_names": "Lehrkräfte im Stunden- und Vertretungsplan"
             },
             "data_description": {
               "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests.",
-              "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar."
+              "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar.",
+              "teacher_names": "Die Kürzel stehen im Eltern-Portal unter „Service → Schulinformationen“ (Stundenplankürzel der Lehrkräfte). Der Schulmanager liest die Liste je Schule einmal am Tag. Unbekannte Kürzel bleiben stehen; die Namen gehen nicht an den KI-Dienst."
             }
           },
           "sprachansagen": {
@@ -412,6 +414,13 @@
         "en": "English",
         "es": "Español",
         "ca": "Català"
+      }
+    },
+    "teacher_names": {
+      "options": {
+        "beide": "Kürzel und Name, z. B. „Mü (Maria Müller)“",
+        "name": "Nur Name",
+        "kuerzel": "Nur Kürzel (Liste nicht abrufen)"
       }
     }
   }

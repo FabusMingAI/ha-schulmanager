@@ -86,14 +86,16 @@
           },
           "termine": {
             "name": "Appointments & classes",
-            "description": "Which appointments appear in the calendar, appointments list and timetable",
+            "description": "Which appointments appear in the calendar, appointments list and timetable, and how teachers are shown",
             "data": {
               "appointment_kinds": "Portal appointments to show",
-              "own_class_only": "Only appointments of the child's class"
+              "own_class_only": "Only appointments of the child's class",
+              "teacher_names": "Teachers in timetable and substitution plan"
             },
             "data_description": {
               "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests.",
-              "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible."
+              "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible.",
+              "teacher_names": "The abbreviations are listed in Eltern-Portal under \"Service → Schulinformationen\" (Stundenplankürzel der Lehrkräfte). The Schulmanager reads the list per school once a day. Unknown abbreviations stay as they are; names are not sent to the AI service."
             }
           },
           "sprachansagen": {
@@ -412,6 +414,13 @@
         "en": "English",
         "es": "Español",
         "ca": "Català"
+      }
+    },
+    "teacher_names": {
+      "options": {
+        "beide": "Abbreviation and name, e.g. \"Mü (Maria Müller)\"",
+        "name": "Name only",
+        "kuerzel": "Abbreviation only (do not fetch the list)"
       }
     }
   }

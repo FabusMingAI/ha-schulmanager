@@ -887,7 +887,7 @@
       if (info && !/^raum(änderung|wechsel)\.?$/i.test(info)) t += ` – ${info}`;
       return t;
     }
-    t = `Vertretung${subj ? ": " + subj : ""}${e.substitute ? " bei " + e.substitute : ""}${r ? ", Raum " + r : ""}`;
+    t = `Vertretung${subj ? ": " + subj : ""}${e.substitute ? " bei " + (e.substitute_label || e.substitute) : ""}${r ? ", Raum " + r : ""}`;
     if (e.old_subject) t += ` (statt ${fullName(e.old_subject)})`;
     if (info) t += ` – ${info}`;
     return t;

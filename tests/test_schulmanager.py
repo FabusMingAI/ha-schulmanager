@@ -241,7 +241,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
     first.children[0].items = [first.children[0].items[2]]  # nur alter Brief
     calls = {"n": 0}
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         calls["n"] += 1
         res = first if calls["n"] == 1 else _fake_result(today)
         if need_download:
@@ -371,7 +371,7 @@ async def test_file_view_signed(hass: HomeAssistant, media_dir, hass_client_no_a
     await async_setup_component(hass, "http", {})
     today = dt_util.now().date()
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         return _fake_result(today)
 
     entry = MockConfigEntry(
@@ -472,7 +472,7 @@ async def test_dashboard_templates_render(hass: HomeAssistant, media_dir) -> Non
     await async_setup_component(hass, "http", {})
     today = dt_util.now().date()
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         return _fake_result(today)
 
     entry = MockConfigEntry(
@@ -499,7 +499,7 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
     await async_setup_component(hass, "http", {})
     today = dt_util.now().date()
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         return _fake_result(today)
 
     entry = MockConfigEntry(
@@ -703,7 +703,7 @@ async def test_timetable_substitutions_flow(
     html = _SUBST_HTML.format(d0=today.strftime("%d.%m.%Y"), d1=tomorrow.strftime("%d.%m.%Y"))
     state = {"subst": parse_substitutions(html)}
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         res = _fake_result(today)
         res.children[0].timetable = state.get("timetable", parse_timetable(DEMO_HTML_LESSON))
         res.children[0].substitutions = state["subst"]
@@ -828,7 +828,7 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
         ]
     }
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         res = _fake_result(today)
         res.children[0].sicknotes = state["notes"]
         return res
@@ -907,7 +907,7 @@ async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> 
     today = dt_util.now().date()
     tomorrow = dt_util.start_of_local_day(today + timedelta(days=1))
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         res = _fake_result(today)
         res.children[0].appointments = [
             {"uid": "a1", "title": "SA in Deutsch (Mü)", "kind": "schulaufgabe", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
@@ -1024,7 +1024,7 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
 
     hass.services.async_register("ai_task", "generate_data", fake_ai, supports_response=SupportsResponse.ONLY)
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         res = _fake_result(today, with_pdf=False)
         res.children[0].appointments = [
             {"uid": "a1", "title": "SA in Deutsch (Mü)", "kind": "schulaufgabe", "start": tomorrow, "end": tomorrow + timedelta(hours=2)},
@@ -1122,7 +1122,7 @@ async def test_translate_missing_summaries(hass: HomeAssistant, media_dir) -> No
 
     hass.services.async_register("ai_task", "generate_data", fake_ai, supports_response=SupportsResponse.ONLY)
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         res = _fake_result(today, with_pdf=False)
         res.children[0].items = [res.children[0].items[0]]
         return res
@@ -1193,7 +1193,7 @@ async def test_translation_retry_and_progress(hass: HomeAssistant, media_dir, ha
 
     hass.services.async_register("ai_task", "generate_data", fake_ai, supports_response=SupportsResponse.ONLY)
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         return _fake_result(today, with_pdf=False)
 
     entry = MockConfigEntry(
@@ -1340,7 +1340,7 @@ async def test_published_date_prefix(hass: HomeAssistant, media_dir, hass_ws_cli
     sent = today - timedelta(days=1)
     prefix = sent.strftime("%d.%m.")
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         return _fake_result(today)
 
     entry = MockConfigEntry(
@@ -1397,7 +1397,7 @@ async def test_archive_events(hass: HomeAssistant, media_dir, hass_ws_client) ->
     await async_setup_component(hass, "http", {})
     today = dt_util.now().date()
 
-    async def fake_fetch(self, need_download=None):
+    async def fake_fetch(self, need_download=None, teachers=False):
         return _fake_result(today)
 
     entry = MockConfigEntry(
@@ -1449,4 +1449,158 @@ async def test_archive_events(hass: HomeAssistant, media_dir, hass_ws_client) ->
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
         assert "gibt-es-nicht" not in m.archived_events(child)
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+# Aufbau wie im Eltern-Portal unter Service → Schulinformationen (erfundene Namen)
+_TEACHERS_HTML = """<div id="asam_content">
+<div class="row m_bot"><div class="col-md-4"></div><div class="col-md-8"><h3>Wer macht Was</h3></div></div>
+<div class="row m_bot"><div class="col-md-4"><b>Schulkürzel</b></div><div class="col-md-6">BSP</div></div>
+<div class="row m_bot"><div class="col-md-4"></div><div class="col-md-8"><h3>Stundenplankürzel der Lehrkräfte</h3></div></div>
+<div class="row m_bot"><div class="col-md-4"><div class="text-right hidden-xs hidden-sm"><b>Kurz</b></div><div class="hidden-md hidden-lg"><b>Kurz</b></div></div><div class="col-md-6">Karla   Kurzweil</div></div>
+<div class="row m_bot"><div class="col-md-4"><div class="text-right hidden-xs hidden-sm"><b>Lang</b></div><div class="hidden-md hidden-lg"><b>Lang</b></div></div><div class="col-md-6">Lena Lang-Weilig</div></div>
+<div class="row m_bot"><div class="col-md-4"></div><div class="col-md-8"><h3>Sonstiges</h3></div></div>
+<div class="row m_bot"><div class="col-md-4"><b>X</b></div><div class="col-md-6">gehört nicht dazu</div></div>
+</div>"""
+
+
+def test_parse_teachers() -> None:
+    """Stundenplankürzel aus den Schulinformationen; Seite ohne Abschnitt -> None."""
+    from custom_components.schulmanager.portal import parse_teachers
+
+    assert parse_teachers(_TEACHERS_HTML) == {"Kurz": "Karla Kurzweil", "Lang": "Lena Lang-Weilig"}
+    assert parse_teachers("<div id='asam_content'><h3>Wer macht Was</h3></div>") is None
+    table = "<h3>Stundenplankürzel der Lehrkräfte</h3><table><tr><th>Kürzel</th><th>Name</th></tr><tr><td>Mü</td><td>Maria Müller</td></tr></table>"
+    assert parse_teachers(table) == {"Mü": "Maria Müller"}
+
+
+async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+    """Kürzel werden je Schule zu Namen; Liste höchstens täglich, Einstellung wirkt."""
+    from custom_components.schulmanager.portal import parse_substitutions, parse_teachers
+
+    await async_setup_component(hass, "http", {})
+    today = dt_util.now().date()
+    tomorrow = today + timedelta(days=1)
+    html = _SUBST_HTML.format(d0=today.strftime("%d.%m.%Y"), d1=tomorrow.strftime("%d.%m.%Y"))
+    state = {"subst": parse_substitutions(html), "teacher_calls": [], "list": parse_teachers(_TEACHERS_HTML)}
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        state["teacher_calls"].append(teachers)
+        res = _fake_result(today)
+        res.children[0].substitutions = state["subst"]
+        res.teachers = state["list"] if teachers else None
+        return res
+
+    notified: list[dict] = []
+
+    async def fake_notify(call: ServiceCall) -> None:
+        notified.append(dict(call.data))
+
+    hass.services.async_register("notify", "handy", fake_notify)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"notify_services": ["notify.handy"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        assert state["teacher_calls"] == [True]
+        assert m.data["teachers"]["bspgym"]["list"]["Kurz"] == "Karla Kurzweil"
+        # neue Vertretung -> Push nennt Kürzel und Namen
+        state["subst"]["days"][1]["entries"].append(
+            {"lesson": "1", "teacher": "Kurz", "substitute": "Lang", "subject": "Ph",
+             "old_subject": None, "room": "P1", "info": "", "kind": "vertretung"}
+        )
+        state["subst"]["days"][1]["entries"].append(
+            {"lesson": "1", "teacher": "Unbek", "substitute": "Lang", "subject": "Ph",
+             "old_subject": None, "room": "P1", "info": "", "kind": "vertretung"}
+        )
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        # Liste nur einmal am Tag
+        assert state["teacher_calls"] == [True, False]
+        push = [n for n in notified if "Vertretungsplan" in n.get("title", "")][-1]
+        assert "Vertretung Lang (Lena Lang-Weilig), Raum P1" in push["message"]
+
+    st = hass.states.get("sensor.schule_anna_vertretungen")
+    e = next(x for x in st.attributes["eintraege"] if x["vertretung"] == "Lang")
+    assert e["vertretung_name"] == "Lena Lang-Weilig" and e["lehrkraft_name"] == "Karla Kurzweil"
+    assert "Lang (Lena Lang-Weilig)" in e["text"]
+    ev = next(x for x in m.child_events("anna") if x["uid"].startswith("vertretung-") and "Ph" in x["title"])
+    # unbekanntes Kürzel bleibt stehen
+    assert "Lehrkräfte laut Plan: Kurz (Karla Kurzweil), Unbek" in ev["hover"]
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "schulmanager/data"})
+    res = (await ws.receive_json())["result"]
+    ent = next(x for d in res["children"][0]["substitutions"]["days"] for x in d["entries"] if x["substitute"] == "Lang")
+    assert ent["substitute_label"] == "Lang (Lena Lang-Weilig)"
+
+    # nur Name
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "teacher_names": "name"})
+    await hass.async_block_till_done()
+    m = entry.runtime_data
+    assert m.teacher_label("anna", "Kurz, Lang") == "Karla Kurzweil, Lena Lang-Weilig"
+    # nur Kürzel: keine Auflösung, Liste wird nicht mehr abgerufen
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "teacher_names": "kuerzel"})
+    await hass.async_block_till_done()
+    m = entry.runtime_data
+    assert m.teacher_label("anna", "Kurz") == "Kurz"
+    assert m._teachers_due("bspgym") is False
+    # Liste ist älter als ein Tag -> wieder fällig; leere Antwort überschreibt nichts
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "teacher_names": "beide"})
+    await hass.async_block_till_done()
+    m = entry.runtime_data
+    m.data["teachers"]["bspgym"]["updated"] = (dt_util.now() - timedelta(days=2)).isoformat()
+    assert m._teachers_due("bspgym") is True
+    state["list"] = {}
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+    assert m.data["teachers"]["bspgym"]["list"]["Lang"] == "Lena Lang-Weilig"
+    assert m._teachers_due("bspgym") is False
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_fetch_retries_after_disconnect(hass: HomeAssistant, media_dir) -> None:
+    """Trennt das Portal die Verbindung, wird einmal neu versucht – mit frischer Sitzung (#8)."""
+    import aiohttp
+
+    today = dt_util.now().date()
+    calls: list[int] = []
+
+    async def flaky(self, need_download=None, teachers=False):
+        calls.append(id(self._session))
+        if len(calls) == 1:
+            raise aiohttp.ServerDisconnectedError()
+        return _fake_result(today)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", flaky), \
+         patch("custom_components.schulmanager.manager.FETCH_RETRY_DELAY", 0):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        assert len(calls) == 2 and m.last_errors == [], m.last_errors
+        assert m.items
+
+    async def always_down(self, need_download=None, teachers=False):
+        calls.append(1)
+        raise aiohttp.ServerDisconnectedError()
+
+    calls.clear()
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", always_down), \
+         patch("custom_components.schulmanager.manager.FETCH_RETRY_DELAY", 0):
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+    assert len(calls) == 2
+    assert any("Portal nicht erreichbar" in e for e in m.last_errors), m.last_errors
     await hass.config_entries.async_unload(entry.entry_id)

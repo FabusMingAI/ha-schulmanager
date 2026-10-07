@@ -252,11 +252,13 @@ class SubstitutionSensor(SchulEntity, SensorEntity):
                 "fach": e.get("subject"),
                 "statt": e.get("old_subject"),
                 "lehrkraft": e.get("teacher"),
+                "lehrkraft_name": m.teacher_name(self.child, e.get("teacher")),
                 "vertretung": e.get("substitute"),
+                "vertretung_name": m.teacher_name(self.child, e.get("substitute")),
                 "raum": e.get("room"),
                 "info": e.get("info"),
                 "art": e.get("kind"),
-                "text": m.substitution_text(e),
+                "text": m.substitution_text(e, child=self.child),
             }
             for d in days
             for e in d["entries"]

@@ -25,6 +25,8 @@ from .const import (
     CONF_AUTO_DOWNLOAD,
     CONF_APPOINTMENT_KINDS,
     CONF_OWN_CLASS_ONLY,
+    CONF_TEACHER_NAMES,
+    TEACHER_NAMES_MODES,
     CONF_SUMMARY_LANGUAGES,
     CONF_DASHBOARD,
     CONF_DIGEST_ENABLED,
@@ -46,6 +48,7 @@ from .const import (
     APPOINTMENT_KINDS,
     DEFAULT_APPOINTMENT_KINDS,
     DEFAULT_OWN_CLASS_ONLY,
+    DEFAULT_TEACHER_NAMES,
     DEFAULT_SUMMARY_LANGUAGES,
     MAX_SUMMARY_LANGUAGES,
     SUMMARY_LANGUAGES,
@@ -302,6 +305,13 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                     )
                 ),
                 vol.Optional(CONF_OWN_CLASS_ONLY, **opt(CONF_OWN_CLASS_ONLY, DEFAULT_OWN_CLASS_ONLY)): bool,
+                vol.Optional(CONF_TEACHER_NAMES, **opt(CONF_TEACHER_NAMES, DEFAULT_TEACHER_NAMES)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=TEACHER_NAMES_MODES,
+                        translation_key="teacher_names",
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Optional(CONF_DASHBOARD, **opt(CONF_DASHBOARD, DEFAULT_DASHBOARD)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=DASHBOARD_MODES,
@@ -375,7 +385,7 @@ class SchulmanagerOptionsFlow(OptionsFlow):
 SETTINGS_SECTIONS: list[tuple[str, list[str], bool]] = [
     ("ki", [CONF_AI_ENTITY, CONF_SUMMARY_LANGUAGES], False),
     ("benachrichtigungen", [CONF_NOTIFY, CONF_DIGEST_ENABLED, CONF_DIGEST_TIME, CONF_REMINDER_TIME, CONF_REMINDER_DAYS], False),
-    ("termine", [CONF_APPOINTMENT_KINDS, CONF_OWN_CLASS_ONLY], False),
+    ("termine", [CONF_APPOINTMENT_KINDS, CONF_OWN_CLASS_ONLY, CONF_TEACHER_NAMES], False),
     ("sprachansagen", [CONF_TTS_TARGETS, CONF_TTS_ENGINE, CONF_TTS_START, CONF_TTS_END], True),
     ("abruf", [CONF_SCAN_INTERVAL, CONF_AUTO_DOWNLOAD, CONF_ANALYZE_DAYS, CONF_LOOKBACK_DAYS], True),
     ("dashboard", [CONF_DASHBOARD], True),

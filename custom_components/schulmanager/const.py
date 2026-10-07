@@ -37,6 +37,7 @@ CONF_DASHBOARD: Final = "dashboard"
 CONF_APPOINTMENT_KINDS: Final = "appointment_kinds"
 CONF_OWN_CLASS_ONLY: Final = "own_class_only"
 CONF_SUMMARY_LANGUAGES: Final = "summary_languages"
+CONF_TEACHER_NAMES: Final = "teacher_names"
 
 DEFAULT_DIGEST_ENABLED: Final = True
 DEFAULT_DIGEST_TIME: Final = "06:45:00"
@@ -56,6 +57,19 @@ APPT_TEST: Final = "test"  # Test / Kurzarbeit / kl. Leistungsnachweis / Stegrei
 APPOINTMENT_KINDS: Final = [APPT_EXAM, APPT_TEST, APPT_SCHOOL]
 DEFAULT_APPOINTMENT_KINDS: Final = [APPT_EXAM, APPT_TEST]
 DEFAULT_OWN_CLASS_ONLY: Final = True
+
+# Lehrkräfte: Anzeige der Stundenplankürzel (Service → Schulinformationen)
+TEACHER_NAMES_ABBR: Final = "kuerzel"  # nur Kürzel, z. B. "Mü"
+TEACHER_NAMES_BOTH: Final = "beide"  # Kürzel und Name, z. B. "Mü (Maria Müller)"
+TEACHER_NAMES_NAME: Final = "name"  # nur Name, z. B. "Maria Müller"
+TEACHER_NAMES_MODES: Final = [TEACHER_NAMES_BOTH, TEACHER_NAMES_NAME, TEACHER_NAMES_ABBR]
+DEFAULT_TEACHER_NAMES: Final = TEACHER_NAMES_BOTH
+TEACHERS_MAX_AGE: Final = timedelta(days=1)  # Liste höchstens einmal am Tag neu lesen
+
+# Abruf: eigene Verbindung je Abruf, ein Wiederholversuch bei Verbindungsfehlern (#8)
+FETCH_ATTEMPTS: Final = 2
+FETCH_RETRY_DELAY: Final = 5  # Sekunden
+FETCH_TIMEOUT: Final = 60  # Sekunden ohne Antwort, bis eine Anfrage abbricht
 
 # Sprachen der KI-Zusammenfassung (Reihenfolge = Reihenfolge der Reiter)
 SUMMARY_LANGUAGES: Final = ["de", "en", "es", "ca"]

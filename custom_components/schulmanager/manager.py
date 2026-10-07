@@ -1189,7 +1189,8 @@ class SchulManager:
                 text = self.substitution_text(e)
                 hover = [text]
                 if e.get("teacher"):
-                    hover.append(f"Lehrkraft laut Plan: {e['teacher']}")
+                    label = "Lehrkräfte" if ", " in e["teacher"] else "Lehrkraft"
+                    hover.append(f"{label} laut Plan: {e['teacher']}")
                 out.append(
                     {
                         "uid": f"vertretung-{e['uid']}",
@@ -1278,7 +1279,8 @@ class SchulManager:
         days: list[dict[str, Any]] = []
         fresh: list[tuple[str, dict[str, Any]]] = []
         for d in subst.get("days", []):
-            entries = []
+            entries: list[dict[str, Any]] = []
+            by_uid: dict[str, dict[str, Any]] = {}
             for e in d.get("entries", []):
                 e = dict(e)
                 raw = "|".join(
@@ -1286,6 +1288,15 @@ class SchulManager:
                     + [str(e.get(k) or "") for k in ("lesson", "subject", "substitute", "room", "info")]
                 )
                 e["uid"] = hashlib.sha1(raw.encode()).hexdigest()[:12]
+                # Geteilte Klassen: das Portal führt je Gruppe/Lehrkraft eine eigene
+                # Zeile, die sich sonst nicht unterscheidet -> ein Eintrag, alle
+                # Lehrkräfte in "teacher" (sonst doppelte Termine mit gleicher uid).
+                if (prev := by_uid.get(e["uid"])) is not None:
+                    teachers = [t for t in (prev.get("teacher") or "").split(", ") if t]
+                    if (t := e.get("teacher")) and t not in teachers:
+                        prev["teacher"] = ", ".join([*teachers, t])
+                    continue
+                by_uid[e["uid"]] = e
                 entries.append(e)
                 if date.fromisoformat(d["date"]) >= today and e["uid"] not in seen:
                     fresh.append((d["date"], e))

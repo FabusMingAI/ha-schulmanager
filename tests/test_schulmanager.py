@@ -748,6 +748,21 @@ async def test_timetable_substitutions_flow(
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
         assert len([n for n in notified if "Vertretungsplan" in n.get("title", "")]) == 1
+        # geteilte Klasse: zweite Zeile, nur andere Lehrkraft -> ein Eintrag, keine Push
+        state["subst"]["days"][1]["entries"].append(
+            {"lesson": "1", "teacher": "Breit", "substitute": "Lang", "subject": "Ph",
+             "old_subject": None, "room": "P1", "info": "", "kind": "vertretung"}
+        )
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        await hass.async_block_till_done()
+        assert len([n for n in notified if "Vertretungsplan" in n.get("title", "")]) == 1
+        st = hass.states.get("sensor.schule_anna_vertretungen")
+        assert st.state == "4" and len(st.attributes["morgen"]) == 1
+        day1 = m.data["substitutions"]["anna"]["days"][1]["entries"]
+        assert len(day1) == 1 and day1[0]["teacher"] == "Kurz, Breit"
+        evs = [x for x in m.child_events("anna") if x["uid"].startswith("vertretung-")]
+        assert len({x["uid"] for x in evs}) == len(evs)
+        assert any("Lehrkräfte laut Plan: Kurz, Breit" in x["hover"] for x in evs)
         # Portal liefert kurzzeitig nichts (z. B. Seite weg) -> alte Daten bleiben
         good = state["subst"]
         state["subst"] = {"available": False, "stand": None, "days": []}

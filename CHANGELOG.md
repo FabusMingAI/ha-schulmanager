@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1 – 2026-10-07
+
+- Fix: **substitutions no longer appear twice** in "Termine & Fristen", the calendar and the timetable. For split classes Eltern-Portal lists one row per group/teacher that differs only in the teacher; these rows are now merged into one entry and all teachers are shown in the hover text ("Lehrkräfte laut Plan: …"). Calendar UIDs are unique again; no new push for the merged rows. / Behoben: Vertretungen erschienen bei geteilten Klassen doppelt; gleiche Zeilen werden zusammengefasst, alle Lehrkräfte stehen im Hover-Text.
+
 ## 0.11.0 – 2026-10-06
 
 - New: **archive in "Termine & Fristen"**. Every entry gets a **📦** button (on hover, always visible on phones); archived entries move to the new **📦 Archiv** view right of "Alle", where **↩️** brings them back. Works on the overview and on each child's tab, stored in Home Assistant (same on all devices). Deadlines stay open tasks with reminders; the calendar is unchanged. New actions `schulmanager.archive_event` and `schulmanager.unarchive_event`. Closes #6. / Neu: Archiv für Termine & Fristen mit Archivieren und Reaktivieren, auf der Übersicht und in den Kinder-Reitern.

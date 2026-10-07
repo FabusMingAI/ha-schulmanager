@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.11.1";
+  const VERSION = "0.12.0";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -197,8 +197,13 @@
     .ev .who { font-size:.75em; padding:1px 7px; border-radius:9px; color:#fff; flex:none; margin-top:2px; }
     .ev.entfall .t { color: var(--error-color,#db4437); }
     .ev.vertretung .t, .ev.raum .t { color: var(--warning-color,#e08a00); }
-    .legend { border-top:1px solid var(--divider-color); margin-top:8px; padding: 8px 16px 6px; display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.8em; color: var(--secondary-text-color); }
-    .legend .lt { width:100%; text-transform:uppercase; letter-spacing:.04em; font-size:.9em; }
+    .legend { border-top:1px solid var(--divider-color); margin-top:8px; padding: 6px 16px; font-size:.8em; color: var(--secondary-text-color); }
+    .legend > summary { cursor:pointer; text-transform:uppercase; letter-spacing:.04em; font-size:.9em; list-style:none; user-select:none; padding:2px 0; }
+    .legend > summary::-webkit-details-marker { display:none; }
+    .legend > summary::before { content:"▸"; display:inline-block; width:1.1em; }
+    .legend[open] > summary::before { content:"▾"; }
+    .legend .lb { display:flex; flex-wrap:wrap; gap:4px 14px; padding: 4px 0 2px; }
+    .legend .lb > div { width:100%; }
     .legend span { white-space:nowrap; }
     .legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; }
     .bar { display:flex; gap:6px; padding: 0 16px 6px; flex-wrap:wrap; align-items:center; }
@@ -221,6 +226,10 @@
     .badge.vertretung, .badge.raum { background: rgba(255,166,0,.18); color: var(--warning-color,#e08a00); }
     .chg { font-size:.82em; color: var(--warning-color,#e08a00); margin-top:2px; }
     .les.entfall .chg { color: var(--error-color,#db4437); }
+    .wkn { display:flex; align-items:center; gap:6px; padding: 0 16px 6px; font-size:.85em; }
+    .wkn .lbl { flex:1; text-align:center; color: var(--secondary-text-color); text-transform:none; letter-spacing:normal; font-size:1em; margin:0; }
+    .wkn .lbl b { color: var(--primary-text-color); font-weight:500; }
+    .wkn .pill { padding:2px 10px; }
     .wk { overflow-x:auto; padding: 0 12px 4px; container-type: inline-size; }
     .wk table { border-collapse: collapse; width:100%; font-size:.82em; table-layout: fixed; }
     .wk th:first-child { width: 3.4em; }
@@ -341,6 +350,20 @@
       }
       this._render();
       if (refreshDialog && this._dialog && !this._editing && !this._hasSelection()) this._reopen();
+    }
+
+    // Einklappbare Legende (Standard: zu); der Zustand bleibt über Aktualisierungen erhalten.
+    _legendHtml(id, body) {
+      const open = (this._legendOpen || {})[id];
+      return `<details class="legend" data-legend="${id}" ${open ? "open" : ""}><summary>Legende</summary><div class="lb">${body}</div></details>`;
+    }
+
+    _bindLegends(root) {
+      root.querySelectorAll("details[data-legend]").forEach((el) =>
+        el.addEventListener("toggle", () => {
+          this._legendOpen = { ...(this._legendOpen || {}), [el.dataset.legend]: el.open };
+        })
+      );
     }
 
     // Inhalt der Karte ersetzen, ohne den offenen Dialog aus dem DOM zu nehmen –
@@ -763,6 +786,19 @@
     d.setDate(d.getDate() + n);
     return isoDay(d);
   };
+  // Montag der angezeigten Woche: aktuelle Woche, am Wochenende die nächste
+  const weekMonday = (today, offset = 0) => {
+    const wd = parseDay(today).getDay() || 7;
+    return addDays(today, (wd >= 6 ? 8 - wd : 1 - wd) + 7 * offset);
+  };
+  // ISO-Kalenderwoche
+  const isoWeek = (iso) => {
+    const d = parseDay(iso);
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y0) / 864e5 + 1) / 7);
+  };
   const dayLabel = (iso, today) => {
     const d = parseDay(iso);
     const base = `${WD[d.getDay()]} ${fmtShort(iso)}`;
@@ -945,19 +981,21 @@
       const order = Object.keys(legend);
       cats.sort((a, b) => order.indexOf(a) - order.indexOf(b));
       if (cats.length || multi) {
-        html += `<div class="legend"><span class="lt">Legende</span>`;
+        let body = "";
         for (const c of cats) {
           const [icon, label] = legend[c] || ["📅", c];
-          html += `<span>${esc(icon)} ${esc(label)}</span>`;
+          body += `<span>${esc(icon)} ${esc(label)}</span>`;
         }
-        if (multi) for (const c of d.children) html += `<span><i style="background:${colors[c.key]}"></i>${esc(c.name)}</span>`;
-        html += `</div><div class="info">Maus auf einen Eintrag halten (am Handy antippen) zeigt die Kurzbeschreibung.</div>`;
+        if (multi) for (const c of d.children) body += `<span><i style="background:${colors[c.key]}"></i>${esc(c.name)}</span>`;
+        body += `<div>Maus auf einen Eintrag halten (am Handy antippen) zeigt die Kurzbeschreibung.</div>`;
+        html += this._legendHtml("termine", body);
       }
       return html;
     }
 
     _bindAgenda() {
       const root = this.shadowRoot.getElementById("sm-c");
+      this._bindLegends(root);
       root.querySelectorAll("[data-range]").forEach((el) =>
         el.addEventListener("click", () => {
           this._range = el.dataset.range;
@@ -1073,6 +1111,15 @@
           this._render();
         })
       );
+      root.querySelectorAll("[data-wkoff]").forEach((el) =>
+        el.addEventListener("click", () => {
+          const k = el.dataset.child;
+          const off = el.dataset.wkoff === "0" ? 0 : ((this._wkOff || {})[k] || 0) + Number(el.dataset.wkoff);
+          this._wkOff = { ...(this._wkOff || {}), [k]: off };
+          this._render();
+        })
+      );
+      this._bindLegends(root);
     }
 
     // Wochenansicht aktiv? Ohne Klick gilt die Einstellung `view: week` der Karte.
@@ -1197,8 +1244,18 @@
       const nums = [...new Set(c.timetable.map((l) => l.lesson))].sort((a, b) => Number(a) - Number(b));
       const times = {};
       for (const l of c.timetable) if (l.start && !times[l.lesson]) times[l.lesson] = l.start;
-      let html = `<div class="wk"><table lang="de"><tr><th></th>`;
-      const dates = [1, 2, 3, 4, 5].map((wd) => this._dateFor(wd, today));
+      const off = (this._wkOff || {})[c.key] || 0;
+      const mon = weekMonday(today, off);
+      const dates = [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
+      const k = esc(c.key);
+      const rel = off === 0 ? "diese Woche" : off === 1 ? "nächste Woche" : off === -1 ? "letzte Woche" : off > 0 ? `in ${off} Wochen` : `vor ${-off} Wochen`;
+      let html = `<div class="wkn">
+          <button class="pill" data-child="${k}" data-wkoff="-1" title="Woche zurück" aria-label="Woche zurück">‹</button>
+          <span class="lbl"><b>KW ${isoWeek(mon)}</b> · ${fmtShort(dates[0])}–${fmtShort(dates[4])} · ${rel}</span>
+          ${off !== 0 ? `<button class="pill" data-child="${k}" data-wkoff="0" title="Zur aktuellen Woche">Heute</button>` : ""}
+          <button class="pill" data-child="${k}" data-wkoff="1" title="Woche vor" aria-label="Woche vor">›</button>
+        </div>`;
+      html += `<div class="wk"><table lang="de"><tr><th></th>`;
       dates.forEach((iso, i) => (html += `<th class="${iso === today ? "today" : ""}">${WD[i + 1]} <span class="dt">${fmtShort(iso)}</span></th>`));
       html += `</tr>`;
       for (const nr of nums) {
@@ -1213,7 +1270,10 @@
         });
         html += `</tr>`;
       }
-      return html + `</table></div><div class="info">Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum). Umrandet: 📝 Schulaufgabe (lila), ✏️ Test (blau).</div>`;
+      html += `</table></div>`;
+      if (dates[4] < today) html += `<div class="info">Vergangene Woche: Vertretungen werden nur ab heute angezeigt.</div>`;
+      else if (dates[0] > addDays(today, 7)) html += `<div class="info">Vertretungen stehen meist erst kurzfristig im Portal.</div>`;
+      return html + this._legendHtml("woche", `<div>Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum). Umrandet: 📝 Schulaufgabe (lila), ✏️ Test (blau).</div>`);
     }
   }
 

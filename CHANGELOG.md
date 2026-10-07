@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.0 – 2026-10-07
+
+- New: **week navigation in the timetable's week view** – ‹ / › go one week back or forward, "Heute" jumps back; the header shows calendar week, dates and "diese/nächste Woche". The week view now always shows Monday to Friday of one calendar week (on weekends the next week). Exams and tests of the shown week are marked; substitutions are only available from today on. / Neu: In der Wochenansicht des Stundenplans wochenweise vor- und zurückblättern, mit KW und „Heute“.
+- New: the **legend** in "Termine & Fristen" and in the week view is **collapsible and collapsed by default**; the open/closed state is kept while the card refreshes. / Neu: Legende ein- und ausklappbar, standardmäßig eingeklappt.
+
 ## 0.11.1 – 2026-10-07
 
 - Fix: **substitutions no longer appear twice** in "Termine & Fristen", the calendar and the timetable. For split classes Eltern-Portal lists one row per group/teacher that differs only in the teacher; these rows are now merged into one entry and all teachers are shown in the hover text ("Lehrkräfte laut Plan: …"). Calendar UIDs are unique again; no new push for the merged rows. / Behoben: Vertretungen erschienen bei geteilten Klassen doppelt; gleiche Zeilen werden zusammengefasst, alle Lehrkräfte stehen im Hover-Text.

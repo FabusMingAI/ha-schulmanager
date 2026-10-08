@@ -19,7 +19,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events
 
 from custom_components.schulmanager.const import DOMAIN
 from custom_components.schulmanager.portal import (
@@ -236,6 +236,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
+    new_item_events = async_capture_events(hass, "schulmanager_new_item")
     # Erster Abruf: Erst-Import (keine Einzel-Pushes); zweiter Abruf liefert den neuen Brief
     first = _fake_result(today)
     first.children[0].items = [first.children[0].items[2]]  # nur alter Brief
@@ -264,6 +265,10 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
             await hass.async_block_till_done()
 
     letter = m.items["bspgym-7-elternbrief-501"]
+    # Event für Automationen mit gültigem Namen und Daten
+    ev = next(e for e in new_item_events if e.data["item_uid"] == "bspgym-7-elternbrief-501")
+    assert ev.data["urgency"] == "hoch"
+    assert ev.data["tasks"] and "Klassenfahrt" in ev.data["tasks"][0]
     # Datei abgelegt + Text gelesen
     assert letter["files"], letter
     path = letter["files"][0]["path"]
@@ -1474,7 +1479,7 @@ def test_parse_teachers() -> None:
     assert parse_teachers(table) == {"Mü": "Maria Müller"}
 
 
-async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, monkeypatch) -> None:
     """Kürzel werden je Schule zu Namen; Liste höchstens täglich, Einstellung wirkt."""
     from custom_components.schulmanager.portal import parse_substitutions, parse_teachers
 
@@ -1490,6 +1495,9 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client) -> 
         res.children[0].substitutions = state["subst"]
         res.teachers = state["list"] if teachers else None
         return res
+
+    # gilt für den ganzen Test: Optionsänderungen laden die Integration neu und rufen dabei ab
+    monkeypatch.setattr("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch)
 
     notified: list[dict] = []
 

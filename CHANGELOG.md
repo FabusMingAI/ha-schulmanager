@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1 – 2026-10-08
+
+- Fix: **the `schulmanager_new_item` event was never fired**, and the first new message with a push stopped the background analysis. Since 0.5.3 the event call in `_notify_item()` passed three constants instead of one event name, which raised a `TypeError` after the push had been sent. As a result there was no voice announcement for urgent messages, no event for automations, and all further messages stayed unanalysed until Home Assistant was restarted. The event is fired correctly again, and an error in push/event/announcement can no longer stop the analysis worker. / Behoben: Das Event `schulmanager_new_item` kam nie an, und die erste neue Mitteilung mit Push hat die Auswertung angehalten (keine Sprachansage, keine weiteren Auswertungen bis zum Neustart).
+
 ## 0.12.0 – 2026-10-07
 
 - New: **week navigation in the timetable's week view** – ‹ / › go one week back or forward, "Heute" jumps back; the header shows calendar week, dates and "diese/nächste Woche". The week view now always shows Monday to Friday of one calendar week (on weekends the next week). Exams and tests of the shown week are marked; substitutions are only available from today on. / Neu: In der Wochenansicht des Stundenplans wochenweise vor- und zurückblättern, mit KW und „Heute“.

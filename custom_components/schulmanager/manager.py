@@ -868,7 +868,11 @@ class SchulManager:
                 item["analysis"] = {"status": "fehler", "error": str(err)}
             self._changed()
             if item.pop("notify", False):
-                await self._notify_item(item)
+                # Ein Fehler bei Push/Event/Ansage darf den Auswerte-Worker nicht beenden
+                try:
+                    await self._notify_item(item)
+                except Exception:  # noqa: BLE001
+                    LOGGER.exception("Benachrichtigung für %s fehlgeschlagen", item["uid"])
             await asyncio.sleep(0)
 
     def _context(self, item: dict[str, Any]) -> dict[str, Any]:
@@ -1592,9 +1596,7 @@ class SchulManager:
             },
         )
         self.hass.bus.async_fire(
-            EVENT_CATEGORIES,
-    EVENT_NEW_ITEM,
-    EVENT_SUBSTITUTION,
+            EVENT_NEW_ITEM,
             {
                 "child": item["child"],
                 "kind": item["kind"],

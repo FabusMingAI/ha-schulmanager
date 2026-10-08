@@ -1479,7 +1479,7 @@ def test_parse_teachers() -> None:
     assert parse_teachers(table) == {"Mü": "Maria Müller"}
 
 
-async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
+async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, monkeypatch) -> None:
     """Kürzel werden je Schule zu Namen; Liste höchstens täglich, Einstellung wirkt."""
     from custom_components.schulmanager.portal import parse_substitutions, parse_teachers
 
@@ -1495,6 +1495,9 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client) -> 
         res.children[0].substitutions = state["subst"]
         res.teachers = state["list"] if teachers else None
         return res
+
+    # gilt für den ganzen Test: Optionsänderungen laden die Integration neu und rufen dabei ab
+    monkeypatch.setattr("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch)
 
     notified: list[dict] = []
 

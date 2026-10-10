@@ -294,7 +294,31 @@ def ws_task(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
     )
     item = m.items.get(task.get("item_uid") or "")
     out["item"] = _item_full(hass, m, item) if item else None
+    if task.get("due") and task.get("child"):
+        from . import event_links
+
+        out["calendar"] = event_links(hass, m, task["child"], f"frist-{task['id']}")
     connection.send_result(msg["id"], out)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "schulmanager/event_links",
+        vol.Required("child"): str,
+        vol.Required("event_id"): str,
+    }
+)
+@callback
+def ws_event_links(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Links „In Kalender eintragen“ (.ics, signiert) und Google Kalender für einen Termin."""
+    from . import event_links
+
+    m = _manager(hass)
+    links = event_links(hass, m, msg["child"], msg["event_id"]) if m else None
+    if links is None:
+        connection.send_error(msg["id"], "not_found", "Termin nicht gefunden")
+        return
+    connection.send_result(msg["id"], links)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "schulmanager/subscribe"})
@@ -317,5 +341,5 @@ def ws_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnection
 
 @callback
 def async_register(hass: HomeAssistant) -> None:
-    for handler in (ws_data, ws_item, ws_task, ws_subscribe):
+    for handler in (ws_data, ws_item, ws_task, ws_event_links, ws_subscribe):
         websocket_api.async_register_command(hass, handler)

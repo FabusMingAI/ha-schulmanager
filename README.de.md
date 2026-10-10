@@ -42,8 +42,11 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 - Jede Aufgabe trägt vor dem Titel das **Erscheinungsdatum der Mitteilung im Eltern-Portal** (`29.09. · Skilager anzahlen`; eigene Aufgaben: der Tag, an dem sie angelegt wurden) – ebenso in den Dialogen (mit Jahr), in der Tagesübersicht und in den To-do-Listen.
 - Während KI-Zusammenfassungen übersetzt werden (z. B. nach dem Hinzufügen einer Sprache), zeigt die Karte oben „🌐 Zusammenfassungen werden übersetzt …: 34 von 90“.
-- **Aufgabe antippen** öffnet die Details: Status **Offen / In Arbeit / Erledigt**, Fälligkeit ändern, eigener **Kommentar**, Zahlungsdaten mit „kopieren“ für IBAN und Verwendungszweck, dazu die **Quelle** mit KI-Zusammenfassung, Originaltext, PDF und Link ins Eltern-Portal.
+- **Status-Icon einer Aufgabe antippen** ändert den Status direkt in der Liste: Kreis (offen) oder ⏳ (in Arbeit) setzt sie auf **erledigt**, der grüne Haken öffnet sie wieder. Erledigte Aufgaben sind nicht mehr durchgestrichen – Haken und Reiter **Erledigt** sagen das schon.
+- **Text einer Aufgabe antippen** öffnet die Details: Status **Offen / In Arbeit / Erledigt**, Fälligkeit ändern, eigener **Kommentar**, Zahlungsdaten mit „kopieren“ für IBAN und Verwendungszweck, dazu die **Quelle** mit KI-Zusammenfassung, Originaltext, PDF und Link ins Eltern-Portal.
 - **Mitteilung antippen** zeigt Text, PDF und die daraus entstandenen Aufgaben und markiert die Mitteilung als gelesen. Auch Mitteilungen haben den Status **Offen / In Arbeit / Erledigt**: Erledigte wandern in den Reiter **Erledigt** (und gelten als gelesen), Mitteilungen in Arbeit tragen ⏳.
+- Unter dem Reiter **Mitteilungen**: **Alle als gelesen markieren** und **Alle als erledigt markieren** (mit Rückfrage; sie wandern nach **Erledigt**).
+- Fristen haben im Aufgaben-Dialog **📅 In Kalender eintragen** und **Google Kalender** (siehe unten).
 - Die **KI-Zusammenfassung** hat einen Reiter je Sprache, die in den Einstellungen gewählt ist (Deutsch, Englisch, Spanisch, Katalanisch).
 - **Text kopieren:** Alles in den Dialogen lässt sich markieren; „📋 … kopieren“ kopiert die KI-Zusammenfassung oder den Text der Mitteilung bzw. PDF, „kopieren“ neben IBAN und Verwendungszweck nur diesen Wert.
 - **PDFs:** „Drucken“ öffnet den Druckdialog des Browsers, „Vollbild“ zeigt das PDF bildschirmfüllend (am Handy ohne Vollbild-Unterstützung öffnet es sich in einem neuen Tab).
@@ -55,7 +58,8 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 - Alle Termine, Fristen und Änderungen aus dem Vertretungsplan nach Tagen sortiert, Überfälliges oben. Umschalten zwischen **Nächste 2 Wochen**, **Alle** und **📦 Archiv**.
 - **Erledigtes archivieren:** Maus auf einen Eintrag (am Handy ist der Knopf immer sichtbar) und auf **📦** klicken. Der Eintrag verschwindet aus der Liste und landet im **📦 Archiv** (rechts neben **Alle**, mit Anzahl). Dort holt **↩️** ihn zurück. Funktioniert auf der Übersicht und in jedem Kinder-Reiter; das Archiv liegt in Home Assistant und ist auf allen Geräten gleich. Archivieren blendet nur in der Karte aus – Fristen bleiben offene Aufgaben mit Erinnerung, der Kalender bleibt unverändert. Einträge, die es nicht mehr gibt, verschwinden automatisch aus dem Archiv.
-- **Maus auf einen Eintrag** zeigt die Kurzbeschreibung der KI (am Handy einmal antippen). Ein Klick auf eine Frist oder einen Termin aus einem Brief öffnet die Details.
+- **Eintrag antippen bzw. anklicken** klappt ihn auf, erneutes Antippen klappt ihn zu – bei allen Arten gleich. Aufgeklappt stehen dort Kurzbeschreibung der KI, Ort und Quelle, bei Fristen und Terminen aus einem Brief **Aufgabe öffnen › / Mitteilung öffnen ›** und **📅 In Kalender eintragen**. Mit der Maus zeigt schon das Darüberfahren die Kurzbeschreibung.
+- **📅 In Kalender eintragen** übernimmt genau diesen einen Eintrag in den eigenen Kalender – ihr entscheidet selbst, welche. Es öffnet eine `.ics`-Datei: iPhone/iPad (Safari) bietet „Zum Kalender hinzufügen“ an, Outlook und die meisten Kalender-Apps öffnen sie als Termin zum Speichern. **Google Kalender** legt den Termin im Google Kalender an (praktisch auf Android, wo `.ics` nicht immer direkt importiert wird). Nochmaliges Eintragen aktualisiert den Termin statt ihn doppelt anzulegen (gleiche `UID`). Fristen erinnern am Vortag um 18 Uhr, Termine mit Uhrzeit eine Stunde vorher. Die Links sind signiert und 24 Stunden gültig. In der Home-Assistant-App öffnet sich der Link im Browser.
 - Unten erklärt eine **Legende** die Icons: 📝 Schulaufgabe, ✏️ Test / Kurzarbeit / Stegreifaufgabe, 🏫 Termin der Schule, 📅 Termin aus einer Mitteilung, ❌ Stunde entfällt, 🔁 Vertretung, 🚪 Raumänderung, 🤒 Krankmeldung und die Fristen nach Art (💶 Zahlung, ✍️ Unterschrift, ↩️ Rückmeldung, 🎒 Mitbringen, 📖 Lesen, ✅ Aufgabe). Bei mehreren Kindern hat jedes eine eigene Farbe.
 
 ### Stundenplan & Vertretungen – `custom:schulmanager-stundenplan`
@@ -70,6 +74,7 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 - Die Wochenansicht passt auch in schmale Karten (halbe Spalte, Handy), ohne dass man seitlich scrollen muss: Fächer werden dort abgekürzt („Mathe“, „Engl.“, „Reli/Eth“, „SA“ für Schulaufgabe).
 - Fächer stehen **ausgeschrieben** da („Biologie“ statt „B“, „Mathematik (Intensivierung)“ statt „MInt“, „Sport“ statt „Sm/Sw“). Das Original-Kürzel erscheint, wenn man mit der Maus darauf zeigt.
 - Änderungen aus dem Vertretungsplan sind farbig markiert: rot = entfällt, orange = Vertretung oder Raumänderung. Die Zahl an den Wochentagen zeigt, wie viele Änderungen anstehen.
+- In der Tagesansicht zeigt Antippen eines Schulaufgaben-/Test-Kastens oder einer Vertretung **📅 In Kalender eintragen** / **Google Kalender**.
 - **Schulaufgaben und Tests** aus den Portal-Terminen sind hervorgehoben: 📝 / ✏️ an den Wochentagen, ein Kasten über den Stunden des Tages und eine Markierung am passenden Fach (lila = Schulaufgabe, blau = Test). Was in den nächsten zwei Wochen ansteht, steht über dem Stundenplan.
 
 ## Voraussetzungen
@@ -129,7 +134,7 @@ Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur 
 | `schulmanager.mark_read` | `child: anna` oder `item_id: …`, ohne Angabe: alles |
 | `schulmanager.complete_task` | `task_id: …` |
 | `schulmanager.update_task` | `task_id` und `status`, `comment`, `due` oder `title` |
-| `schulmanager.update_item` | `item_id` und `status` (`offen`, `in_arbeit`, `erledigt`) einer Mitteilung |
+| `schulmanager.update_item` | `status` (`offen`, `in_arbeit`, `erledigt`) einer Mitteilung (`item_id`); ohne `item_id` für alle Mitteilungen von `child` (bzw. aller Kinder), liefert `changed` |
 | `schulmanager.add_task` | `child`, `title`, optional `due`, `amount`, `details`, `type` |
 | `schulmanager.reanalyze` | eine Mitteilung neu von der KI auswerten lassen |
 | `schulmanager.archive_event` / `schulmanager.unarchive_event` | `child` und `event_id` (uid eines Eintrags in „Termine & Fristen“): ins Archiv schieben bzw. zurückholen |
@@ -142,10 +147,11 @@ Events für eigene Automationen: `schulmanager_new_item` (mit `child`, `title`, 
 ## Gut zu wissen
 
 - **Empfangsbestätigung:** Das Eltern-Portal zählt das Herunterladen eines Elternbriefs als „Empfang bestätigt“. Mit aktivierter automatischer Ablage bestätigt der Schulmanager deshalb neue Briefe, sobald er die PDF holt. Wer das nicht will, schaltet „Anhänge/PDFs automatisch ablegen“ aus. Dann entsteht je Brief die Aufgabe „Empfang im Portal bestätigen“.
-- **Datenschutz:** Alles bleibt in Home Assistant. Ausnahme: Ist ein KI-Dienst gewählt, gehen Text und PDF-Inhalt der Mitteilung zur Auswertung an dessen Anbieter. PDF-Links im Dashboard sind signiert (30 Tage gültig) und ohne Anmeldung bzw. Signatur nicht abrufbar.
+- **Datenschutz:** Alles bleibt in Home Assistant. Ausnahme: Ist ein KI-Dienst gewählt, gehen Text und PDF-Inhalt der Mitteilung zur Auswertung an dessen Anbieter. PDF-Links im Dashboard sind signiert (30 Tage gültig) und ohne Anmeldung bzw. Signatur nicht abrufbar. Kalender-Links (`.ics`) sind 24 Stunden gültig. Eine `.ics`-Datei enthält den Eintrag so, wie ihn die Karte zeigt (Namen der Lehrkräfte wie unter *Termine & Klassen* eingestellt), und verlässt Home Assistant, sobald ihr sie öffnet.
 - **Inoffiziell:** Das Portal hat keine offizielle Schnittstelle. Der Zugriff läuft über die Bibliothek [pyelternportal](https://github.com/michull/pyelternportal), die das HTML ausliest. Ändert der Anbieter das Layout, kann ein Bereich vorübergehend ausfallen. Der Fehler steht dann in `sensor.schulmanager_letzter_abruf`, die übrigen Bereiche laufen weiter.
 - **Stundenplan, Vertretungsplan und Krankmeldungen** gibt es nur, wenn die Schule sie im Eltern-Portal freigeschaltet hat. Fehlt eine dieser Seiten oder trennt das Portal dort die Verbindung, wird nur dieser Bereich übersprungen (Hinweis in `sensor.schulmanager_letzter_abruf`), alles andere wird weiter abgerufen. Liefert das Portal kurzzeitig eine leere Seite, bleiben die zuletzt gelesenen Daten stehen.
 - **Namen der Lehrkräfte:** Das Eltern-Portal führt unter *Service → Schulinformationen* die „Stundenplankürzel der Lehrkräfte“. Der Schulmanager liest diese Liste je Schule einmal am Tag und zeigt die Namen neben den Kürzeln in Stundenplan, Vertretungsplan, Kalender, Hover-Texten und Push-Nachrichten – wie unter *Termine & Klassen* eingestellt. Jede Schule hat ihre eigene Liste; unbekannte Kürzel bleiben stehen. Die Namen bleiben in Home Assistant und gehen nie an den KI-Dienst.
+- **Geänderte Mitteilungen:** Ändert eine Lehrkraft eine Mitteilung im Portal, wird sie neu ausgewertet und als ungelesen angezeigt. Reine Unterschiede in Leerzeichen oder Zeilenumbrüchen zählen nicht, und sehen die meisten bekannten Mitteilungen auf einmal anders aus (z. B. nach einem Update von Portal oder Schulmanager), werden sie still aktualisiert, statt alle wieder ungelesen zu werden.
 - **Verbindung:** Jeder Abruf nutzt je Schule eine eigene, frische Verbindung. Trennt das Portal sie („Server disconnected“), versucht der Schulmanager es nach ein paar Sekunden noch einmal, bevor er die zuletzt gelesenen Daten behält.
 - **Krankmeldungen** werden nur gelesen, nie abgeschickt – krankmelden wie gewohnt im Portal.
 - **Noch nicht enthalten:** „Kommunikation Eltern/Klassenleitung“ (nur Fachlehrkräfte) und das Klassenbuch.

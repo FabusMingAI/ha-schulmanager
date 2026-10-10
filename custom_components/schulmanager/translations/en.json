@@ -322,11 +322,15 @@
     },
     "update_item": {
       "name": "Edit message",
-      "description": "Set the status of a message: open, in progress or done. Done messages count as read and move to \"Done\".",
+      "description": "Set the status of a message: open, in progress or done. Done messages count as read and move to \"Done\". Without a message ID the status applies to all messages of the child (without child: of all children).",
       "fields": {
         "item_id": {
           "name": "Message ID",
-          "description": "ID of the message."
+          "description": "ID of the message. Leave empty to change all messages."
+        },
+        "child": {
+          "name": "Child",
+          "description": "Only messages of this child (when no message ID is given)."
         },
         "status": {
           "name": "Status",

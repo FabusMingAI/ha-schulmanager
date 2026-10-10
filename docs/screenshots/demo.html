@@ -92,8 +92,8 @@
       { uid: "e4", date: "2026-10-07", time: "10:45", time_end: "11:30", category: "entfall", icon: "❌", title: "4. Std. Biologie entfällt", hover: "" },
       { uid: "e5", date: "2026-10-08", until: "2026-10-12", category: "frist_zahlung", icon: "💶", title: "Wandertag: 12,50 € überweisen", task_id: "t1",
         hover: "Busfahrt und Eintritt Tierpark. Überweisung an das Schulkonto, Verwendungszweck: Wandertag 7B Anna." },
-      { uid: "e6", date: "2026-10-14", time: "08:00", category: "termin", icon: "📅", title: "Wandertag Tierpark", location: "Treffpunkt Haupteingang",
-        hover: "Rucksack mit Brotzeit und Trinkflasche, wetterfeste Kleidung. Rückkehr ca. 14 Uhr." },
+      { uid: "e6", date: "2026-10-14", time: "08:00", category: "termin", icon: "📅", title: "Wandertag Tierpark", location: "Treffpunkt Haupteingang", item_uid: "i9",
+        hover: "Rucksack mit Brotzeit und Trinkflasche, wetterfeste Kleidung. Rückkehr ca. 14 Uhr. · Ort: Treffpunkt Haupteingang · Aus: Wandertag der 7. Klassen" },
     ],
   };
   const max = {
@@ -127,7 +127,7 @@
   // Aufgabe für den Detail-Dialog (card=task)
   const TASK = {
     id: "t9", child: "anna", child_name: "Anna", icon: "💶", title: "Skilager anzahlen", type: "zahlung",
-    status: "in_arbeit", due: "2026-10-09", days: 4, source: "ki", published: "2026-09-29",
+    status: "in_arbeit", due: "2026-10-09", days: 4, source: "ki", published: "2026-09-29", calendar: { ics: "#ics", google: "#google" },
     amount_text: "120,00 €", payee: "Förderverein Beispiel-Gymnasium", iban: "DE00 0000 0000 0000 0000 00", reference: "Skilager Anna 7B",
     details: "Anzahlung für das Skilager im Januar. Restbetrag folgt im Dezember.",
     comment: "Überweisung vorbereitet", comment_at: "2026-10-04",
@@ -166,7 +166,8 @@
   window.hass = {
     callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, errors: [],
         last_update: `${TODAY}T08:15:00+02:00`, version: "0.10.1", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
-      : msg.type === "schulmanager/task" ? TASK : msg.type === "schulmanager/item" ? ITEM : {},
+      : msg.type === "schulmanager/task" ? TASK : msg.type === "schulmanager/item" ? ITEM
+      : msg.type === "schulmanager/event_links" ? { ics: "#ics", google: "#google" } : {},
     callService: async () => {},
     user: { is_admin: true },
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },

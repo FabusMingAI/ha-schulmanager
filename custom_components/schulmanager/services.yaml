@@ -56,7 +56,10 @@ add_task:
 update_item:
   fields:
     item_id:
-      required: true
+      selector:
+        text:
+    child:
+      example: anna
       selector:
         text:
     status:

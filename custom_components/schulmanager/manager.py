@@ -136,6 +136,18 @@ def _safe_name(text: str, limit: int = 80) -> str:
     return text[:limit].rstrip(" .") or "Dokument"
 
 
+def _content_key(title: str | None, body: str | None) -> str:
+    """Inhalt einer Mitteilung ohne Unterschiede in Leerzeichen/Zeilenumbrüchen."""
+    return re.sub(r"\s+", " ", f"{title or ''}\n{body or ''}").strip()
+
+
+# Ändert sich bei einem Abruf die Version so vieler bekannter Mitteilungen auf
+# einmal, liegt das am Portal bzw. am Auslesen (z. B. andere Darstellung) und
+# nicht an den Lehrkräften: dann nichts als ungelesen markieren (#14).
+MASS_CHANGE_MIN = 5
+MASS_CHANGE_SHARE = 0.5
+
+
 def _parse_time(value: str | None, default: str) -> time:
     try:
         return time.fromisoformat(value or default)
@@ -458,6 +470,28 @@ class SchulManager:
         )
         new_count = 0
         fresh_subs: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+        known = [
+            (p, self.items[p.uid])
+            for c in result.children
+            for p in c.items
+            if p.uid in self.items
+        ]
+        changed = [
+            p
+            for p, s in known
+            if s.get("version") != p.version
+            and _content_key(s.get("title"), s.get("body")) != _content_key(p.title, p.body)
+        ]
+        mass_change = len(changed) >= MASS_CHANGE_MIN and len(changed) > len(known) * MASS_CHANGE_SHARE
+        if mass_change:
+            LOGGER.warning(
+                "%s: %d von %d bekannten Mitteilungen sehen anders aus als beim letzten Abruf. "
+                "Vermutlich hat sich die Darstellung im Portal geändert; sie werden "
+                "aktualisiert, aber nicht erneut als ungelesen markiert",
+                result.school,
+                len(changed),
+                len(known),
+            )
         for pchild in result.children:
             key = slugify(pchild.firstname) or pchild.student_id
             self.children[key] = {
@@ -525,7 +559,29 @@ class SchulManager:
                         new_count += 1
                     self.items[pitem.uid] = stored
                     await self._store_files(stored, pitem.files)
+                elif stored.get("version") != pitem.version and (
+                    mass_change
+                    or _content_key(stored.get("title"), stored.get("body"))
+                    == _content_key(pitem.title, pitem.body)
+                ):
+                    # Nur Darstellung/Zeitstempel anders oder viele auf einmal (#14):
+                    # Stand übernehmen, Gelesen/Status und Auswertung bleiben.
+                    LOGGER.debug("%s: neue Version ohne inhaltliche Änderung", pitem.uid)
+                    stored.update(
+                        title=pitem.title,
+                        body=pitem.body,
+                        sent=pitem.sent.isoformat() if pitem.sent else stored.get("sent"),
+                        version=pitem.version,
+                        meta=pitem.meta,
+                    )
+                    if pitem.files and not stored.get("files"):
+                        await self._store_files(stored, pitem.files)
                 elif stored.get("version") != pitem.version:
+                    LOGGER.info(
+                        "%s: Mitteilung „%s“ wurde im Portal geändert, wird neu ausgewertet",
+                        pitem.uid,
+                        pitem.title,
+                    )
                     stored.update(
                         title=pitem.title,
                         body=pitem.body,
@@ -995,20 +1051,38 @@ class SchulManager:
     def summary_languages(self) -> list[str]:
         return summary_languages(self.opt(CONF_SUMMARY_LANGUAGES))
 
-    def set_item_status(self, uid: str, status: str) -> None:
-        """Status einer Mitteilung: offen, in Arbeit oder erledigt (erledigt = gelesen)."""
-        item = self.items.get(uid)
-        if item is None:
-            raise HomeAssistantError(f"Unbekannte Mitteilung: {uid}")
+    def set_item_status(
+        self, uid: str | None, status: str, child: str | None = None
+    ) -> int:
+        """Status einer Mitteilung: offen, in Arbeit oder erledigt (erledigt = gelesen).
+
+        Ohne ``uid`` gilt der Status für alle Mitteilungen (eines Kindes), die ihn
+        noch nicht haben. Gibt die Zahl der geänderten Mitteilungen zurück.
+        """
         if status not in (STATUS_OPEN, STATUS_PROGRESS, STATUS_DONE):
             raise HomeAssistantError(f"Unbekannter Status: {status}")
-        item["status"] = status
-        if status == STATUS_DONE:
-            item["read"] = True
-            item["done_at"] = dt_util.now().isoformat()
+        if uid:
+            item = self.items.get(uid)
+            if item is None:
+                raise HomeAssistantError(f"Unbekannte Mitteilung: {uid}")
+            targets = [item]
         else:
-            item.pop("done_at", None)
+            targets = [
+                i
+                for i in self.items.values()
+                if (not child or i["child"] == child)
+                and (i.get("status") or STATUS_OPEN) != status
+            ]
+        now = dt_util.now().isoformat()
+        for item in targets:
+            item["status"] = status
+            if status == STATUS_DONE:
+                item["read"] = True
+                item["done_at"] = now
+            else:
+                item.pop("done_at", None)
         self._changed()
+        return len(targets)
 
     def complete_task(self, tid: str, done: bool = True) -> None:
         if tid not in self.tasks:
@@ -1150,6 +1224,17 @@ class SchulManager:
             "payments_total": round(sum(t.get("amount") or 0 for t in payments), 2),
             "next_task": dated[0] if dated else None,
         }
+
+    def find_event(self, child: str, uid: str) -> dict[str, Any] | None:
+        """Einen Eintrag aus ``child_events`` über seine ID (für .ics, #12)."""
+        if child not in self.children:
+            return None
+        return next((e for e in self.child_events(child) if e["uid"] == uid), None)
+
+    def event_portal_url(self, ev: dict[str, Any]) -> str | None:
+        """Link ins Eltern-Portal zur Mitteilung eines Eintrags, sonst None."""
+        item = self.items.get(ev.get("item_uid") or "")
+        return item.get("url") if item else None
 
     def child_events(self, child: str, subst_from: date | None = None) -> list[dict[str, Any]]:
         """Alle Kalendereinträge eines Kindes (normalisiert).

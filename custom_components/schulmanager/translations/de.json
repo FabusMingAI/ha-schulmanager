@@ -322,11 +322,15 @@
     },
     "update_item": {
       "name": "Mitteilung bearbeiten",
-      "description": "Status einer Mitteilung setzen: offen, in Arbeit oder erledigt. Erledigte Mitteilungen gelten als gelesen und erscheinen unter „Erledigt“.",
+      "description": "Status einer Mitteilung setzen: offen, in Arbeit oder erledigt. Erledigte Mitteilungen gelten als gelesen und erscheinen unter „Erledigt“. Ohne Mitteilungs-ID gilt der Status für alle Mitteilungen des Kindes (ohne Kind: aller Kinder).",
       "fields": {
         "item_id": {
           "name": "Mitteilungs-ID",
-          "description": "ID der Mitteilung."
+          "description": "ID der Mitteilung. Leer lassen, um alle Mitteilungen zu ändern."
+        },
+        "child": {
+          "name": "Kind",
+          "description": "Nur Mitteilungen dieses Kindes (wenn keine Mitteilungs-ID angegeben ist)."
         },
         "status": {
           "name": "Status",

@@ -54,6 +54,12 @@
   const AMPEL = { rot: "Dringend", gelb: "Etwas offen", gruen: "Alles erledigt" };
   const LANG_ORDER = ["de", "en", "es", "ca"];
   const LANG_NAMES = { de: "Deutsch", en: "English", es: "Español", ca: "Català" };
+  // Knöpfe „In Kalender eintragen“ (.ics für iPhone/Outlook/…) und „Google Kalender“ (#12)
+  const calButtons = (l) =>
+    l && l.ics
+      ? `<a class="btn sm" href="${esc(l.ics)}" target="_blank" rel="noopener" title="Termin als .ics-Datei öffnen – Apple Kalender, Outlook und die meisten Kalender-Apps">📅 In Kalender eintragen</a>` +
+        (l.google ? `<a class="btn sm" href="${esc(l.google)}" target="_blank" rel="noopener" title="Termin im Google Kalender anlegen (z. B. auf Android)">Google Kalender</a>` : "")
+      : "";
   // In die Zwischenablage kopieren – auch ohne HTTPS (dort fehlt navigator.clipboard)
   const copyText = async (text) => {
     try {
@@ -108,7 +114,13 @@
     .row .main { flex:1; min-width:0; }
     .row .t { white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
     .row .s { font-size:.82em; color: var(--secondary-text-color); white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
-    .row.done .t { text-decoration: line-through; color: var(--secondary-text-color); }
+    .row.done .t { color: var(--secondary-text-color); }
+    .row.task { cursor: default; padding-left: 6px; }
+    .row.task .main { cursor: pointer; }
+    .stb { flex:none; width:44px; height:44px; margin:-8px -4px -8px 0; padding:0; border:none; background:none; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; color: inherit; -webkit-tap-highlight-color: transparent; }
+    .stb:hover { background: var(--divider-color); }
+    .stb:focus-visible { outline: 2px solid var(--primary-color); }
+    .stb[disabled] { opacity:.5; }
     .row.unread .t { font-weight: 600; }
     .due { font-size:.82em; white-space:nowrap; color: var(--secondary-text-color); text-align:right; }
     .due.over, .due.soon { color: var(--error-color,#db4437); font-weight:600; }
@@ -121,6 +133,7 @@
     .empty { padding: 16px; color: var(--secondary-text-color); }
     .foot { padding: 4px 16px 8px; font-size:.8em; color: var(--secondary-text-color); display:flex; justify-content:space-between; gap:8px; }
     .foot a { color: var(--primary-color); cursor:pointer; text-decoration:none; }
+    .foot .fl { display:flex; flex-wrap:wrap; gap:4px 16px; justify-content:flex-end; }
 
     .ov { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9999; display:flex; align-items:center; justify-content:center; }
     .dlg { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; cursor: auto; }
@@ -188,6 +201,12 @@
     .ev .t { line-height:1.4; }
     .ev .hv { display:none; font-size:.85em; color: var(--secondary-text-color); margin-top:2px; }
     .ev.open .hv { display:block; }
+    .acts { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .exam[data-cal], .chg.cal { cursor:pointer; }
+    .chg .acts .btn, .exam .acts .btn { color: var(--primary-text-color); }
+    .btn.sm { padding:3px 10px; font-size:.85em; border-radius:14px; }
+    .ev .acts .btn.sm { font-size:1em; }
+    .calw { font-size:.85em; color: var(--secondary-text-color); align-self:center; }
     .ev .arc { flex:none; width:1.9em; height:1.9em; padding:0; border:1px solid var(--divider-color); background: var(--card-background-color, #fff); border-radius:50%; font-size:.8em; line-height:1; cursor:pointer; visibility:hidden; margin-top:1px; }
     .ev.archived .arc { visibility:visible; }
     .ev:hover .arc, .ev.open .arc, .ev .arc:focus { visibility:visible; }
@@ -352,6 +371,39 @@
       if (refreshDialog && this._dialog && !this._editing && !this._hasSelection()) this._reopen();
     }
 
+    // aufgeklappte Einträge („Kind:ID“)
+    get _evOpen() {
+      if (!this.__evOpen) this.__evOpen = new Set();
+      return this.__evOpen;
+    }
+
+    // „In Kalender eintragen“ (#12): Links werden erst beim Aufklappen geholt
+    // (signiert, 24 h gültig) und eine Stunde zwischengespeichert.
+    _calLinks(child, uid) {
+      const key = `${child}:${uid}`;
+      this._links = this._links || {};
+      const l = this._links[key];
+      if (l && (l.pending || Date.now() - l.at < 3600e3)) return l.pending ? null : l;
+      this._links[key] = { pending: true };
+      this._ws({ type: "schulmanager/event_links", child, event_id: uid })
+        .then((r) => {
+          this._links[key] = { ...r, at: Date.now() };
+          this._render();
+        })
+        .catch(() => {
+          this._links[key] = { error: true, at: Date.now() - 3540e3 };
+          this._render();
+        });
+      return null;
+    }
+
+    _calHtml(child, uid) {
+      const l = this._calLinks(child, uid);
+      if (!l) return `<span class="calw">📅 Kalender-Link wird geladen …</span>`;
+      if (l.error) return `<span class="calw">📅 Kalender-Link nicht verfügbar</span>`;
+      return calButtons(l);
+    }
+
     // Einklappbare Legende (Standard: zu); der Zustand bleibt über Aktualisierungen erhalten.
     _legendHtml(id, body) {
       const open = (this._legendOpen || {})[id];
@@ -407,9 +459,16 @@
           this._render();
         })
       );
-      root.querySelectorAll("[data-task]").forEach((el) =>
-        el.addEventListener("click", () => this._openTask(el.dataset.task))
-      );
+      root.querySelectorAll("[data-task]").forEach((el) => {
+        el.addEventListener("click", () => this._openTask(el.dataset.task));
+        el.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this._openTask(el.dataset.task);
+          }
+        });
+      });
+      this._bindToggles(root, () => this._render());
       root.querySelectorAll("[data-item]").forEach((el) =>
         el.addEventListener("click", () => this._openItem(el.dataset.item))
       );
@@ -417,6 +476,44 @@
         el.addEventListener("click", (ev) => {
           ev.stopPropagation();
           this._call("mark_read", { child: el.dataset.readall });
+        })
+      );
+      root.querySelectorAll("[data-doneall]").forEach((el) =>
+        el.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          const n = Number(el.dataset.n) || 0;
+          if (!confirm(`${n} Mitteilung${n === 1 ? "" : "en"} als erledigt markieren? Sie wandern in den Reiter „Erledigt“ und lassen sich dort einzeln wieder öffnen.`)) return;
+          await this._call("update_item", { child: el.dataset.doneall, status: "erledigt" });
+          this._load();
+        })
+      );
+    }
+
+    // Status-Icon einer Aufgabe: Kreis/„In Arbeit“ → erledigt, Haken → wieder offen (#10)
+    _bindToggles(root, after) {
+      root.querySelectorAll("[data-toggle]").forEach((el) =>
+        el.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          const id = el.dataset.toggle;
+          const next = el.dataset.next;
+          el.disabled = true;
+          try {
+            await this._call("update_task", { task_id: id, status: next });
+          } catch (err) {
+            el.disabled = false;
+            alert(`Schulmanager: ${err && err.message ? err.message : err}`);
+            return;
+          }
+          // sofort umsortieren, die Daten vom Server folgen über das Abo
+          for (const c of (this._data && this._data.children) || []) {
+            const t = (c.tasks || []).find((x) => x.id === id);
+            if (t) {
+              t.status = next;
+              t.status_label = next === "erledigt" ? "Erledigt" : "Offen";
+            }
+          }
+          if (after) after();
         })
       );
     }
@@ -453,7 +550,7 @@
             <button class="tab ${tab === "erledigt" ? "on" : ""}" data-child="${esc(c.key)}" data-tab="erledigt">Erledigt</button>
           </div>
           <div class="list">${body}</div>
-          ${tab === "mitteilungen" && c.unread ? `<div class="foot"><span></span><a data-readall="${esc(c.key)}">Alle als gelesen markieren</a></div>` : ""}
+          ${tab === "mitteilungen" && (c.unread || activeItems.length) ? `<div class="foot"><span></span><span class="fl">${c.unread ? `<a data-readall="${esc(c.key)}">Alle als gelesen markieren</a>` : ""}${activeItems.length ? `<a data-doneall="${esc(c.key)}" data-n="${activeItems.length}">Alle als erledigt markieren</a>` : ""}</span></div>` : ""}
         </div>`;
     }
 
@@ -468,9 +565,11 @@
           const due = t.due
             ? `<div class="due ${dueClass(t)}">${fmtShort(t.due)}<br>${t.status === "erledigt" ? "" : daysText(t.days)}</div>`
             : "";
-          return `<div class="row ${t.status === "erledigt" ? "done" : ""}" data-task="${esc(t.id)}">
-              <ha-icon class="st ${esc(t.status)}" icon="${st[2]}" title="${st[1]}"></ha-icon>
-              <div class="main"><div class="t">${esc(t.icon)} ${esc(datedTitle(t.published, t.title))}${t.has_files ? " 📎" : ""}</div>
+          const next = t.status === "erledigt" ? "offen" : "erledigt";
+          const hint = t.status === "erledigt" ? "Wieder öffnen" : "Als erledigt markieren";
+          return `<div class="row task ${t.status === "erledigt" ? "done" : ""}">
+              <button class="stb" data-toggle="${esc(t.id)}" data-next="${next}" title="${st[1]} – antippen: ${hint}" aria-label="${esc(t.title)}: ${hint}"><ha-icon class="st ${esc(t.status)}" icon="${st[2]}"></ha-icon></button>
+              <div class="main" data-task="${esc(t.id)}" role="button" tabindex="0"><div class="t">${esc(t.icon)} ${esc(datedTitle(t.published, t.title))}${t.has_files ? " 📎" : ""}</div>
               ${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div>${due}</div>`;
         })
         .join("");
@@ -561,6 +660,10 @@
           if (!this._hasSelection()) this._openTask(el.dataset.task);
         })
       );
+      this._bindToggles(ov, () => {
+        this._render();
+        this._reopen();
+      });
       ov.querySelectorAll("[data-preview]").forEach((el) =>
         el.addEventListener("click", () => {
           const box = ov.querySelector(".pv");
@@ -689,6 +792,7 @@
         <div class="sec"><div class="lbl">Fällig</div>
           <input type="date" class="due-in" value="${esc(t.due || "")}">
           ${t.due && t.status !== "erledigt" ? `<div class="sub" style="margin-top:4px">${daysText(t.days)}</div>` : ""}
+          ${t.calendar ? `<div class="btns">${calButtons(t.calendar)}</div>` : ""}
         </div>
         ${pay}
         ${t.details ? `<div class="sec"><div class="lbl">Details</div><div>${esc(t.details)}</div></div>` : ""}
@@ -910,6 +1014,7 @@
       return 6;
     }
 
+
     _render() {
       let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
@@ -964,12 +1069,18 @@
         for (const e of list) {
           const sub = e.category === "entfall" || e.category === "vertretung" || e.category === "raum" ? e.category : "";
           const time = e.time ? e.time : e.until ? "bis " + fmtShort(e.until) : "";
-          const evKey = esc(e.child + ":" + e.uid);
-          html += `<div class="ev ${sub} ${e.archived ? "archived" : ""}" data-ev="${evKey}">
+          const rawKey = e.child + ":" + e.uid;
+          const evKey = esc(rawKey);
+          const isOpen = this._evOpen.has(rawKey);
+          const detail = e.task_id ? "Aufgabe öffnen ›" : e.item_uid ? "Mitteilung öffnen ›" : "";
+          const acts = isOpen
+            ? `<div class="acts">${detail ? `<button class="btn sm" data-open="${evKey}">${detail}</button>` : ""}${this._calHtml(e.child, e.uid)}</div>`
+            : "";
+          html += `<div class="ev ${sub} ${e.archived ? "archived" : ""} ${isOpen ? "open" : ""}" data-ev="${evKey}" aria-expanded="${isOpen}">
               <span class="ic">${esc(e.icon)}</span>
               <span class="tm">${esc(time)}</span>
               <div class="main"><div class="t">${esc(e.title)}</div>
-                <div class="hv">${esc(clip(e.hover))}</div></div>
+                <div class="hv">${e.hover ? `<div>${esc(clip(e.hover))}</div>` : ""}${acts}</div></div>
               ${multi ? `<span class="who" style="background:${colors[e.child]}">${esc(e.child_name)}</span>` : ""}
               <button class="arc" data-arc="${evKey}" title="${e.archived ? "Reaktivieren: zurück in die Termine & Fristen" : "Archivieren: ins Archiv schieben"}" aria-label="${e.archived ? "Reaktivieren" : "Archivieren"}">${e.archived ? "↩️" : "📦"}</button>
             </div>`;
@@ -987,7 +1098,7 @@
           body += `<span>${esc(icon)} ${esc(label)}</span>`;
         }
         if (multi) for (const c of d.children) body += `<span><i style="background:${colors[c.key]}"></i>${esc(c.name)}</span>`;
-        body += `<div>Maus auf einen Eintrag halten (am Handy antippen) zeigt die Kurzbeschreibung.</div>`;
+        body += `<div>Maus auf einen Eintrag halten zeigt die Kurzbeschreibung. Antippen bzw. Klicken klappt ihn auf und wieder zu – mit Details und „📅 In Kalender eintragen“.</div>`;
         html += this._legendHtml("termine", body);
       }
       return html;
@@ -1009,24 +1120,37 @@
           this._toggleArchive(el.dataset.arc, el);
         })
       );
-      const touch = window.matchMedia && window.matchMedia("(hover: none)").matches;
-      root.querySelectorAll("[data-ev]").forEach((el) => {
-        const ev = this._events[el.dataset.ev];
-        if (!ev) return;
-        if (!touch) {
-          el.addEventListener("mouseenter", (m) => this._showTip(ev, m));
-          el.addEventListener("mousemove", (m) => this._moveTip(m));
-          el.addEventListener("mouseleave", () => this._hideTip());
-        }
-        el.addEventListener("click", () => {
+      root.querySelectorAll("[data-open]").forEach((el) =>
+        el.addEventListener("click", (m) => {
+          m.stopPropagation();
           this._hideTip();
-          if (touch && !el.classList.contains("open") && ev.hover) {
-            el.classList.add("open");
-            return;
-          }
+          const ev = this._events[el.dataset.open];
+          if (!ev) return;
           if (ev.task_id) this._openTask(ev.task_id);
           else if (ev.item_uid) this._openItem(ev.item_uid);
-          else el.classList.toggle("open");
+        })
+      );
+      // Alle Einträge gleich (#15): Antippen/Klicken klappt auf und zu; der Zustand
+      // bleibt beim Aktualisieren der Karte erhalten. Die Kurzbeschreibung als
+      // schwebender Hinweis nur mit Maus – auf Touch-Geräten blieb sie sonst stehen.
+      root.querySelectorAll("[data-ev]").forEach((el) => {
+        const key = el.dataset.ev;
+        const ev = this._events[key];
+        if (!ev) return;
+        el.addEventListener("pointerenter", (m) => {
+          if (m.pointerType === "mouse" && !this._evOpen.has(key)) this._showTip(ev, m);
+        });
+        el.addEventListener("pointermove", (m) => {
+          if (m.pointerType === "mouse") this._moveTip(m);
+        });
+        el.addEventListener("pointerleave", () => this._hideTip());
+        el.addEventListener("click", (m) => {
+          if (m.target.closest("a, button")) return;
+          if (this._hasSelection && this._hasSelection()) return;
+          this._hideTip();
+          if (this._evOpen.has(key)) this._evOpen.delete(key);
+          else this._evOpen.add(key);
+          this._render();
         });
       });
     }
@@ -1059,7 +1183,7 @@
       tip.innerHTML = `<b>${esc(ev.icon)} ${esc(ev.title)}</b>
         ${ev.hover ? `<div>${esc(clip(ev.hover))}</div>` : ""}
         <div class="k">${esc(when)}${ev.location ? " · " + esc(ev.location) : ""}${cat ? " · " + esc(cat[1]) : ""}${this._data.children.length > 1 ? " · " + esc(ev.child_name) : ""}</div>
-        ${ev.task_id || ev.item_uid ? `<div class="k">Klicken für Details</div>` : ""}`;
+        <div class="k">Klicken zum Aufklappen${ev.task_id || ev.item_uid ? " (Details, In Kalender eintragen)" : " (In Kalender eintragen)"}</div>`;
       this.shadowRoot.appendChild(tip);
       this._tip = tip;
       this._moveTip(m);
@@ -1119,7 +1243,28 @@
           this._render();
         })
       );
+      root.querySelectorAll("[data-cal]").forEach((el) =>
+        el.addEventListener("click", (m) => {
+          if (m.target.closest("a, button")) return;
+          const key = el.dataset.cal;
+          if (this._evOpen.has(key)) this._evOpen.delete(key);
+          else this._evOpen.add(key);
+          this._render();
+        })
+      );
       this._bindLegends(root);
+    }
+
+    // Änderung aus dem Vertretungsplan; antippen zeigt „In Kalender eintragen“ (#12)
+    _chgHtml(c, e) {
+      const has = e.uid && (c.events || []).some((x) => x.uid === `vertretung-${e.uid}`);
+      if (!has) return `<div class="chg">${esc(changeText(e))}</div>`;
+      const uid = `vertretung-${e.uid}`;
+      return `<div class="chg cal" data-cal="${esc(c.key + ":" + uid)}" title="Antippen: In Kalender eintragen">${esc(changeText(e))}${this._calRow(c.key, uid)}</div>`;
+    }
+
+    _calRow(child, uid) {
+      return this._evOpen.has(`${child}:${uid}`) ? `<div class="acts">${this._calHtml(child, uid)}</div>` : "";
     }
 
     // Wochenansicht aktiv? Ohne Klick gilt die Einstellung `view: week` der Karte.
@@ -1210,7 +1355,7 @@
       const dayExams = (this._exams || {})[iso] || [];
       for (const e of dayExams) {
         const [icon, label] = EXAM_LABEL[e.category];
-        html += `<div class="exam ${e.category === "test" ? "test" : ""}">${icon} <b>${label}</b>: ${esc(e.title)}</div>`;
+        html += `<div class="exam ${e.category === "test" ? "test" : ""}" data-cal="${esc(c.key + ":" + e.uid)}" title="Antippen: In Kalender eintragen">${icon} <b>${label}</b>: ${esc(e.title)}${this._calRow(c.key, e.uid)}</div>`;
       }
       const examFor = (subject) => dayExams.find((e) => e.subject && sameSubject(e.subject, subject));
       if (!c.timetable.length) html += `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
@@ -1227,14 +1372,14 @@
             <span class="nr">${esc(l.lesson)}.</span>
             <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
             <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}${exBadge}</div>
-              ${ch.map((e) => `<div class="chg">${esc(changeText(e))}</div>`).join("")}</div>
+              ${ch.map((e) => this._chgHtml(c, e)).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
           </div>`;
       }
       const rest = entries.filter((e, i) => !used.has(i));
       if (rest.length) {
         html += `<div class="day">Weitere Änderungen</div>`;
-        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div><div class="chg">${esc(changeText(e))}</div></div><span class="rm">${esc(e.room || "")}</span></div>`;
+        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div>${this._chgHtml(c, e)}</div><span class="rm">${esc(e.room || "")}</span></div>`;
       }
       return html;
     }

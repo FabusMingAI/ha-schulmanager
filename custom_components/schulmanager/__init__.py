@@ -27,13 +27,15 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 
-from . import dashboard, websocket
+from . import dashboard, ics, websocket
 from .const import (
     CARD_URL,
     DOMAIN,
     LOCAL_CARD_FILE,
     LOCAL_CARD_URL,
     FILE_URL_BASE,
+    ICS_LINK_VALIDITY,
+    ICS_URL_BASE,
     LOGGER,
     PLATFORMS,
     SIGNAL_UPDATED,
@@ -65,6 +67,57 @@ def file_url(hass: HomeAssistant, uid: str, index: int) -> str:
         timedelta(days=30),
         use_content_user=True,
     )
+
+
+def event_links(hass: HomeAssistant, manager: SchulManager, child: str, uid: str) -> dict[str, str] | None:
+    """Signierter .ics-Link und Google-Kalender-Link für einen Termin (#12)."""
+    ev = manager.find_event(child, uid)
+    if ev is None:
+        return None
+    child_name = manager.children.get(child, {}).get("name")
+    return {
+        "ics": async_sign_path(
+            hass,
+            f"{ICS_URL_BASE}/{_quote(child)}/{_quote(uid)}",
+            ICS_LINK_VALIDITY,
+            use_content_user=True,
+        ),
+        "google": ics.google_url(
+            ev, child_name, hass.config.time_zone, manager.event_portal_url(ev)
+        ),
+    }
+
+
+class SchulIcsView(HomeAssistantView):
+    """Ein einzelner Termin als .ics – nur mit Anmeldung oder signiertem Link."""
+
+    url = ICS_URL_BASE + "/{child}/{uid}"
+    name = "api:schulmanager:ics"
+    requires_auth = True
+
+    async def get(self, request: web.Request, child: str, uid: str) -> web.StreamResponse:
+        hass: HomeAssistant = request.app["hass"]
+        try:
+            manager = get_manager(hass)
+        except HomeAssistantError:
+            return web.Response(status=404)
+        ev = manager.find_event(child, uid)
+        if ev is None:
+            return web.Response(status=404)
+        body = ics.build_ics(
+            ev,
+            child,
+            manager.children.get(child, {}).get("name"),
+            manager.event_portal_url(ev),
+        )
+        return web.Response(
+            body=body.encode("utf-8"),
+            headers={
+                "Content-Type": "text/calendar; charset=utf-8",
+                "Content-Disposition": f"inline; filename*=UTF-8''{_quote(ics.ics_filename(ev))}",
+                "Cache-Control": "private, no-store",
+            },
+        )
 
 
 class SchulFileView(HomeAssistantView):
@@ -131,11 +184,12 @@ class SchulCardView(HomeAssistantView):
 def _quote(name: str) -> str:
     from urllib.parse import quote
 
-    return quote(name)
+    return quote(name, safe="")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(SchulFileView())
+    hass.http.register_view(SchulIcsView())
     card = await hass.async_add_executor_job(_card_path)
     hass.http.register_view(SchulCardView(card))
     websocket.async_register(hass)
@@ -306,8 +360,11 @@ def _register_services(hass: HomeAssistant) -> None:
             changes["due"] = due.isoformat() if due else None
         get_manager(hass).update_task(call.data[ATTR_TASK], **changes)
 
-    async def update_item(call: ServiceCall) -> None:
-        get_manager(hass).set_item_status(call.data[ATTR_ITEM], call.data["status"])
+    async def update_item(call: ServiceCall) -> ServiceResponse:
+        n = get_manager(hass).set_item_status(
+            call.data.get(ATTR_ITEM), call.data["status"], child=call.data.get(ATTR_CHILD)
+        )
+        return {"changed": n}
 
     async def reanalyze(call: ServiceCall) -> None:
         await get_manager(hass).async_reanalyze(call.data[ATTR_ITEM])
@@ -431,8 +488,13 @@ def _register_services(hass: HomeAssistant) -> None:
         "update_item",
         update_item,
         schema=vol.Schema(
-            {vol.Required(ATTR_ITEM): cv.string, vol.Required("status"): vol.In(TASK_STATUSES)}
+            {
+                vol.Optional(ATTR_ITEM): cv.string,
+                vol.Optional(ATTR_CHILD): cv.string,
+                vol.Required("status"): vol.In(TASK_STATUSES),
+            }
         ),
+        supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
         DOMAIN, "reanalyze", reanalyze, schema=vol.Schema({vol.Required(ATTR_ITEM): cv.string})

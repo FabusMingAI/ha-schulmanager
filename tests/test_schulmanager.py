@@ -1612,3 +1612,186 @@ async def test_fetch_retries_after_disconnect(hass: HomeAssistant, media_dir) ->
     assert len(calls) == 2
     assert any("Portal nicht erreichbar" in e for e in m.last_errors), m.last_errors
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+def test_build_ics() -> None:
+    """Einzelner Termin als .ics nach RFC 5545 (#12): ganztägig, mit Uhrzeit, Maskierung, Umbruch."""
+    from zoneinfo import ZoneInfo
+
+    from custom_components.schulmanager import ics
+
+    now = datetime(2026, 10, 10, 8, 0, tzinfo=ZoneInfo("UTC"))
+    day = date(2026, 10, 20)
+    frist = {
+        "uid": "frist-abc",
+        "summary": "💶 Frist: Klassenfahrt bezahlen",
+        "title": "Frist: Klassenfahrt bezahlen",
+        "start": day,
+        "end": day + timedelta(days=1),
+        "description": "Betrag: 185,00 €\nIBAN: DE00 1234; Verwendungszweck: Anna, 8b",
+        "hover": "Bitte überweisen " + "sehr lange Beschreibung " * 8,
+        "category": "frist_zahlung",
+    }
+    text = ics.build_ics(frist, "anna", "Anna", "https://bspgym.eltern-portal.org/x", now=now)
+    assert text.startswith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n")
+    assert text.endswith("END:VCALENDAR\r\n")
+    lines = text.split("\r\n")
+    assert all(len(line.encode("utf-8")) <= 75 for line in lines)
+    unfolded = text.replace("\r\n ", "")
+    assert "UID:anna-frist-abc@schulmanager" in unfolded
+    assert "DTSTART;VALUE=DATE:20261020" in unfolded
+    assert "DTEND;VALUE=DATE:20261021" in unfolded
+    assert "SUMMARY:Anna: 💶 Frist: Klassenfahrt bezahlen" in unfolded
+    assert r"IBAN: DE00 1234\; Verwendungszweck: Anna\, 8b" in unfolded
+    assert "\\nEltern-Portal: https://bspgym.eltern-portal.org/x" in unfolded
+    assert "URL:https://bspgym.eltern-portal.org/x" in unfolded
+    assert "TRIGGER:-PT6H" in unfolded
+    # gleiche UID bei erneutem Erzeugen -> kein Duplikat im Kalender
+    assert ics.build_ics(frist, "anna", "Anna", now=now).count("UID:anna-frist-abc@schulmanager") == 1
+
+    tz = ZoneInfo("Europe/Berlin")
+    start = datetime(2026, 10, 21, 18, 30, tzinfo=tz)
+    termin = {
+        "uid": "x-termin-0",
+        "summary": "📅 Elternabend",
+        "title": "Elternabend",
+        "start": start,
+        "end": start + timedelta(hours=1),
+        "description": "Aus: Einladung",
+        "hover": "Infos zur Fahrt · Ort: Aula · Aus: Einladung",
+        "location": "Aula",
+    }
+    unfolded = ics.build_ics(termin, "anna", "Anna", now=now).replace("\r\n ", "")
+    assert "DTSTART:20261021T163000Z" in unfolded and "DTEND:20261021T173000Z" in unfolded
+    assert "LOCATION:Aula" in unfolded and "TRIGGER:-PT1H" in unfolded
+    assert unfolded.count("Aus: Einladung") == 1  # Beschreibung ohne Wiederholung
+    g = ics.google_url(termin, "Anna", "Europe/Berlin")
+    assert g.startswith("https://calendar.google.com/calendar/render?action=TEMPLATE")
+    assert "dates=20261021T183000%2F20261021T193000" in g and "ctz=Europe%2FBerlin" in g
+    assert "dates=20261020%2F20261021" in ics.google_url(frist, "Anna", "Europe/Berlin")
+    assert ics.ics_filename(termin) == "2026-10-21 Elternabend.ics"
+
+
+async def test_event_ics_view_and_links(
+    hass: HomeAssistant, media_dir, hass_ws_client, hass_client_no_auth
+) -> None:
+    """„In Kalender eintragen“: signierter .ics-Link je Termin, Google-Link, Frist im Aufgaben-Dialog (#12)."""
+    await async_setup_component(hass, "http", {})
+    today = dt_util.now().date()
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        return _fake_result(today)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        ws = await hass_ws_client(hass)
+        await ws.send_json({"id": 1, "type": "schulmanager/event_links", "child": "anna", "event_id": "bspgym-7-termin-1"})
+        res = await ws.receive_json()
+        assert res["success"], res
+        links = res["result"]
+        assert "authSig=" in links["ics"] and links["google"].startswith("https://calendar.google.com/")
+
+        client = await hass_client_no_auth()
+        resp = await client.get(links["ics"])
+        assert resp.status == 200
+        assert resp.headers["Content-Type"].startswith("text/calendar")
+        body = (await resp.text()).replace("\r\n ", "")
+        assert "BEGIN:VEVENT" in body and "SUMMARY:Anna: 📝 SA Mathematik" in body
+        assert body.count("BEGIN:VEVENT") == 1
+        # ohne Signatur nicht abrufbar
+        assert (await client.get(links["ics"].split("?")[0])).status == 401
+
+        await ws.send_json({"id": 2, "type": "schulmanager/event_links", "child": "anna", "event_id": "gibt-es-nicht"})
+        assert not (await ws.receive_json())["success"]
+
+        # Frist einer Aufgabe: Links direkt im Aufgaben-Dialog
+        task = next(t for t in m.tasks.values() if t.get("due"))
+        await ws.send_json({"id": 3, "type": "schulmanager/task", "task_id": task["id"]})
+        cal = (await ws.receive_json())["result"]["calendar"]
+        resp = await client.get(cal["ics"])
+        assert resp.status == 200
+        assert f"UID:anna-frist-{task['id']}@schulmanager" in (await resp.text()).replace("\r\n ", "")
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_version_change_keeps_read_and_bulk_done(hass: HomeAssistant, media_dir) -> None:
+    """#14: Neue Versionen ohne echte Änderung (oder viele auf einmal) setzen nichts auf ungelesen; alle erledigt."""
+    today = dt_util.now().date()
+    sent = datetime.combine(today - timedelta(days=1), datetime.min.time())
+    state = {"versions": {}, "bodies": {}}
+
+    def items() -> list[PortalItem]:
+        return [
+            PortalItem(
+                uid=f"bspgym-7-nachricht-{n}",
+                kind="nachricht",
+                title=f"Nachricht {n}",
+                body=state["bodies"].get(n, f"Text {n}"),
+                sent=sent,
+                url="https://bspgym.eltern-portal.org/x",
+                version=state["versions"].get(n, "v1"),
+            )
+            for n in range(6)
+        ]
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        res = _fake_result(today, with_pdf=False)
+        res.children[0].items = items()
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        m.mark_read()
+        uid0 = "bspgym-7-nachricht-0"
+        await hass.services.async_call(DOMAIN, "update_item", {"item_id": uid0, "status": "erledigt"}, blocking=True)
+
+        async def refresh() -> None:
+            await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+            await hass.async_block_till_done()
+
+        # nur Leerzeichen/Zeilenumbrüche anders -> bleibt gelesen
+        state["versions"][1] = "v2"
+        state["bodies"][1] = "  Text\n 1 "
+        await refresh()
+        assert m.items["bspgym-7-nachricht-1"]["read"] is True
+        assert m.items["bspgym-7-nachricht-1"]["version"] == "v2"
+
+        # echte Änderung einer einzelnen Mitteilung -> wieder ungelesen
+        state["versions"][2] = "v2"
+        state["bodies"][2] = "Text 2 – Termin verschoben"
+        await refresh()
+        assert m.items["bspgym-7-nachricht-2"]["read"] is False
+        m.mark_read()
+
+        # alle sehen auf einmal anders aus (z. B. Darstellung im Portal geändert)
+        for n in range(6):
+            state["versions"][n] = "v3"
+            state["bodies"][n] = f"<p>Text {n}</p>"
+        await refresh()
+        assert all(i["read"] for i in m.items.values()), [i["uid"] for i in m.items.values() if not i["read"]]
+        assert m.items[uid0]["status"] == "erledigt"
+        assert all(i["version"] == "v3" for i in m.items.values())
+
+        # „Alle als erledigt markieren“ für ein Kind
+        resp = await hass.services.async_call(
+            DOMAIN, "update_item", {"child": "anna", "status": "erledigt"}, blocking=True, return_response=True
+        )
+        assert resp == {"changed": 5}
+        assert all(i["status"] == "erledigt" and i["read"] for i in m.items.values())
+    await hass.config_entries.async_unload(entry.entry_id)

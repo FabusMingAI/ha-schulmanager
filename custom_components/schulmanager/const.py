@@ -164,6 +164,9 @@ ACTION_READ: Final = f"{ACTION_PREFIX}_READ"
 
 MEDIA_SUBDIR: Final = "schulmanager"
 FILE_URL_BASE: Final = f"/api/{DOMAIN}/datei"
+ICS_URL_BASE: Final = f"/api/{DOMAIN}/ics"
+# Gültigkeit der signierten .ics-Links (die Karte holt bei Bedarf neue)
+ICS_LINK_VALIDITY: Final = timedelta(hours=24)
 CARD_URL: Final = f"/{DOMAIN}_static/schulmanager-card.js"
 LOCAL_CARD_FILE: Final = "schulmanager-card.js"
 LOCAL_CARD_URL: Final = f"/local/{DOMAIN}/{LOCAL_CARD_FILE}"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0 – 2026-10-10
+
+- New: **📅 add a single entry to your own calendar** (iPhone, Android, Outlook). In "Termine & Fristen", in the day view of the timetable (exams, tests, substitutions) and in the task dialog of deadlines there is **📅 In Kalender eintragen** (signed `.ics` file, valid 24 h) and **Google Kalender**. You decide which entries go into your calendar; adding one again updates it instead of creating a duplicate. Closes #12 and #11. / Neu: Einzelnen Termin per `.ics` oder Google Kalender in den eigenen Kalender übernehmen.
+- New: **change a task's status by tapping its icon** – circle or ⏳ → done, green check → open again; only tapping the text opens the details. Done tasks are no longer struck through. Closes #10. / Neu: Status per Antippen des Icons umschalten, kein Durchstreichen mehr.
+- New: **"Alle als erledigt markieren"** below the messages (with confirmation), next to "Alle als gelesen markieren" – the old link only marked messages as read, so nothing moved to "Erledigt". `schulmanager.update_item` now accepts `child` instead of `item_id` for all messages. / Neu: Alle Mitteilungen auf einmal als erledigt markieren.
+- Fix: **entries in "Termine & Fristen" can be expanded and collapsed by tapping**, including 📅 appointments from messages, which stayed open and could not be closed on phones. All entries behave the same now; the expanded state survives card updates, the hover tooltip only appears with a mouse. Closes #15. / Behoben: Termine aus Mitteilungen ließen sich am Handy nicht auf- und zuklappen.
+- Fix: **messages no longer become unread again after an update** when they only look different (spaces/line breaks) or when most known messages change at once (e.g. different rendering in the portal); real edits by a teacher still mark them unread and are logged. Refs #14. / Behoben: Nach einem Update waren alle Mitteilungen wieder ungelesen.
+
 ## 0.12.1 – 2026-10-08
 
 - Fix: **the `schulmanager_new_item` event was never fired**, and the first new message with a push stopped the background analysis. Since 0.5.3 the event call in `_notify_item()` passed three constants instead of one event name, which raised a `TypeError` after the push had been sent. As a result there was no voice announcement for urgent messages, no event for automations, and all further messages stayed unanalysed until Home Assistant was restarted. The event is fired correctly again, and an error in push/event/announcement can no longer stop the analysis worker. / Behoben: Das Event `schulmanager_new_item` kam nie an, und die erste neue Mitteilung mit Push hat die Auswertung angehalten (keine Sprachansage, keine weiteren Auswertungen bis zum Neustart).

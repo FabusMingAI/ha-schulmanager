@@ -49,8 +49,11 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 - Every task shows the **date its message appeared in Eltern-Portal** in front of the title (`29.09. · Skilager anzahlen`; own tasks: the day you added them) – also in the dialogs (with year), the morning summary and the to-do lists.
 - While AI summaries are being translated (e.g. after adding a language), a progress line "🌐 Zusammenfassungen werden übersetzt …: 34 von 90" appears at the top of the card.
-- **Tap a task** to open its details: status **open / in progress / done**, change the due date, add your own **comment**, payment details with "copy" for IBAN and payment reference, plus the **source** with AI summary, original text, PDF and a link to Eltern-Portal.
+- **Tap the status icon** of a task to change it right in the list: the circle (open) or ⏳ (in progress) marks it **done**, the green check reopens it. Done tasks are no longer struck through – the check and the **Erledigt** tab already say so.
+- **Tap a task's text** to open its details: status **open / in progress / done**, change the due date, add your own **comment**, payment details with "copy" for IBAN and payment reference, plus the **source** with AI summary, original text, PDF and a link to Eltern-Portal.
 - **Tap a message** to see its text, the PDF and the tasks created from it; it is marked as read. Messages also have the status **open / in progress / done**: done messages move to the **Erledigt** tab (and count as read), messages in progress show ⏳.
+- Below the **Mitteilungen** tab: **Alle als gelesen markieren** (mark all as read) and **Alle als erledigt markieren** (mark all as done, after a confirmation – they move to **Erledigt**).
+- Deadlines in the task dialog have **📅 In Kalender eintragen** and **Google Kalender** (see below).
 - The **AI summary** has one tab per language chosen in the settings (German, English, Spanish, Catalan).
 - **Copy text:** everything in the dialogs can be selected; "📋 … kopieren" copies the AI summary or the message/PDF text, "kopieren" next to IBAN and payment reference copies just that value.
 - **PDFs:** "Drucken" opens the browser's print dialog, "Vollbild" shows the PDF full screen (on phones without full-screen support it opens in a new tab).
@@ -62,7 +65,8 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 - All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks**, **all** and **📦 Archiv**.
 - **Archive entries you no longer need:** hover an entry (on phones the button is always shown) and click **📦**. It disappears from the list and moves to **📦 Archiv** (right of **Alle**, with the number of archived entries). There, **↩️** brings it back. Works on the overview and on every child's tab; the archive is stored in Home Assistant, so it is the same on all devices. Archiving only hides the entry in the card – deadlines stay open tasks and keep their reminders, the calendar is unchanged. Entries that no longer exist are removed from the archive automatically.
-- **Hover an entry** to see the AI's short summary (tap once on phones). Clicking a deadline or an appointment taken from a letter opens its details.
+- **Tap or click an entry** to expand it and again to collapse it – the same for every kind of entry. Expanded, it shows the AI's short summary, location and source, **Aufgabe öffnen › / Mitteilung öffnen ›** for deadlines and appointments from a letter, and **📅 In Kalender eintragen**. With a mouse, hovering shows the short summary as a tooltip.
+- **📅 In Kalender eintragen** puts exactly this one entry into your own calendar – you decide which ones. It opens an `.ics` file: iPhone/iPad (Safari) offers "Add to Calendar", Outlook and most calendar apps open it as an event to save. **Google Kalender** opens the event in Google Calendar (handy on Android, where `.ics` files are not always imported). Adding the same entry again updates it instead of creating a duplicate (stable `UID`). Deadlines get a reminder at 6 pm the day before, timed entries one hour before. The links are signed and valid for 24 hours. In the Home Assistant Companion app the link opens in the browser.
 - A **legend** at the bottom explains the icons: 📝 exam (*Schulaufgabe*), ✏️ test / short test / pop quiz, 🏫 school appointment, 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, 🤒 sick note, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
 
 ### Timetable & substitutions – `custom:schulmanager-stundenplan`
@@ -77,6 +81,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
 - Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.
+- Tap an exam/test box or a substitution in the day view for **📅 In Kalender eintragen** / **Google Kalender**.
 - **Exams and tests** are marked: 📝 / ✏️ on the weekday buttons, a box above the lessons of that day and a badge on the matching subject (purple = exam, blue = test). Upcoming ones for the next two weeks are listed above the timetable.
 
 ## Requirements
@@ -130,7 +135,7 @@ Entity IDs follow your Home Assistant language (shown here for German).
 | `schulmanager.refresh` | Fetch all portals now |
 | `schulmanager.mark_read` | Mark a message, a child or everything as read |
 | `schulmanager.complete_task` / `schulmanager.update_task` | Change status, comment, due date or title |
-| `schulmanager.update_item` | `item_id` and `status` (`offen`, `in_arbeit`, `erledigt`) of a message |
+| `schulmanager.update_item` | `status` (`offen`, `in_arbeit`, `erledigt`) of a message (`item_id`); without `item_id` for all messages of `child` (or of all children), returns `changed` |
 | `schulmanager.add_task` | Add your own task |
 | `schulmanager.reanalyze` | Let the AI analyse a message again |
 | `schulmanager.archive_event` / `schulmanager.unarchive_event` | `child` and `event_id` (uid of an entry in "Termine & Fristen"): move it to the archive or bring it back |
@@ -143,10 +148,11 @@ Events for your own automations: `schulmanager_new_item`, `schulmanager_task_rem
 ## Good to know
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, Schulmanager therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.
-- **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days.
+- **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days; calendar (`.ics`) links after 24 hours. An `.ics` file contains the entry as shown in the card (teacher names as set in *Termine & Klassen*) and leaves Home Assistant once you open it.
 - **Timetable, substitution plan and sick notes** are only available if the school has enabled them in Eltern-Portal. If such a page is missing or the portal drops the connection there, only that section is skipped (noted in `sensor.schulmanager_letzter_abruf`); everything else is still fetched. If the portal briefly returns an empty page, the last known data is kept.
 - **Unofficial:** Eltern-Portal has no public API. Access uses the library [pyelternportal](https://github.com/michull/pyelternportal), which reads the web pages. If the portal layout changes, single sections may stop working until an update; the error shows up in `sensor.schulmanager_letzter_abruf`.
 - **Teacher names:** Eltern-Portal lists the timetable abbreviations of all teachers under *Service → Schulinformationen* ("Stundenplankürzel der Lehrkräfte"). Schulmanager reads this list per school once a day and shows the names next to the abbreviations in the timetable, substitution plan, calendar, hover texts and push notifications – as set in *Termine & Klassen*. Each school has its own list; unknown abbreviations stay as they are. The names stay in Home Assistant and are never sent to the AI service.
+- **Changed messages:** if a teacher edits a message in the portal, it is analysed again and shown as unread. Pure formatting differences (spaces, line breaks) are ignored, and if most known messages look different at once (e.g. after a portal or Schulmanager update), they are updated quietly instead of all becoming unread again.
 - **Connection:** every fetch uses its own fresh connection per school. If the portal drops it ("Server disconnected"), Schulmanager tries once more after a few seconds before keeping the last known data.
 - **Sick notes** are only read, never submitted – report sickness in the portal as usual.
 - **Not yet included:** communication with the class teacher (only subject teachers) and the class register.

@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Schulmanager – Demo-Karten</title>
+<title>Eltern Portal Manager Bavaria – Demo-Karten</title>
 <!--
-  Rendert die Lovelace-Karten des Schulmanagers ohne Home Assistant mit erfundenen
+  Rendert die Lovelace-Karten von „Eltern Portal Manager Bavaria“ ohne Home Assistant mit erfundenen
   Demo-Daten (keine echten Namen, Lehrkräfte, Schulen oder Räume). Grundlage für die
   Screenshots in docs/images – siehe make_screenshots.py.
   Aufruf: demo.html?card=stundenplan|termine|header|task|item&view=day|week&theme=light|dark
@@ -164,21 +164,21 @@
 
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
-    callWS: async (msg) => msg.type === "schulmanager/data" ? { children, legend: LEGEND, today: TODAY, errors: [],
-        last_update: `${TODAY}T08:15:00+02:00`, version: "0.10.1", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
-      : msg.type === "schulmanager/task" ? TASK : msg.type === "schulmanager/item" ? ITEM
-      : msg.type === "schulmanager/event_links" ? { ics: "#ics", google: "#google" } : {},
+    callWS: async (msg) => msg.type === "eltern_portal_schulmanager/data" ? { children, legend: LEGEND, today: TODAY, errors: [],
+        last_update: `${TODAY}T08:15:00+02:00`, version: "0.14.0", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
+      : msg.type === "eltern_portal_schulmanager/task" ? TASK : msg.type === "eltern_portal_schulmanager/item" ? ITEM
+      : msg.type === "eltern_portal_schulmanager/event_links" ? { ics: "#ics", google: "#google" } : {},
     callService: async () => {},
     user: { is_admin: true },
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },
   };
 
   const s = document.createElement("script");
-  s.src = "../../custom_components/schulmanager/www/schulmanager-card.js";
+  s.src = "../../custom_components/eltern_portal_schulmanager/www/eltern-portal-schulmanager-card.js";
   s.onload = () => {
-    const el = document.createElement(card === "task" || card === "item" ? "schulmanager-card" : "schulmanager-" + card);
+    const el = document.createElement(card === "task" || card === "item" ? "eltern-portal-schulmanager-card" : "eltern-portal-schulmanager-" + card);
     el.setConfig(card === "header"
-      ? { subtitle: "Anna & Max", icon: "../../custom_components/schulmanager/brand/icon.png" }
+      ? { subtitle: "Anna & Max", icon: "../../custom_components/eltern_portal_schulmanager/brand/icon.png" }
       : q.get("view") ? { view: q.get("view") } : {});
     document.getElementById("wrap").appendChild(el);
     el.hass = window.hass;

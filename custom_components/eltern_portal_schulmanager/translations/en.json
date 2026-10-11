@@ -15,7 +15,7 @@
         "description": "Added:\n{added}",
         "menu_options": {
           "user": "Add another school",
-          "finish": "Done – create Schulmanager"
+          "finish": "Done – create Eltern Portal Manager Bavaria"
         }
       },
       "reauth_confirm": {
@@ -26,6 +26,10 @@
           "username": "E-mail address (optional)",
           "password": "Password"
         }
+      },
+      "migrate": {
+        "title": "Take over Schulmanager",
+        "description": "“Schulmanager” is now called **Eltern Portal Manager Bavaria**. An existing setup was found (“{title}”, schools: {schools}).\n\nTaking it over keeps credentials, settings, tasks, messages, archive, stored files, entity IDs and history. The old entry is removed afterwards and dashboards are switched to the new cards.\n\nAutomations and scripts using `schulmanager.…` actions or `schulmanager_…` events have to be changed by hand – they are listed under Settings → Repairs."
       }
     },
     "error": {
@@ -36,14 +40,14 @@
       "unknown": "Unexpected error – see the log."
     },
     "abort": {
-      "already_configured": "Schulmanager is already set up. Add more schools via “Configure”.",
+      "already_configured": "Eltern Portal Manager Bavaria is already set up. Add more schools via “Configure”.",
       "reauth_successful": "Credentials updated."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Schulmanager",
+        "title": "Eltern Portal Manager Bavaria",
         "menu_options": {
           "settings": "Settings (AI, reminders, announcements)",
           "add_portal": "Add school",
@@ -95,7 +99,7 @@
             "data_description": {
               "appointment_kinds": "Which entries of the Eltern-Portal \"Termine\" page appear in the calendar, appointments list and timetable. Default: only exams and tests.",
               "own_class_only": "Hides appointments that explicitly name only other classes or grades (e.g. \"Schullandheim 5b+5c\", \"Jgst. 10\"). Appointments without a class stay visible.",
-              "teacher_names": "The abbreviations are listed in Eltern-Portal under \"Service → Schulinformationen\" (Stundenplankürzel der Lehrkräfte). The Schulmanager reads the list per school once a day. Unknown abbreviations stay as they are; names are not sent to the AI service."
+              "teacher_names": "The abbreviations are listed in Eltern-Portal under \"Service → Schulinformationen\" (Stundenplankürzel der Lehrkräfte). The integration reads the list per school once a day. Unknown abbreviations stay as they are; names are not sent to the AI service."
             }
           },
           "sprachansagen": {
@@ -137,7 +141,7 @@
               "dashboard": "“Schule” dashboard"
             },
             "data_description": {
-              "dashboard": "Tabs: “Overview” with calendar and Schulmanager plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it."
+              "dashboard": "Tabs: “Overview” with appointments and timetables plus one tab per child – best on phones. Single page: everything on one page. Do not manage: the dashboard is left as you built it."
             }
           }
         }
@@ -152,7 +156,7 @@
       },
       "remove_portal": {
         "title": "Remove school",
-        "description": "Tasks and messages of this school are removed from Schulmanager. Stored files stay in the media folder.",
+        "description": "Tasks and messages of this school are removed from the integration. Stored files stay in the media folder.",
         "data": {
           "school": "School"
         }
@@ -167,7 +171,7 @@
       "too_many_languages": "Please choose at most 4 languages."
     },
     "abort": {
-      "portal_added": "School added. Schulmanager is reloading.",
+      "portal_added": "School added. The integration is reloading.",
       "portal_removed": "School removed.",
       "last_portal": "The last school cannot be removed – delete the integration instead."
     }
@@ -426,6 +430,12 @@
         "name": "Name only",
         "kuerzel": "Abbreviation only (do not fetch the list)"
       }
+    }
+  },
+  "issues": {
+    "legacy_references": {
+      "title": "Automations still use the old Schulmanager names",
+      "description": "“Schulmanager” is now called Eltern Portal Manager Bavaria. These automations or scripts still call `{old_domain}.…` actions or listen to `{old_domain}_…` events:\n\n{items}\n\nPlease change them to `{new_domain}.…` (e.g. `{new_domain}.refresh`) and `{new_domain}_…` (e.g. `{new_domain}_new_item`). This notice disappears once no old names are left."
     }
   }
 }

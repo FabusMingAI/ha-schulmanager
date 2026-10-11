@@ -223,7 +223,7 @@ async def async_analyze_ai(
         ),
     )
     data: dict[str, Any] = {
-        "task_name": f"Schulmanager: {ctx.get('title', '')[:60]}",
+        "task_name": f"Eltern Portal Manager: {ctx.get('title', '')[:60]}",
         "instructions": prompt,
         "entity_id": ai_entity,
     }
@@ -289,7 +289,7 @@ async def async_translate_summary(
         resp = await hass.services.async_call(
             "ai_task",
             "generate_data",
-            {"task_name": "Schulmanager: Übersetzung", "instructions": prompt, "entity_id": ai_entity},
+            {"task_name": "Eltern Portal Manager: Übersetzung", "instructions": prompt, "entity_id": ai_entity},
             blocking=True,
             return_response=True,
         )

@@ -1,6 +1,6 @@
 {
-  "domain": "schulmanager",
-  "name": "Schulmanager (Eltern-Portal)",
+  "domain": "eltern_portal_schulmanager",
+  "name": "Eltern Portal Manager Bavaria",
   "after_dependencies": [
     "ai_task",
     "assist_satellite",
@@ -27,8 +27,8 @@
     "pyelternportal"
   ],
   "requirements": [
-    "pyelternportal==0.0.25",
+    "pyelternportal==0.0.27",
     "pypdf>=4.0.0"
   ],
-  "version": "0.13.0"
+  "version": "0.14.0"
 }

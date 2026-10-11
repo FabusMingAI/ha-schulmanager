@@ -1,4 +1,4 @@
-"""Tests für den Schulmanager in einer echten Home-Assistant-Testinstanz."""
+"""Tests für „Eltern Portal Manager Bavaria“ in einer echten Home-Assistant-Testinstanz."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ from homeassistant.util import dt as dt_util
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events
 
-from custom_components.schulmanager.const import DOMAIN
-from custom_components.schulmanager.portal import (
+from custom_components.eltern_portal_schulmanager.const import DOMAIN
+from custom_components.eltern_portal_schulmanager.portal import (
     PortalAttachment,
     PortalChild,
     PortalFile,
@@ -156,7 +156,7 @@ async def test_config_flow_demo(hass: HomeAssistant) -> None:
         {"school": "https://demo.eltern-portal.org?username=a%40b.de", "username": "A@b.de", "password": "x"},
     )
     assert result["type"] is FlowResultType.MENU
-    with patch("custom_components.schulmanager.async_setup_entry", return_value=True):
+    with patch("custom_components.eltern_portal_schulmanager.async_setup_entry", return_value=True):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"next_step_id": "finish"}
         )
@@ -236,7 +236,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    new_item_events = async_capture_events(hass, "schulmanager_new_item")
+    new_item_events = async_capture_events(hass, "eltern_portal_schulmanager_new_item")
     # Erster Abruf: Erst-Import (keine Einzel-Pushes); zweiter Abruf liefert den neuen Brief
     first = _fake_result(today)
     first.children[0].items = [first.children[0].items[2]]  # nur alter Brief
@@ -252,7 +252,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
                         it.files = []
         return res
 
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -272,7 +272,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
     # Datei abgelegt + Text gelesen
     assert letter["files"], letter
     path = letter["files"][0]["path"]
-    assert path.startswith("schulmanager/Anna/")
+    assert path.startswith("eltern_portal_schulmanager/Anna/")
     assert (media_dir / path).exists()
     assert "185,00 EUR" in letter["text"]
     assert any("185,00 EUR" in p for p in prompts)
@@ -318,7 +318,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
     await hass.services.async_call(DOMAIN, "mark_read", {"child": "anna"}, blocking=True)
     assert hass.states.get("sensor.schule_anna_status").state in ("gruen", "gelb")
     # Datei über die gesicherte Ansicht abrufbar, ohne Signatur nicht
-    from custom_components.schulmanager import SchulFileView
+    from custom_components.eltern_portal_schulmanager import SchulFileView
 
     # Übersicht für Sprachassistent / Skripte
     ov = await hass.services.async_call(DOMAIN, "get_overview", {}, blocking=True, return_response=True)
@@ -348,7 +348,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
     print(notified[0]["message"])
     # Neustart: Daten bleiben erhalten
     await hass.config_entries.async_unload(entry.entry_id)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     assert entry.runtime_data.tasks[task["id"]]["status"] == "erledigt"
@@ -357,7 +357,7 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
 
 
 async def test_rules_without_ai(hass: HomeAssistant) -> None:
-    from custom_components.schulmanager.analyzer import analyze_rules
+    from custom_components.eltern_portal_schulmanager.analyzer import analyze_rules
 
     r = analyze_rules(
         {
@@ -385,7 +385,7 @@ async def test_file_view_signed(hass: HomeAssistant, media_dir, hass_client_no_a
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     st = hass.states.get("sensor.schule_anna_status")
@@ -407,7 +407,7 @@ async def test_file_view_signed(hass: HomeAssistant, media_dir, hass_client_no_a
 async def test_portal_parsing_links() -> None:
     """Download-Links von Briefen und Nachrichten-Anhänge werden erkannt."""
     import aiohttp
-    from custom_components.schulmanager.portal import SchulPortal
+    from custom_components.eltern_portal_schulmanager.portal import SchulPortal
     from pyelternportal.student import Student
 
     async with aiohttp.ClientSession() as s:
@@ -486,10 +486,10 @@ async def test_dashboard_templates_render(hass: HomeAssistant, media_dir) -> Non
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-    dash = yaml.safe_load(pathlib.Path("dashboard/schulmanager_dashboard.yaml").read_text())
+    dash = yaml.safe_load(pathlib.Path("dashboard/eltern_portal_schulmanager_dashboard.yaml").read_text())
     cards = dash["views"][0]["sections"][0]["cards"]
     for card in cards:
         if card["type"] == "markdown":
@@ -513,25 +513,25 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     ws = await hass_ws_client(hass)
-    await ws.send_json({"id": 1, "type": "schulmanager/subscribe"})
+    await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/subscribe"})
     assert (await ws.receive_json())["success"]
-    await ws.send_json({"id": 2, "type": "schulmanager/data"})
+    await ws.send_json({"id": 2, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
     child = res["children"][0]
     assert child["name"] == "Anna" and child["tasks"]
     # Kopfzeile: Version und letzter Abruf; kein Tagesüberblick mehr (seit 0.10.1)
-    manifest = json.loads(pathlib.Path("custom_components/schulmanager/manifest.json").read_text())
+    manifest = json.loads(pathlib.Path("custom_components/eltern_portal_schulmanager/manifest.json").read_text())
     assert res["version"] == manifest["version"] and res["repo_url"].startswith("https://github.com/")
     assert res["last_update"]
     assert "day" not in child
     task = next(t for t in child["tasks"] if t["amount"])
-    await ws.send_json({"id": 3, "type": "schulmanager/task", "task_id": task["id"]})
+    await ws.send_json({"id": 3, "type": "eltern_portal_schulmanager/task", "task_id": task["id"]})
     detail = (await ws.receive_json())["result"]
-    assert detail["item"]["files"][0]["url"].startswith("/api/schulmanager/datei/")
+    assert detail["item"]["files"][0]["url"].startswith("/api/eltern_portal_schulmanager/datei/")
     assert "185,00 EUR" in detail["item"]["text"]
     # Status „in Arbeit“ + Kommentar
     await hass.services.async_call(
@@ -560,8 +560,8 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
     assert m.tasks[task["id"]]["status"] == "offen"
     # Karte wird ausgeliefert
     client = await hass_client()
-    resp = await client.get("/schulmanager_static/schulmanager-card.js")
-    assert resp.status == 200 and "schulmanager-card" in await resp.text()
+    resp = await client.get("/eltern_portal_schulmanager_static/eltern-portal-schulmanager-card.js")
+    assert resp.status == 200 and "eltern-portal-schulmanager-card" in await resp.text()
     await hass.config_entries.async_unload(entry.entry_id)
 
 
@@ -577,10 +577,10 @@ async def test_card_registered_as_lovelace_resource(hass: HomeAssistant) -> None
     await hass.async_block_till_done()
     res = hass.data["lovelace"].resources
     urls = [i["url"] for i in res.async_items()]
-    assert len(urls) == 1 and urls[0].startswith("/local/schulmanager/schulmanager-card.js?v="), urls
-    assert os.path.isfile(hass.config.path("www", "schulmanager", "schulmanager-card.js"))
+    assert len(urls) == 1 and urls[0].startswith("/local/eltern_portal_schulmanager/eltern-portal-schulmanager-card.js?v="), urls
+    assert os.path.isfile(hass.config.path("www", "eltern_portal_schulmanager", "eltern-portal-schulmanager-card.js"))
     # zweiter Start: kein Duplikat
-    from custom_components.schulmanager import _async_register_resource, _card_path
+    from custom_components.eltern_portal_schulmanager import _async_register_resource, _card_path
 
     await _async_register_resource(hass, _card_path())
     assert len(res.async_items()) == 1
@@ -592,7 +592,7 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
 
     from homeassistant.setup import async_setup_component
 
-    from custom_components.schulmanager import dashboard as dash_mod
+    from custom_components.eltern_portal_schulmanager import dashboard as dash_mod
 
     os.makedirs(hass.config.path("www"), exist_ok=True)
     assert await async_setup_component(hass, "lovelace", {})
@@ -613,21 +613,21 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     titles = [v["title"] for v in cfg["views"]]
     assert titles[0] == "Übersicht" and len(titles) == 1 + len(m.children), titles
     overview = json.dumps(cfg["views"][0])
-    assert "custom:schulmanager-termine" in overview
+    assert "custom:eltern-portal-schulmanager-termine" in overview
     # rechte Spalte: Stundenplan je Kind statt der Schulmanager-Karte (seit 0.7.1)
     right = cfg["views"][0]["sections"][1]["cards"]
-    plans = [c["child"] for c in right if c["type"] == "custom:schulmanager-stundenplan"]
+    plans = [c["child"] for c in right if c["type"] == "custom:eltern-portal-schulmanager-stundenplan"]
     assert plans == list(m.children), right
-    assert all(c.get("view") == "week" for c in right if c["type"] == "custom:schulmanager-stundenplan")
+    assert all(c.get("view") == "week" for c in right if c["type"] == "custom:eltern-portal-schulmanager-stundenplan")
     assert all(c["type"] != "entities" for c in right)
     assert "sensor.schule_erika_status" not in overview
     assert cfg["views"][1]["sections"][0]["cards"][0] == {
-        "type": "custom:schulmanager-card", "child": "erika", "grid_options": {"columns": 12}
+        "type": "custom:eltern-portal-schulmanager-card", "child": "erika", "grid_options": {"columns": 12}
     }
     child_view = json.dumps(cfg["views"][1])
-    assert "custom:schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
+    assert "custom:eltern-portal-schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
     assert '"view": "week"' in child_view
-    assert os.path.isfile(hass.config.path("www", "schulmanager", "icon.png"))
+    assert os.path.isfile(hass.config.path("www", "eltern_portal_schulmanager", "icon.png"))
 
     # eigene Änderung bleibt erhalten
     cfg["views"].append({"title": "Eigene Ansicht", "cards": []})
@@ -676,7 +676,7 @@ async def test_portal_parsing_timetable_substitutions() -> None:
     """Stundenplan mit Uhrzeiten, Vertretungsplan mit Entfall, Raumänderung, altem Fach."""
     from pyelternportal.demo import DEMO_HTML_LESSON
 
-    from custom_components.schulmanager.portal import parse_substitutions, parse_timetable
+    from custom_components.eltern_portal_schulmanager.portal import parse_substitutions, parse_timetable
 
     plan = parse_timetable(DEMO_HTML_LESSON)
     first = plan[0]
@@ -699,7 +699,7 @@ async def test_timetable_substitutions_flow(
     hass: HomeAssistant, media_dir, hass_ws_client
 ) -> None:
     """Stundenplan + Vertretungen: Sensoren, Kalender, Push nur bei Neuem, Karte-Daten."""
-    from custom_components.schulmanager.portal import parse_substitutions, parse_timetable
+    from custom_components.eltern_portal_schulmanager.portal import parse_substitutions, parse_timetable
     from pyelternportal.demo import DEMO_HTML_LESSON
 
     await async_setup_component(hass, "http", {})
@@ -727,7 +727,7 @@ async def test_timetable_substitutions_flow(
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -791,7 +791,7 @@ async def test_timetable_substitutions_flow(
 
     # Kartendaten: Termine mit Kategorie + Kurzbeschreibung, Legende, Stundenplan
     ws = await hass_ws_client(hass)
-    await ws.send_json({"id": 1, "type": "schulmanager/data"})
+    await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
     child = res["children"][0]
     cats = {e["category"] for e in child["events"]}
@@ -844,7 +844,7 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -861,7 +861,7 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
         await hass.async_block_till_done()
         assert hass.states.get("sensor.schule_anna_krankmeldungen").state == "3"
     ws = await hass_ws_client(hass)
-    await ws.send_json({"id": 1, "type": "schulmanager/data"})
+    await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
     assert res["legend"]["krank"][0] == "🤒"
     child = res["children"][0]
@@ -869,7 +869,7 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
     # in der Terminliste stehen nur aktuelle Krankmeldungen (ab gestern)
     assert all(e["date"] >= (today - timedelta(days=1)).isoformat() or e.get("until") for e in child["events"] if e["category"] == "krank")
     m.data["sicknotes"]["anna"].append({"start": today.isoformat(), "end": today.isoformat(), "comment": "Arzttermin"})
-    await ws.send_json({"id": 2, "type": "schulmanager/data"})
+    await ws.send_json({"id": 2, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
     assert any(e["category"] == "krank" and "Arzttermin" in e["hover"] for e in res["children"][0]["events"])
     await hass.config_entries.async_unload(entry.entry_id)
@@ -888,7 +888,7 @@ async def test_optional_section_disconnect_keeps_fetch(hass: HomeAssistant, medi
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_sicknote_demo", boom):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_sicknote_demo", boom):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     m = entry.runtime_data
@@ -900,7 +900,7 @@ async def test_optional_section_disconnect_keeps_fetch(hass: HomeAssistant, medi
 
 async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> None:
     """Portal-Termine: Standard nur Schulaufgaben und Tests, Termine der Schule per Einstellung."""
-    from custom_components.schulmanager.portal import appointment_kind, appointment_subject
+    from custom_components.eltern_portal_schulmanager.portal import appointment_kind, appointment_subject
 
     assert appointment_kind("event-important", "x") == "schulaufgabe"
     assert appointment_kind("event-warning", "x") == "test"
@@ -927,7 +927,7 @@ async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> 
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -952,7 +952,7 @@ async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> 
 
 def test_concerns_class() -> None:
     """Termine anderer Klassen/Jahrgangsstufen erkennen (Beispiele aus echten Portalen, anonymisiert)."""
-    from custom_components.schulmanager.classes import concerns_class
+    from custom_components.eltern_portal_schulmanager.classes import concerns_class
 
     nine_d = {
         "Grundwissenstest Chemie Jgst. 10": False,
@@ -989,7 +989,7 @@ def test_concerns_class() -> None:
 
 def test_normalize_summaries() -> None:
     """KI-Zusammenfassung in mehreren Sprachen; erste gewählte Sprache ist die Haupt-Zusammenfassung."""
-    from custom_components.schulmanager.analyzer import normalize, summary_languages
+    from custom_components.eltern_portal_schulmanager.analyzer import normalize, summary_languages
 
     assert summary_languages(None) == ["de", "en"]
     assert summary_languages(["ca", "de"]) == ["de", "ca"]
@@ -1009,7 +1009,7 @@ def test_normalize_summaries() -> None:
 
 async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir, hass_ws_client) -> None:
     """Status für Mitteilungen, Sprachen der KI-Zusammenfassung, Termine anderer Klassen, Einstellungs-Link."""
-    from custom_components.schulmanager import dashboard as dash_mod
+    from custom_components.eltern_portal_schulmanager import dashboard as dash_mod
 
     today = dt_util.now().date()
     tomorrow = dt_util.start_of_local_day(today + timedelta(days=1))
@@ -1046,7 +1046,7 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1078,7 +1078,7 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
         assert m.items[uid]["status"] == "erledigt" and m.items[uid]["read"] is True and m.items[uid]["done_at"]
 
         client = await hass_ws_client(hass)
-        await client.send_json({"id": 1, "type": "schulmanager/data"})
+        await client.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
         res = (await client.receive_json())["result"]
         assert res["languages"] == [["de", "Deutsch"], ["en", "English"], ["ca", "Català"]]
         item = next(i for i in res["children"][0]["items"] if i["uid"] == uid)
@@ -1104,8 +1104,8 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
         # Einstellungen von der Startseite erreichbar
         cfg = dash_mod.build_config(hass, m, "tabs")
         head = cfg["views"][0]["header"]["card"]
-        assert head["type"] == "custom:schulmanager-header"
-        assert head["settings_path"] == "/config/integrations/integration/schulmanager"
+        assert head["type"] == "custom:eltern-portal-schulmanager-header"
+        assert head["settings_path"] == "/config/integrations/integration/eltern_portal_schulmanager"
     await hass.config_entries.async_unload(entry.entry_id)
 
 
@@ -1140,7 +1140,7 @@ async def test_translate_missing_summaries(hass: HomeAssistant, media_dir) -> No
     )
     entry.add_to_hass(hass)
     uid = "bspgym-7-elternbrief-501"
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1209,9 +1209,9 @@ async def test_translation_retry_and_progress(hass: HomeAssistant, media_dir, ha
     )
     entry.add_to_hass(hass)
     notices = MagicMock()
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch), \
-         patch("custom_components.schulmanager.manager.TRANSLATE_NOTIFY_MIN", 1), \
-         patch("custom_components.schulmanager.manager.persistent_notification.async_create", notices):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch), \
+         patch("custom_components.eltern_portal_schulmanager.manager.TRANSLATE_NOTIFY_MIN", 1), \
+         patch("custom_components.eltern_portal_schulmanager.manager.persistent_notification.async_create", notices):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1227,7 +1227,7 @@ async def test_translation_retry_and_progress(hass: HomeAssistant, media_dir, ha
         m._translate_batch = {"total": 4, "done": 1, "failed": 1, "new_langs": ["ca"]}
         assert m.translation_progress == {"done": 2, "total": 4, "languages": ["Català"]}
         client = await hass_ws_client(hass)
-        await client.send_json({"id": 1, "type": "schulmanager/data"})
+        await client.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
         assert (await client.receive_json())["result"]["translation"]["total"] == 4
         m._translate_batch = None
 
@@ -1253,7 +1253,7 @@ async def test_translation_retry_and_progress(hass: HomeAssistant, media_dir, ha
         texts = [c.args[1] for c in notices.call_args_list]
         assert any("übersetzt (ca." in t and "English" in t for t in texts)
         assert any(t.startswith("Fertig:") and "1 fehlgeschlagen" in t for t in texts)
-        sensor = hass.states.get("sensor.schulmanager_letzter_abruf")
+        sensor = hass.states.get("sensor.eltern_portal_manager_bavaria_letzter_abruf")
         assert sensor.attributes["uebersetzung_ausstehend"] == 0
 
         # nach der Wartezeit: neuer Versuch klappt
@@ -1279,7 +1279,7 @@ async def test_translation_retry_and_progress(hass: HomeAssistant, media_dir, ha
 
 async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     """#4: Einstellungen in einklappbaren Abschnitten, gespeichert wird flach."""
-    from custom_components.schulmanager.config_flow import SETTINGS_SECTIONS
+    from custom_components.eltern_portal_schulmanager.config_flow import SETTINGS_SECTIONS
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -1316,7 +1316,7 @@ async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     all_keys = [k for _n, keys, _c in SETTINGS_SECTIONS for k in keys]
     assert len(all_keys) == len(set(all_keys))
     for lang in ("de", "en"):
-        tr = json.load(open(f"custom_components/schulmanager/translations/{lang}.json"))
+        tr = json.load(open(f"custom_components/eltern_portal_schulmanager/translations/{lang}.json"))
         sections = tr["options"]["step"]["settings"]["sections"]
         for name, keys, _c in SETTINGS_SECTIONS:
             assert sections[name]["name"]
@@ -1354,7 +1354,7 @@ async def test_published_date_prefix(hass: HomeAssistant, media_dir, hass_ws_cli
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1376,7 +1376,7 @@ async def test_published_date_prefix(hass: HomeAssistant, media_dir, hass_ws_cli
 
         # Karte
         client = await hass_ws_client(hass)
-        await client.send_json({"id": 1, "type": "schulmanager/data"})
+        await client.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
         res = (await client.receive_json())["result"]
         t = next(x for x in res["children"][0]["tasks"] if x["id"] == pay["id"])
         assert t["published"] == sent.isoformat() and t["title"] == title_before
@@ -1411,13 +1411,13 @@ async def test_archive_events(hass: HomeAssistant, media_dir, hass_ws_client) ->
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         ws = await hass_ws_client(hass)
 
         async def events() -> list[dict]:
-            await ws.send_json({"id": events.n, "type": "schulmanager/data"})
+            await ws.send_json({"id": events.n, "type": "eltern_portal_schulmanager/data"})
             events.n += 1
             return (await ws.receive_json())["result"]["children"][0]["events"]
 
@@ -1471,7 +1471,7 @@ _TEACHERS_HTML = """<div id="asam_content">
 
 def test_parse_teachers() -> None:
     """Stundenplankürzel aus den Schulinformationen; Seite ohne Abschnitt -> None."""
-    from custom_components.schulmanager.portal import parse_teachers
+    from custom_components.eltern_portal_schulmanager.portal import parse_teachers
 
     assert parse_teachers(_TEACHERS_HTML) == {"Kurz": "Karla Kurzweil", "Lang": "Lena Lang-Weilig"}
     assert parse_teachers("<div id='asam_content'><h3>Wer macht Was</h3></div>") is None
@@ -1481,7 +1481,7 @@ def test_parse_teachers() -> None:
 
 async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, monkeypatch) -> None:
     """Kürzel werden je Schule zu Namen; Liste höchstens täglich, Einstellung wirkt."""
-    from custom_components.schulmanager.portal import parse_substitutions, parse_teachers
+    from custom_components.eltern_portal_schulmanager.portal import parse_substitutions, parse_teachers
 
     await async_setup_component(hass, "http", {})
     today = dt_util.now().date()
@@ -1497,7 +1497,7 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, mon
         return res
 
     # gilt für den ganzen Test: Optionsänderungen laden die Integration neu und rufen dabei ab
-    monkeypatch.setattr("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch)
+    monkeypatch.setattr("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch)
 
     notified: list[dict] = []
 
@@ -1512,7 +1512,7 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, mon
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1542,7 +1542,7 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, mon
     # unbekanntes Kürzel bleibt stehen
     assert "Lehrkräfte laut Plan: Kurz (Karla Kurzweil), Unbek" in ev["hover"]
     ws = await hass_ws_client(hass)
-    await ws.send_json({"id": 1, "type": "schulmanager/data"})
+    await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
     ent = next(x for d in res["children"][0]["substitutions"]["days"] for x in d["entries"] if x["substitute"] == "Lang")
     assert ent["substitute_label"] == "Lang (Lena Lang-Weilig)"
@@ -1565,7 +1565,7 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, mon
     m.data["teachers"]["bspgym"]["updated"] = (dt_util.now() - timedelta(days=2)).isoformat()
     assert m._teachers_due("bspgym") is True
     state["list"] = {}
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
     assert m.data["teachers"]["bspgym"]["list"]["Lang"] == "Lena Lang-Weilig"
@@ -1592,8 +1592,8 @@ async def test_fetch_retries_after_disconnect(hass: HomeAssistant, media_dir) ->
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", flaky), \
-         patch("custom_components.schulmanager.manager.FETCH_RETRY_DELAY", 0):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", flaky), \
+         patch("custom_components.eltern_portal_schulmanager.manager.FETCH_RETRY_DELAY", 0):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1605,8 +1605,8 @@ async def test_fetch_retries_after_disconnect(hass: HomeAssistant, media_dir) ->
         raise aiohttp.ServerDisconnectedError()
 
     calls.clear()
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", always_down), \
-         patch("custom_components.schulmanager.manager.FETCH_RETRY_DELAY", 0):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", always_down), \
+         patch("custom_components.eltern_portal_schulmanager.manager.FETCH_RETRY_DELAY", 0):
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
     assert len(calls) == 2
@@ -1618,7 +1618,7 @@ def test_build_ics() -> None:
     """Einzelner Termin als .ics nach RFC 5545 (#12): ganztägig, mit Uhrzeit, Maskierung, Umbruch."""
     from zoneinfo import ZoneInfo
 
-    from custom_components.schulmanager import ics
+    from custom_components.eltern_portal_schulmanager import ics
 
     now = datetime(2026, 10, 10, 8, 0, tzinfo=ZoneInfo("UTC"))
     day = date(2026, 10, 20)
@@ -1688,12 +1688,12 @@ async def test_event_ics_view_and_links(
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
         ws = await hass_ws_client(hass)
-        await ws.send_json({"id": 1, "type": "schulmanager/event_links", "child": "anna", "event_id": "bspgym-7-termin-1"})
+        await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/event_links", "child": "anna", "event_id": "bspgym-7-termin-1"})
         res = await ws.receive_json()
         assert res["success"], res
         links = res["result"]
@@ -1709,12 +1709,12 @@ async def test_event_ics_view_and_links(
         # ohne Signatur nicht abrufbar
         assert (await client.get(links["ics"].split("?")[0])).status == 401
 
-        await ws.send_json({"id": 2, "type": "schulmanager/event_links", "child": "anna", "event_id": "gibt-es-nicht"})
+        await ws.send_json({"id": 2, "type": "eltern_portal_schulmanager/event_links", "child": "anna", "event_id": "gibt-es-nicht"})
         assert not (await ws.receive_json())["success"]
 
         # Frist einer Aufgabe: Links direkt im Aufgaben-Dialog
         task = next(t for t in m.tasks.values() if t.get("due"))
-        await ws.send_json({"id": 3, "type": "schulmanager/task", "task_id": task["id"]})
+        await ws.send_json({"id": 3, "type": "eltern_portal_schulmanager/task", "task_id": task["id"]})
         cal = (await ws.receive_json())["result"]["calendar"]
         resp = await client.get(cal["ics"])
         assert resp.status == 200
@@ -1753,7 +1753,7 @@ async def test_version_change_keeps_read_and_bulk_done(hass: HomeAssistant, medi
         unique_id=DOMAIN,
     )
     entry.add_to_hass(hass)
-    with patch("custom_components.schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         m = entry.runtime_data
@@ -1794,4 +1794,327 @@ async def test_version_change_keeps_read_and_bulk_done(hass: HomeAssistant, medi
         )
         assert resp == {"changed": 5}
         assert all(i["status"] == "erledigt" and i["read"] for i in m.items.values())
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+# ----------------------------------------------------------------------
+# 0.14: Umbenennung „Schulmanager“ → „Eltern Portal Manager Bavaria“ (#18)
+# ----------------------------------------------------------------------
+async def test_migration_from_schulmanager(hass: HomeAssistant, media_dir) -> None:
+    """Alte Einrichtung (Domain „schulmanager“) wird mit Daten, Entitäten und Dateien übernommen."""
+    import os
+
+    from homeassistant.helpers import device_registry as dr, entity_registry as er
+    from homeassistant.helpers.storage import Store
+
+    from custom_components.eltern_portal_schulmanager import dashboard as dash_mod
+    from custom_components.eltern_portal_schulmanager.const import LEGACY_DOMAIN
+
+    os.makedirs(hass.config.path("www"), exist_ok=True)
+    assert await async_setup_component(hass, "lovelace", {})
+    today = dt_util.now().date()
+    portals = [{"school": "bspgym", "school_name": "Beispiel-Gymnasium", "username": "x@y.de", "password": "p"}]
+    old = MockConfigEntry(
+        domain=LEGACY_DOMAIN,
+        title="Schulmanager",
+        data={"portals": portals},
+        options={"reminder_days": "2,0", "dashboard": "tabs"},
+        unique_id=LEGACY_DOMAIN,
+        entry_id="old01",
+    )
+    old.add_to_hass(hass)
+    # „Schulmanager Online“ nutzt dieselbe Domain – darf nie angefasst werden
+    other = MockConfigEntry(domain=LEGACY_DOMAIN, title="Schulmanager Online", data={"username": "z@y.de"}, entry_id="other1")
+    other.add_to_hass(hass)
+
+    dev_reg, ent_reg = dr.async_get(hass), er.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id="old01", identifiers={(LEGACY_DOMAIN, "old01_anna")}, name="Schule Anna"
+    )
+    dev_reg.async_update_device(device.id, area_id="kinderzimmer")
+    status = ent_reg.async_get_or_create(
+        "sensor", LEGACY_DOMAIN, "old01_anna_ampel", config_entry=old, device_id=device.id,
+        suggested_object_id="schule_anna_status",
+    )
+    diag = ent_reg.async_get_or_create(
+        "sensor", LEGACY_DOMAIN, "old01_letzter_abruf", config_entry=old,
+        suggested_object_id="schulmanager_letzter_abruf",
+    )
+    foreign = ent_reg.async_get_or_create(
+        "sensor", LEGACY_DOMAIN, "other1_noten", config_entry=other, suggested_object_id="noten"
+    )
+    hass.states.async_set(status.entity_id, "unavailable", {"restored": True})
+
+    # Abgelegte Datei und gespeicherte Daten der alten Version
+    old_rel = os.path.join("schulmanager", "Anna", "2026-27", "brief.pdf")
+    (media_dir / old_rel).parent.mkdir(parents=True)
+    (media_dir / old_rel).write_bytes(b"%PDF-1.4")
+    stored = {
+        "items": {
+            "bspgym-7-elternbrief-9": {
+                "uid": "bspgym-7-elternbrief-9", "child": "anna", "school": "bspgym",
+                "school_name": "Beispiel-Gymnasium", "kind": "elternbrief", "title": "Wandertag",
+                "body": "", "sent": f"{today.isoformat()}T08:00:00", "url": None, "version": "v1",
+                "meta": {}, "files": [{"name": "brief.pdf", "path": old_rel}], "text": "",
+                "read": True, "status": "erledigt", "notify": False,
+                "analysis": {"status": "fertig", "summary": "Wandertag am Freitag"},
+            }
+        },
+        "tasks": {
+            "t1": {"id": "t1", "child": "anna", "title": "Eigene Aufgabe", "type": "aufgabe",
+                   "status": "in_arbeit", "comment": "schon angefangen", "source": "manuell",
+                   "created": dt_util.now().isoformat()}
+        },
+        "children": {"anna": {"name": "Anna", "school": "bspgym", "school_name": "Beispiel-Gymnasium",
+                              "classname": "8b", "student_id": "7"}},
+        "initialized": ["bspgym"],
+        "archived": {"anna": ["bspgym-7-termin-1"]},
+    }
+    await Store(hass, 1, f"{LEGACY_DOMAIN}.old01").async_save(stored)
+
+    # Von Hand angepasstes Dashboard mit den alten Kartentypen
+    dash = await dash_mod._async_get_dashboard(hass, create=True)
+    await dash.async_save({"views": [{"title": "Meins", "cards": [
+        {"type": "custom:schulmanager-heute", "settings_path": "/config/integrations/integration/schulmanager"},
+        {"type": "custom:schulmanager-card", "child": "anna"},
+        {"type": "entities", "entities": [{"type": "button", "tap_action": {
+            "action": "perform-action", "perform_action": "schulmanager.refresh"}}]},
+    ]}]})
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        return _fake_result(today, with_pdf=False)
+
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        assert result["type"] is FlowResultType.FORM and result["step_id"] == "migrate"
+        assert "Beispiel-Gymnasium" in result["description_placeholders"]["schools"]
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert result["title"] == "Eltern Portal Manager Bavaria"
+        await hass.async_block_till_done()
+
+    new = hass.config_entries.async_entries(DOMAIN)[0]
+    assert "migrated_from" not in new.data and new.data["portals"] == portals
+    assert new.options["reminder_days"] == "2,0"
+    # alter Eintrag weg, fremder bleibt
+    assert hass.config_entries.async_get_entry("old01") is None
+    assert hass.config_entries.async_get_entry("other1") is not None
+    assert ent_reg.async_get(foreign.entity_id).platform == LEGACY_DOMAIN
+    # Entity-IDs bleiben, gehören jetzt zur neuen Integration
+    moved = ent_reg.async_get(status.entity_id)
+    assert moved.platform == DOMAIN and moved.config_entry_id == new.entry_id
+    assert moved.unique_id == f"{new.entry_id}_anna_ampel"
+    assert ent_reg.async_get(diag.entity_id).platform == DOMAIN
+    assert hass.states.get("sensor.schule_anna_status") is not None
+    assert hass.states.get("sensor.schulmanager_letzter_abruf") is not None
+    # Gerät samt Raum bleibt erhalten
+    dev = dev_reg.async_get(device.id)
+    assert dev is not None and dev.area_id == "kinderzimmer"
+    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers and new.entry_id in dev.config_entries
+    # Daten übernommen
+    m = new.runtime_data
+    assert m.tasks["t1"]["status"] == "in_arbeit" and m.tasks["t1"]["comment"] == "schon angefangen"
+    assert m.items["bspgym-7-elternbrief-9"]["status"] == "erledigt"
+    assert m.data["archived"] == {"anna": ["bspgym-7-termin-1"]}
+    # Datei in den neuen Medienordner verschoben
+    new_rel = m.items["bspgym-7-elternbrief-9"]["files"][0]["path"]
+    assert new_rel == os.path.join("eltern_portal_schulmanager", "Anna", "2026-27", "brief.pdf")
+    assert (media_dir / new_rel).is_file() and not (media_dir / "schulmanager").exists()
+    # Dashboard umgeschrieben
+    cfg = json.dumps(await dash.async_load(False))
+    import re
+
+    assert not re.search(r"custom:schulmanager-|(?<![\w-])schulmanager\.refresh", cfg), cfg
+    assert "custom:eltern-portal-schulmanager-header" in cfg
+    assert "custom:eltern-portal-schulmanager-card" in cfg
+    assert "eltern_portal_schulmanager.refresh" in cfg
+    assert "/config/integrations/integration/eltern_portal_schulmanager" in cfg
+    # Hinweis an den Nutzer
+    from homeassistant.components.persistent_notification import _async_get_or_create_notifications
+
+    note = _async_get_or_create_notifications(hass)[f"{DOMAIN}_migration"]
+    assert "Eltern Portal Manager Bavaria" in note["message"] and "Reparaturen" in note["message"]
+    # zweiter Einrichtungsversuch: schon eingerichtet
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert result["type"] is FlowResultType.ABORT
+    await hass.config_entries.async_unload(new.entry_id)
+
+
+async def test_legacy_folder_removed_only_if_ours(hass: HomeAssistant, tmp_path) -> None:
+    """custom_components/schulmanager wird nur gelöscht, wenn es von diesem Projekt stammt."""
+    import os
+
+    from custom_components.eltern_portal_schulmanager.migration import _remove_legacy_folder
+
+    hass.config.config_dir = str(tmp_path)
+    folder = tmp_path / "custom_components" / "schulmanager"
+    folder.mkdir(parents=True)
+    (folder / "manifest.json").write_text(json.dumps({
+        "domain": "schulmanager", "name": "Schulmanager Online",
+        "documentation": "https://github.com/MrIcemanLE/Schulmanager-homeassistant",
+    }))
+    assert not _remove_legacy_folder(hass) and folder.is_dir()
+    (folder / "manifest.json").write_text(json.dumps({
+        "domain": "schulmanager", "name": "Schulmanager (Eltern-Portal)",
+        "documentation": "https://github.com/FabusMingAI/ha-schulmanager",
+    }))
+    assert _remove_legacy_folder(hass) and not os.path.exists(folder)
+    assert not _remove_legacy_folder(hass)  # nichts mehr da
+
+
+def test_replace_legacy_names() -> None:
+    from custom_components.eltern_portal_schulmanager.migration import replace_legacy_names
+
+    text = (
+        "custom:schulmanager-card custom:schulmanager-heute custom:schulmanager-stundenplan "
+        "schulmanager.refresh schulmanager.clear_cache schulmanager_new_item "
+        "schulmanager_homework_new custom:schulmanager-foo"
+    )
+    out = replace_legacy_names(text)
+    assert "custom:eltern-portal-schulmanager-card" in out
+    assert "custom:eltern-portal-schulmanager-header" in out
+    assert "custom:eltern-portal-schulmanager-stundenplan" in out
+    assert "eltern_portal_schulmanager.refresh" in out
+    assert "eltern_portal_schulmanager_new_item" in out
+    # Namen anderer Integrationen bleiben
+    assert "schulmanager.clear_cache" in out and "schulmanager_homework_new" in out
+    assert "custom:schulmanager-foo" in out
+
+
+async def test_repair_issue_for_legacy_automations(hass: HomeAssistant, media_dir) -> None:
+    """Automationen mit alten Aktionen/Events erscheinen als Reparatur-Hinweis."""
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.eltern_portal_schulmanager.migration import (
+        ISSUE_LEGACY_REFERENCES,
+        async_check_legacy_references,
+    )
+
+    assert await async_setup_component(hass, "automation", {"automation": [
+        {"id": "a1", "alias": "Flurlicht bei dringender Mitteilung",
+         "triggers": [{"trigger": "event", "event_type": "schulmanager_new_item"}],
+         "actions": [{"action": "light.turn_on", "target": {"entity_id": "light.flur"}}]},
+        {"id": "a2", "alias": "Morgens abrufen",
+         "triggers": [{"trigger": "time", "at": "06:00:00"}],
+         "actions": [{"action": "schulmanager.refresh"}]},
+        {"id": "a3", "alias": "Schon umgestellt",
+         "triggers": [{"trigger": "time", "at": "06:00:00"}],
+         "actions": [{"action": "eltern_portal_schulmanager.refresh"}]},
+    ]})
+    await hass.async_block_till_done()
+    async_check_legacy_references(hass)
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_LEGACY_REFERENCES)
+    assert issue is not None and issue.translation_key == ISSUE_LEGACY_REFERENCES
+    items = issue.translation_placeholders["items"]
+    assert "Flurlicht bei dringender Mitteilung" in items and "Morgens abrufen" in items
+    assert "Schon umgestellt" not in items
+    for lang in ("de", "en"):
+        tr = json.load(open(f"custom_components/eltern_portal_schulmanager/translations/{lang}.json"))
+        assert "{items}" in tr["issues"][ISSUE_LEGACY_REFERENCES]["description"]
+        assert "{schools}" in tr["config"]["step"]["migrate"]["description"]
+
+    # Mit „Schulmanager Online“ (gleiche Domain) ist schulmanager.refresh nicht eindeutig
+    MockConfigEntry(domain="schulmanager", data={"username": "z"}).add_to_hass(hass)
+    async_check_legacy_references(hass)
+    items = ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_LEGACY_REFERENCES).translation_placeholders["items"]
+    assert "Morgens abrufen" not in items and "Flurlicht" in items
+
+    # nach dem Umstellen verschwindet der Hinweis
+    await hass.services.async_call("automation", "turn_off", {"entity_id": "all"}, blocking=True)
+    with patch(
+        "custom_components.eltern_portal_schulmanager.migration.find_legacy_references", return_value=[]
+    ):
+        async_check_legacy_references(hass)
+    assert ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_LEGACY_REFERENCES) is None
+
+
+def test_parse_substitutions_five_and_six_columns() -> None:
+    """Vertretungsplan mit 5 Spalten (ohne Fach) und mit 6 Spalten (Fach durchgestrichen)."""
+    from custom_components.eltern_portal_schulmanager.portal import parse_substitutions
+
+    five = """<div id="asam_content"><div class='main_center'>
+      <div class='list bold full_width text_center'>Di., 29.09.2026 - KW 40</div>
+      <table class='table'>
+        <tr class='vp_plan_head'><td>Std.</td><td>Betrifft.</td><td>Vertretung</td><td>Raum</td><td>Info</td></tr>
+        <tr class='liste_grau'><td>3.</td><td>Bz</td><td>Sf</td><td>B003</td><td>Vertretung</td></tr>
+        <tr class='liste_weiss'><td>5.</td><td>Mü</td><td>&nbsp;</td><td></td><td>entfällt</td></tr>
+      </table></div></div>"""
+    days = parse_substitutions(five)["days"]
+    assert [d["date"] for d in days] == ["2026-09-29"]
+    first, second = days[0]["entries"]
+    assert first == {
+        "lesson": "3", "teacher": "Bz", "substitute": "Sf", "subject": "", "old_subject": None,
+        "room": "B003", "info": "Vertretung", "kind": "vertretung",
+    }
+    assert second["kind"] == "entfall" and second["room"] == ""
+
+    six = """<div id="asam_content"><div class='main_center'>
+      <div class='list bold full_width text_center'>Mi., 07.10.2026 - KW 41</div>
+      <table class='table'>
+        <tr class='vp_plan_head'><td>Std.</td><td>Betrifft.</td><td>Vertretung</td><td>Fach</td><td>Raum</td><td>Info</td></tr>
+        <tr class=''><td colspan='6'>Keine Vertretungen für 8b</td></tr>
+      </table>
+      <div class='list bold full_width text_center'>Do., 08.10.2026 - KW 41</div>
+      <table class='table'>
+        <tr class='vp_plan_head'><td>Std.</td><td>Betrifft.</td><td>Vertretung</td><td>Fach</td><td>Raum</td><td>Info</td></tr>
+        <tr class='liste_grau'><td>1.</td><td>Abc</td><td>&nbsp;</td><td>C</td><td>1</td><td>entfällt</td></tr>
+        <tr class='liste_grau'><td>3.</td><td>Abc</td><td>Xyz</td>
+          <td><span style='text-decoration: line-through;'>&nbsp;M&nbsp;</span> PuG</td><td>2</td><td>verlegt</td></tr>
+      </table></div></div>"""
+    days = parse_substitutions(six)["days"]
+    assert [d["date"] for d in days] == ["2026-10-07", "2026-10-08"]
+    assert days[0]["entries"] == []
+    cancel, moved = days[1]["entries"]
+    assert cancel["subject"] == "C" and cancel["kind"] == "entfall"
+    assert moved["subject"] == "PuG" and moved["old_subject"] == "M" and moved["substitute"] == "Xyz"
+
+
+async def test_five_column_subject_from_timetable(hass: HomeAssistant, media_dir) -> None:
+    """Ohne Spalte „Fach“ kommt das Fach aus dem Stundenplan (nur wenn eindeutig)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "demo", "school_name": "Demo", "username": "", "password": ""}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    from custom_components.eltern_portal_schulmanager.manager import SchulManager
+
+    m = SchulManager(hass, entry)
+    await m.async_load()
+    day = date(2026, 9, 29)  # Dienstag
+    m.data["timetable"]["anna"] = {"lessons": [
+        {"weekday": 2, "lesson": "3", "subject": "B"},
+        {"weekday": 2, "lesson": "4", "subject": "E"},
+        {"weekday": 2, "lesson": "4", "subject": "F"},
+    ]}
+    m._merge_substitutions("anna", {"available": True, "days": [{"date": day.isoformat(), "entries": [
+        {"lesson": "3", "teacher": "Bz", "substitute": "Sf", "subject": "", "room": "B003", "info": "", "kind": "vertretung"},
+        {"lesson": "4", "teacher": "Mü", "substitute": "", "subject": "", "room": "", "info": "entfällt", "kind": "entfall"},
+    ]}]})
+    e3, e4 = m.data["substitutions"]["anna"]["days"][0]["entries"]
+    assert e3["subject"] == "B" and e3["subject_from_timetable"]
+    assert e4["subject"] == ""  # geteilte Stunde: nicht eindeutig
+
+
+async def test_legacy_push_buttons_still_work(hass: HomeAssistant, media_dir) -> None:
+    """Buttons aus Push-Nachrichten von vor der Umbenennung (SCHULMANAGER_DONE::…) funktionieren."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "demo", "school_name": "Demo", "username": "", "password": ""}]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    m = entry.runtime_data
+    task = m.add_task("erika", "Turnbeutel mitbringen")
+    hass.bus.async_fire("mobile_app_notification_action", {"action": f"SCHULMANAGER_DONE::{task['id']}"})
+    await hass.async_block_till_done()
+    assert m.tasks[task["id"]]["status"] == "erledigt"
+    task2 = m.add_task("erika", "Brief unterschreiben")
+    hass.bus.async_fire("mobile_app_notification_action", {"action": f"ELTERNPORTAL_DONE::{task2['id']}"})
+    await hass.async_block_till_done()
+    assert m.tasks[task2["id"]]["status"] == "erledigt"
     await hass.config_entries.async_unload(entry.entry_id)

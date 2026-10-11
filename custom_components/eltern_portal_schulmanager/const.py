@@ -1,4 +1,4 @@
-"""Konstanten für den Schulmanager."""
+"""Konstanten für „Eltern Portal Manager Bavaria“ (bis 0.13: „Schulmanager“)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,12 @@ import logging
 from datetime import timedelta
 from typing import Final
 
-DOMAIN: Final = "schulmanager"
+DOMAIN: Final = "eltern_portal_schulmanager"
+NAME: Final = "Eltern Portal Manager Bavaria"
+# Bis 0.13.x hieß die Integration „Schulmanager“ mit der Domain „schulmanager“. Dieselbe
+# Domain nutzt „Schulmanager Online“ (MrIcemanLE) – beide ließen sich nicht gleichzeitig
+# installieren. Siehe migration.py.
+LEGACY_DOMAIN: Final = "schulmanager"
 LOGGER = logging.getLogger(__package__)
 
 PLATFORMS: Final = ["sensor", "todo", "calendar"]
@@ -157,18 +162,22 @@ EVENT_SUBSTITUTION: Final = f"{DOMAIN}_substitution"
 SIGNAL_UPDATED: Final = f"{DOMAIN}_updated"
 
 # Aktionen der Companion-App-Benachrichtigungen
-ACTION_PREFIX: Final = "SCHULMANAGER"
+ACTION_PREFIX: Final = "ELTERNPORTAL"
+# Buttons in Push-Nachrichten, die noch vor der Umbenennung verschickt wurden
+LEGACY_ACTION_PREFIX: Final = "SCHULMANAGER"
 ACTION_DONE: Final = f"{ACTION_PREFIX}_DONE"
 ACTION_SNOOZE: Final = f"{ACTION_PREFIX}_SNOOZE"
 ACTION_READ: Final = f"{ACTION_PREFIX}_READ"
 
-MEDIA_SUBDIR: Final = "schulmanager"
+MEDIA_SUBDIR: Final = "eltern_portal_schulmanager"
+LEGACY_MEDIA_SUBDIR: Final = "schulmanager"
 FILE_URL_BASE: Final = f"/api/{DOMAIN}/datei"
 ICS_URL_BASE: Final = f"/api/{DOMAIN}/ics"
 # Gültigkeit der signierten .ics-Links (die Karte holt bei Bedarf neue)
 ICS_LINK_VALIDITY: Final = timedelta(hours=24)
-CARD_URL: Final = f"/{DOMAIN}_static/schulmanager-card.js"
-LOCAL_CARD_FILE: Final = "schulmanager-card.js"
+CARD_FILE: Final = "eltern-portal-schulmanager-card.js"
+CARD_URL: Final = f"/{DOMAIN}_static/{CARD_FILE}"
+LOCAL_CARD_FILE: Final = CARD_FILE
 LOCAL_CARD_URL: Final = f"/local/{DOMAIN}/{LOCAL_CARD_FILE}"
 
 # Dashboard „Schule“
@@ -181,3 +190,14 @@ DASHBOARD_OFF: Final = "off"
 DASHBOARD_MODES: Final = [DASHBOARD_TABS, DASHBOARD_SINGLE, DASHBOARD_OFF]
 DEFAULT_DASHBOARD: Final = DASHBOARD_TABS
 LOCAL_ICON_URL: Final = f"/local/{DOMAIN}/icon.png"
+
+# Kartentypen (bis 0.13: custom:schulmanager-*); die Migration schreibt Dashboards um
+CARD_PREFIX: Final = "eltern-portal-schulmanager"
+LEGACY_CARD_TYPES: Final = {
+    f"custom:schulmanager-{name}": f"custom:{CARD_PREFIX}-{'header' if name == 'heute' else name}"
+    for name in ("card", "termine", "stundenplan", "header", "heute")
+}
+LEGACY_CARD_URLS: Final = (
+    "/local/schulmanager/schulmanager-card.js",
+    "/schulmanager_static/schulmanager-card.js",
+)

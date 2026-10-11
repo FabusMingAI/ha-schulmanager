@@ -15,7 +15,7 @@
         "description": "Hinzugefügt:\n{added}",
         "menu_options": {
           "user": "Weitere Schule hinzufügen",
-          "finish": "Fertig – Schulmanager anlegen"
+          "finish": "Fertig – Eltern Portal Manager Bavaria anlegen"
         }
       },
       "reauth_confirm": {
@@ -26,6 +26,10 @@
           "username": "E-Mail-Adresse (optional)",
           "password": "Passwort"
         }
+      },
+      "migrate": {
+        "title": "Schulmanager übernehmen",
+        "description": "„Schulmanager“ heißt jetzt **Eltern Portal Manager Bavaria**. Es gibt bereits eine Einrichtung („{title}“, Schulen: {schools}).\n\nBeim Übernehmen bleiben Zugangsdaten, Einstellungen, Aufgaben, Mitteilungen, Archiv, abgelegte Dateien, Entity-IDs und Verlauf erhalten. Der alte Eintrag wird danach entfernt, Dashboards werden auf die neuen Karten umgestellt.\n\nAutomationen und Skripte mit `schulmanager.…`-Aktionen oder `schulmanager_…`-Events müssen danach von Hand umgestellt werden – sie erscheinen unter Einstellungen → Reparaturen."
       }
     },
     "error": {
@@ -36,14 +40,14 @@
       "unknown": "Unerwarteter Fehler – siehe Protokoll."
     },
     "abort": {
-      "already_configured": "Der Schulmanager ist bereits eingerichtet. Weitere Schulen fügst du über „Konfigurieren“ hinzu.",
+      "already_configured": "Eltern Portal Manager Bavaria ist bereits eingerichtet. Weitere Schulen fügst du über „Konfigurieren“ hinzu.",
       "reauth_successful": "Anmeldung aktualisiert."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Schulmanager",
+        "title": "Eltern Portal Manager Bavaria",
         "menu_options": {
           "settings": "Einstellungen (KI, Erinnerungen, Ansagen)",
           "add_portal": "Schule hinzufügen",
@@ -95,7 +99,7 @@
             "data_description": {
               "appointment_kinds": "Welche Einträge aus „Termine“ im Eltern-Portal in Kalender, Terminliste und Stundenplan erscheinen. Standard: nur Schulaufgaben und Tests.",
               "own_class_only": "Blendet Termine aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen (z. B. „Schullandheim 5b+5c“, „Jgst. 10“). Termine ohne Klassenangabe bleiben sichtbar.",
-              "teacher_names": "Die Kürzel stehen im Eltern-Portal unter „Service → Schulinformationen“ (Stundenplankürzel der Lehrkräfte). Der Schulmanager liest die Liste je Schule einmal am Tag. Unbekannte Kürzel bleiben stehen; die Namen gehen nicht an den KI-Dienst."
+              "teacher_names": "Die Kürzel stehen im Eltern-Portal unter „Service → Schulinformationen“ (Stundenplankürzel der Lehrkräfte). Die Integration liest die Liste je Schule einmal am Tag. Unbekannte Kürzel bleiben stehen; die Namen gehen nicht an den KI-Dienst."
             }
           },
           "sprachansagen": {
@@ -137,7 +141,7 @@
               "dashboard": "Dashboard „Schule“"
             },
             "data_description": {
-              "dashboard": "Reiter: „Übersicht“ mit Kalender und Schulmanager, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast."
+              "dashboard": "Reiter: „Übersicht“ mit Terminen und Stundenplänen, dazu ein Reiter pro Kind – ideal fürs Handy. Eine Seite: alles untereinander. Nicht verwalten: Dashboard bleibt, wie du es angelegt hast."
             }
           }
         }
@@ -152,7 +156,7 @@
       },
       "remove_portal": {
         "title": "Schule entfernen",
-        "description": "Aufgaben und Mitteilungen dieser Schule werden aus dem Schulmanager gelöscht. Abgelegte Dateien bleiben im Medienordner.",
+        "description": "Aufgaben und Mitteilungen dieser Schule werden aus der Integration gelöscht. Abgelegte Dateien bleiben im Medienordner.",
         "data": {
           "school": "Schule"
         }
@@ -167,7 +171,7 @@
       "too_many_languages": "Bitte höchstens 4 Sprachen wählen."
     },
     "abort": {
-      "portal_added": "Schule hinzugefügt. Der Schulmanager lädt neu.",
+      "portal_added": "Schule hinzugefügt. Die Integration lädt neu.",
       "portal_removed": "Schule entfernt.",
       "last_portal": "Die letzte Schule kann nicht entfernt werden – lösche stattdessen die Integration."
     }
@@ -426,6 +430,12 @@
         "name": "Nur Name",
         "kuerzel": "Nur Kürzel (Liste nicht abrufen)"
       }
+    }
+  },
+  "issues": {
+    "legacy_references": {
+      "title": "Automationen nutzen noch die alten Schulmanager-Namen",
+      "description": "„Schulmanager“ heißt jetzt Eltern Portal Manager Bavaria. Diese Automationen bzw. Skripte rufen noch Aktionen `{old_domain}.…` auf oder reagieren auf Events `{old_domain}_…`:\n\n{items}\n\nBitte umstellen auf `{new_domain}.…` (z. B. `{new_domain}.refresh`) bzw. `{new_domain}_…` (z. B. `{new_domain}_new_item`). Der Hinweis verschwindet, sobald keine alten Namen mehr vorkommen."
     }
   }
 }

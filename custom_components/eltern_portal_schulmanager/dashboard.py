@@ -2,13 +2,13 @@
 
 Die Ansicht wird in den Einstellungen der Integration gewählt:
 
-* ``tabs``   – Reiter „Übersicht“ (Kalender + Schulmanager) und ein Reiter je Kind
+* ``tabs``   – Reiter „Übersicht“ (Termine + Stundenplan) und ein Reiter je Kind
 * ``single`` – alles auf einer Seite
 * ``off``    – das Dashboard wird nicht angefasst
 
-Von Hand geänderte Dashboards werden geschützt: Der Schulmanager überschreibt
+Von Hand geänderte Dashboards werden geschützt: Die Integration überschreibt
 nur, was er selbst erzeugt hat, oder wenn in den Einstellungen bewusst eine
-andere Ansicht gewählt bzw. die Aktion ``schulmanager.rebuild_dashboard``
+andere Ansicht gewählt bzw. die Aktion ``eltern_portal_schulmanager.rebuild_dashboard``
 aufgerufen wird.
 """
 
@@ -23,6 +23,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
+    CARD_PREFIX,
+    NAME,
     CONF_DASHBOARD,
     DASHBOARD_ICON,
     DASHBOARD_MODES,
@@ -66,7 +68,7 @@ def _header(names: list[str]) -> dict[str, Any]:
     Eigene Karte statt Markdown, damit die Abrufzeit live aktualisiert wird.
     """
     card: dict[str, Any] = {
-        "type": "custom:schulmanager-header",
+        "type": f"custom:{CARD_PREFIX}-header",
         "settings_path": SETTINGS_PATH,
         "icon": LOCAL_ICON_URL,
     }
@@ -78,10 +80,10 @@ def _header(names: list[str]) -> dict[str, Any]:
 def _schulmanager_card(
     hass: HomeAssistant, manager: SchulManager, links: bool, title: bool = True
 ) -> dict[str, Any]:
-    """Entitäten-Karte „Schulmanager“: letzter Abruf und Aktionen.
+    """Entitäten-Karte mit dem Namen der Integration: letzter Abruf und Aktionen.
 
     Die Kinder stehen nicht mehr als eigene Zeilen darin – dafür gibt es die
-    Reiter bzw. die Schulmanager-Karte je Kind.
+    Reiter bzw. die Aufgaben-Karte je Kind.
     """
     rows: list[Any] = []
     if last := _eid(hass, "sensor", f"{manager.entry.entry_id}_letzter_abruf"):
@@ -104,13 +106,13 @@ def _schulmanager_card(
     ]
     card: dict[str, Any] = {"type": "entities", "entities": rows}
     if title:
-        card["title"] = "Schulmanager"
+        card["title"] = NAME
     return card
 
 
 def _termine(child: str | None = None) -> dict[str, Any]:
     """Terminliste mit KI-Kurzbeschreibung beim Überfahren und Legende."""
-    card: dict[str, Any] = {"type": "custom:schulmanager-termine", "grid_options": {"columns": 12}}
+    card: dict[str, Any] = {"type": f"custom:{CARD_PREFIX}-termine", "grid_options": {"columns": 12}}
     if child:
         card["child"] = child
     return card
@@ -118,7 +120,7 @@ def _termine(child: str | None = None) -> dict[str, Any]:
 
 def _stundenplan(child: str, view: str | None = "week") -> dict[str, Any]:
     """Stundenplan-Karte; startet überall in der Wochenansicht (seit 0.7.3)."""
-    card: dict[str, Any] = {"type": "custom:schulmanager-stundenplan", "child": child, "grid_options": {"columns": 12}}
+    card: dict[str, Any] = {"type": f"custom:{CARD_PREFIX}-stundenplan", "child": child, "grid_options": {"columns": 12}}
     if view:
         card["view"] = view
     return card
@@ -147,7 +149,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
         sections: list[dict[str, Any]] = []
         for key, child in children.items():
             cards: list[dict[str, Any]] = [
-                {"type": "custom:schulmanager-card", "child": key, "grid_options": {"columns": 12}},
+                {"type": f"custom:{CARD_PREFIX}-card", "child": key, "grid_options": {"columns": 12}},
                 _stundenplan(key),
             ]
             if btn := _portal_button(child):
@@ -188,7 +190,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                     ],
                 },
                 {
-                    # Rechte Spalte: Stundenplan je Kind in Wochenansicht (seit 0.7.1 statt der Schulmanager-Karte)
+                    # Rechte Spalte: Stundenplan je Kind in Wochenansicht (seit 0.7.1 statt der Aufgaben-Karte)
                     "type": "grid",
                     "cards": [
                         card
@@ -219,7 +221,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
             {
                 "type": "grid",
                 "cards": [
-                    {"type": "custom:schulmanager-card", "child": key, "grid_options": {"columns": 12}}
+                    {"type": f"custom:{CARD_PREFIX}-card", "child": key, "grid_options": {"columns": 12}}
                 ],
             }
         ]

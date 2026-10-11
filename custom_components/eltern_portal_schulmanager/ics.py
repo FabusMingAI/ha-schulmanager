@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-PRODID = "-//FabusMingAI//Schulmanager for Home Assistant//DE"
+PRODID = "-//FabusMingAI//Eltern Portal Manager Bavaria for Home Assistant//DE"
 GOOGLE_URL = "https://calendar.google.com/calendar/render"
 MAX_GOOGLE_DETAILS = 1500
 
@@ -81,6 +81,8 @@ def event_details(ev: dict[str, Any], portal_url: str | None = None) -> str:
 
 def event_uid(child: str, uid: str) -> str:
     safe = re.sub(r"[^A-Za-z0-9._-]+", "-", f"{child}-{uid}").strip("-")
+    # Bewusst unverändert seit 0.13 (vor der Umbenennung): sonst würde ein schon
+    # eingetragener Termin beim erneuten Eintragen doppelt angelegt.
     return f"{safe}@schulmanager"
 
 

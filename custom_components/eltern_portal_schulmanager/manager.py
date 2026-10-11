@@ -1,4 +1,4 @@
-"""Kernlogik des Schulmanagers: Abruf, Ablage, Auswertung, Aufgaben, Erinnerungen."""
+"""Kernlogik von „Eltern Portal Manager Bavaria“ (bis 0.13 „Schulmanager“): Abruf, Ablage, Auswertung, Aufgaben, Erinnerungen."""
 
 from __future__ import annotations
 
@@ -40,68 +40,64 @@ from .analyzer import (
 from .classes import concerns_class
 from .const import (
     ACTION_DONE,
+    ACTION_PREFIX,
     ACTION_READ,
     ACTION_SNOOZE,
     AMPEL_GREEN,
-    APPT_EXAM,
-    APPT_TEST,
-    CONF_APPOINTMENT_KINDS,
-    CONF_OWN_CLASS_ONLY,
-    CONF_SUMMARY_LANGUAGES,
-    CONF_TEACHER_NAMES,
-    DEFAULT_TEACHER_NAMES,
-    FETCH_ATTEMPTS,
-    FETCH_RETRY_DELAY,
-    FETCH_TIMEOUT,
-    TEACHER_NAMES_ABBR,
-    TEACHER_NAMES_NAME,
-    TEACHERS_MAX_AGE,
-    DEFAULT_APPOINTMENT_KINDS,
-    DEFAULT_OWN_CLASS_ONLY,
     AMPEL_RED,
     AMPEL_YELLOW,
+    APPT_EXAM,
+    APPT_TEST,
     CONF_AI_ENTITY,
     CONF_ANALYZE_DAYS,
+    CONF_APPOINTMENT_KINDS,
     CONF_AUTO_DOWNLOAD,
     CONF_DIGEST_ENABLED,
     CONF_DIGEST_TIME,
     CONF_LOOKBACK_DAYS,
     CONF_NOTIFY,
+    CONF_OWN_CLASS_ONLY,
     CONF_PORTALS,
     CONF_REMINDER_DAYS,
     CONF_REMINDER_TIME,
     CONF_SCAN_INTERVAL,
     CONF_SCHOOL,
+    CONF_SUMMARY_LANGUAGES,
+    CONF_TEACHER_NAMES,
     CONF_TTS_END,
     CONF_TTS_ENGINE,
     CONF_TTS_START,
     CONF_TTS_TARGETS,
     DEFAULT_ANALYZE_DAYS,
+    DEFAULT_APPOINTMENT_KINDS,
     DEFAULT_AUTO_DOWNLOAD,
     DEFAULT_DIGEST_ENABLED,
     DEFAULT_DIGEST_TIME,
     DEFAULT_LOOKBACK_DAYS,
+    DEFAULT_OWN_CLASS_ONLY,
     DEFAULT_REMINDER_DAYS,
     DEFAULT_REMINDER_TIME,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TEACHER_NAMES,
     DEFAULT_TTS_END,
     DEFAULT_TTS_START,
     DOMAIN,
-    LANGUAGE_NAMES,
-    TRANSLATE_MAX_TRIES,
-    TRANSLATE_NOTIFY_MIN,
-    TRANSLATE_RETRY,
-    TRANSLATE_SECONDS_PER_ITEM,
     EVENT_CATEGORIES,
     EVENT_NEW_ITEM,
     EVENT_SUBSTITUTION,
     EVENT_TASK_REMINDER,
+    FETCH_ATTEMPTS,
+    FETCH_RETRY_DELAY,
+    FETCH_TIMEOUT,
     KIND_LABELS,
     KIND_LETTER,
     KIND_MANUAL,
     KIND_POLL,
+    LANGUAGE_NAMES,
+    LEGACY_ACTION_PREFIX,
     LOGGER,
     MEDIA_SUBDIR,
+    NAME,
     SIGNAL_UPDATED,
     STATUS_DONE,
     STATUS_OPEN,
@@ -109,7 +105,17 @@ from .const import (
     STORAGE_VERSION,
     SUBSTITUTION_KINDS,
     TASK_TYPE_ICONS,
+    TEACHERS_MAX_AGE,
+    TEACHER_NAMES_ABBR,
+    TEACHER_NAMES_NAME,
+    TRANSLATE_MAX_TRIES,
+    TRANSLATE_NOTIFY_MIN,
+    TRANSLATE_RETRY,
+    TRANSLATE_SECONDS_PER_ITEM,
 )
+
+# Kennung für Benachrichtigungen (tag/group) der Companion-App
+TAG = "eltern-portal"
 from .portal import (
     appointment_kind,
     appointment_subject,
@@ -274,7 +280,7 @@ class SchulManager:
         )
         self._unsubs.append(
             async_track_time_interval(
-                self.hass, self._scheduled_refresh, interval, name="Schulmanager Abruf"
+                self.hass, self._scheduled_refresh, interval, name=f"{NAME} Abruf"
             )
         )
         rt = _parse_time(self.opt(CONF_REMINDER_TIME), DEFAULT_REMINDER_TIME)
@@ -296,7 +302,7 @@ class SchulManager:
             )
         )
         self._worker = self.entry.async_create_background_task(
-            self.hass, self._analysis_worker(), "schulmanager_analyse"
+            self.hass, self._analysis_worker(), f"{DOMAIN}_analyse"
         )
         if self._pending() or self._missing_translations():
             self._queue_event.set()
@@ -605,10 +611,10 @@ class SchulManager:
             self.data["initialized"].append(result.school)
             if new_count:
                 await self._notify(
-                    f"Schulmanager: {result.school_name}",
+                    f"{NAME}: {result.school_name}",
                     f"Eingerichtet. {new_count} aktuelle Mitteilungen werden ausgewertet, "
                     "ältere liegen im Archiv.",
-                    {"tag": f"schulmanager-init-{result.school}"},
+                    {"tag": f"{TAG}-init-{result.school}"},
                 )
 
     def _new_item(self, child: str, result: PortalResult, p: PortalItem) -> dict[str, Any]:
@@ -852,7 +858,7 @@ class SchulManager:
 
     def _translation_notice(self, text: str) -> None:
         persistent_notification.async_create(
-            self.hass, text, title="Schulmanager", notification_id=f"{DOMAIN}_uebersetzung"
+            self.hass, text, title=NAME, notification_id=f"{DOMAIN}_uebersetzung"
         )
 
     async def _translate_missing(self) -> None:
@@ -1492,6 +1498,11 @@ class SchulManager:
                         prev["teacher"] = ", ".join([*teachers, t])
                     continue
                 by_uid[e["uid"]] = e
+                if not e.get("subject"):
+                    # Vertretungsplan mit 5 Spalten (ohne „Fach“): Fach aus dem Stundenplan
+                    if subj := self.lesson_subject(key, date.fromisoformat(d["date"]), e.get("lesson")):
+                        e["subject"] = subj
+                        e["subject_from_timetable"] = True
                 entries.append(e)
                 if date.fromisoformat(d["date"]) >= today and e["uid"] not in seen:
                     fresh.append((d["date"], e))
@@ -1522,6 +1533,19 @@ class SchulManager:
             return None
 
         return find(nums[0], "start"), find(nums[-1], "end")
+
+    def lesson_subject(self, child: str, day: date, lesson: str | None) -> str | None:
+        """Fach einer Stunde laut Stundenplan – nur wenn es eindeutig ist."""
+        lessons = self.data["timetable"].get(child, {}).get("lessons", [])
+        nums = re.findall(r"\d+", lesson or "")
+        if not nums or not lessons:
+            return None
+        subjects = {
+            x.get("subject")
+            for x in lessons
+            if x["weekday"] == day.isoweekday() and x["lesson"] == nums[0] and x.get("subject")
+        }
+        return subjects.pop() if len(subjects) == 1 else None
 
     def child_sicknotes(self, child: str, school_year_only: bool = False) -> list[dict[str, Any]]:
         """Krankmeldungen eines Kindes, neueste zuerst, mit Zahl der Schultage."""
@@ -1589,7 +1613,7 @@ class SchulManager:
         await self._notify(
             f"🔁 Vertretungsplan {name}",
             "\n".join(lines[:8]) + (f"\n… und {len(lines) - 8} weitere" if len(lines) > 8 else ""),
-            {"tag": f"schulmanager-vertretung-{child}", "group": f"schulmanager-{child}"},
+            {"tag": f"{TAG}-vertretung-{child}", "group": f"{TAG}-{child}"},
         )
         self.hass.bus.async_fire(
             EVENT_SUBSTITUTION,
@@ -1673,8 +1697,8 @@ class SchulManager:
             f"{prefix} {child} · {KIND_LABELS.get(item['kind'], '')}",
             "\n".join(lines),
             {
-                "tag": f"schulmanager-{item['uid']}",
-                "group": f"schulmanager-{item['child']}",
+                "tag": f"{TAG}-{item['uid']}",
+                "group": f"{TAG}-{item['child']}",
                 "url": item["url"],
                 "clickAction": item["url"],
                 "actions": actions,
@@ -1763,8 +1787,8 @@ class SchulManager:
             f"⏰ {child}: {TASK_TYPE_ICONS.get(t['type'], '✅')} Schul-Erinnerung",
             body,
             {
-                "tag": f"schulmanager-task-{t['id']}",
-                "group": f"schulmanager-{t.get('child')}",
+                "tag": f"{TAG}-task-{t['id']}",
+                "group": f"{TAG}-{t.get('child')}",
                 "actions": actions,
             },
         )
@@ -1822,7 +1846,7 @@ class SchulManager:
         await self._notify(
             "🎒 Schule heute",
             self.digest_text(),
-            {"tag": "schulmanager-digest", "group": "schulmanager"},
+            {"tag": f"{TAG}-digest", "group": TAG},
         )
         return True
 
@@ -1831,6 +1855,9 @@ class SchulManager:
         if "::" not in action:
             return
         kind, _, ref = action.partition("::")
+        # Buttons aus Push-Nachrichten von vor der Umbenennung (SCHULMANAGER_DONE …)
+        if kind.startswith(f"{LEGACY_ACTION_PREFIX}_"):
+            kind = ACTION_PREFIX + kind[len(LEGACY_ACTION_PREFIX):]
         if kind == ACTION_DONE and ref in self.tasks:
             self.complete_task(ref, True)
         elif kind == ACTION_SNOOZE and ref in self.tasks:

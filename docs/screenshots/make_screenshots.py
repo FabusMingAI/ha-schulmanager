@@ -1,4 +1,4 @@
-"""Screenshots der Schulmanager-Karten mit Demo-Daten erzeugen (für README.md / README.de.md).
+"""Screenshots der Karten von „Eltern Portal Manager Bavaria“ mit Demo-Daten erzeugen (für README.md / README.de.md).
 
 Benötigt Playwright mit Chromium:
     pip install playwright && playwright install chromium
@@ -58,7 +58,7 @@ def main() -> None:
                 page.add_style_tag(content=css)
             if action == "dialog":  # Dialog füllt das Fenster wie am Handy
                 page.set_viewport_size({"width": width, "height": 844})
-            card_el = page.locator("schulmanager-card" if card in ("task", "item") else f"schulmanager-{card}")
+            card_el = page.locator("eltern-portal-schulmanager-card" if card in ("task", "item") else f"eltern-portal-schulmanager-{card}")
             card_el.locator("ha-card").wait_for()
             page.wait_for_function("() => !window.cardEl.shadowRoot.textContent.includes('Lade')")
             if action == "day":

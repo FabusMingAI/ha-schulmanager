@@ -10,8 +10,8 @@ labels: bug
 
 **Versions / Versionen**
 - Home Assistant:
-- Schulmanager:
+- Eltern Portal Manager Bavaria (Version):
 - Portal section (Elternbriefe, Termine, Umfragen …):
 
-**Log** (Settings → System → Logs, filter `schulmanager` / `pyelternportal`).
+**Log** (Settings → System → Logs, filter `eltern_portal_schulmanager` / `pyelternportal`).
 Please remove names, e-mail addresses and school codes. / Bitte Namen, E-Mail-Adressen und Schulkennungen entfernen.

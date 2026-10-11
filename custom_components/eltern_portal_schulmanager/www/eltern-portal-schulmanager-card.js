@@ -1,14 +1,17 @@
-/* Schulmanager-Karte für Home Assistant – Aufgaben und Mitteilungen pro Kind.
+/* Karten von „Eltern Portal Manager Bavaria“ für Home Assistant – Aufgaben und Mitteilungen pro Kind.
  * Wird von der Integration automatisch geladen. Verwendung im Dashboard:
- *   type: custom:schulmanager-card         # Aufgaben & Mitteilungen
- *   type: custom:schulmanager-termine      # Termine & Fristen mit Legende
- *   type: custom:schulmanager-stundenplan  # Stundenplan mit Vertretungen
- *   type: custom:schulmanager-header       # Kopfzeile: letzter Abruf, Version, Einstellungen
+ *   type: custom:eltern-portal-schulmanager-card         # Aufgaben & Mitteilungen
+ *   type: custom:eltern-portal-schulmanager-termine      # Termine & Fristen mit Legende
+ *   type: custom:eltern-portal-schulmanager-stundenplan  # Stundenplan mit Vertretungen
+ *   type: custom:eltern-portal-schulmanager-header       # Kopfzeile: letzter Abruf, Version, Einstellungen
  *   child: anna          # optional, ohne Angabe: alle Kinder
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.12.1";
+  const VERSION = "0.14.0";
+  // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
+  const DOMAIN = "eltern_portal_schulmanager";
+  const NAME = "Eltern Portal Manager Bavaria";
   const esc = (v) =>
     String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmtDate = (iso) => {
@@ -335,7 +338,7 @@
         .subscribeMessage(() => {
           clearTimeout(this._deb);
           this._deb = setTimeout(() => this._load(true), 400);
-        }, { type: "schulmanager/subscribe" })
+        }, { type: `${DOMAIN}/subscribe` })
         .catch(() => {
           this._unsub = null;
           return null;
@@ -347,12 +350,12 @@
     }
 
     async _call(service, data) {
-      await this._hass.callService("schulmanager", service, data);
+      await this._hass.callService(DOMAIN, service, data);
     }
 
     async _load(refreshDialog) {
       try {
-        const msg = { type: "schulmanager/data" };
+        const msg = { type: `${DOMAIN}/data` };
         if (this._config.child) msg.child = this._config.child;
         this._data = await this._ws(msg);
         this._error = null;
@@ -385,7 +388,7 @@
       const l = this._links[key];
       if (l && (l.pending || Date.now() - l.at < 3600e3)) return l.pending ? null : l;
       this._links[key] = { pending: true };
-      this._ws({ type: "schulmanager/event_links", child, event_id: uid })
+      this._ws({ type: `${DOMAIN}/event_links`, child, event_id: uid })
         .then((r) => {
           this._links[key] = { ...r, at: Date.now() };
           this._render();
@@ -443,7 +446,7 @@
     _render() {
       let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
-      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch – die Daten erscheinen gleich automatisch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Eltern Portal Manager startet noch – die Daten erscheinen gleich automatisch …</div>` : `<div class="empty">${NAME}: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else if (!this._data.children.length) html += `<div class="empty">Keine Kinder gefunden.</div>`;
       else {
@@ -502,7 +505,7 @@
             await this._call("update_task", { task_id: id, status: next });
           } catch (err) {
             el.disabled = false;
-            alert(`Schulmanager: ${err && err.message ? err.message : err}`);
+            alert(`${NAME}: ${err && err.message ? err.message : err}`);
             return;
           }
           // sofort umsortieren, die Daten vom Server folgen über das Abo
@@ -738,10 +741,10 @@
 
     // PDF drucken: unsichtbar laden und den Druckdialog des Browsers öffnen
     _print(url) {
-      const old = document.getElementById("schulmanager-print");
+      const old = document.getElementById("eltern-portal-schulmanager-print");
       if (old) old.remove();
       const frame = document.createElement("iframe");
-      frame.id = "schulmanager-print";
+      frame.id = "eltern-portal-schulmanager-print";
       frame.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;";
       frame.src = url;
       frame.onload = () => {
@@ -769,9 +772,9 @@
     async _openTask(id, silent) {
       let t;
       try {
-        t = await this._ws({ type: "schulmanager/task", task_id: id });
+        t = await this._ws({ type: `${DOMAIN}/task`, task_id: id });
       } catch (e) {
-        if (!silent) console.error("Schulmanager:", e);
+        if (!silent) console.error(`${NAME}:`, e);
         return;
       }
       this._dialog = { type: "task", id };
@@ -828,9 +831,9 @@
     async _openItem(uid, silent) {
       let i;
       try {
-        i = await this._ws({ type: "schulmanager/item", item_id: uid });
+        i = await this._ws({ type: `${DOMAIN}/item`, item_id: uid });
       } catch (e) {
-        if (!silent) console.error("Schulmanager:", e);
+        if (!silent) console.error(`${NAME}:`, e);
         return;
       }
       this._dialog = { type: "item", id: uid };
@@ -1018,7 +1021,7 @@
     _render() {
       let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
-      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Eltern Portal Manager startet noch …</div>` : `<div class="empty">${NAME}: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else html += this._agendaHtml();
       html += `</ha-card>`;
@@ -1169,7 +1172,7 @@
         this._render();
       } catch (err) {
         if (btn) btn.disabled = false;
-        alert(`Schulmanager: ${err && err.message ? err.message : err}`);
+        alert(`${NAME}: ${err && err.message ? err.message : err}`);
       }
     }
 
@@ -1216,7 +1219,7 @@
     _render() {
       let html = `<ha-card>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
-      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Schulmanager startet noch …</div>` : `<div class="empty">Schulmanager: ${esc(this._error)}</div>`;
+      if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Eltern Portal Manager startet noch …</div>` : `<div class="empty">${NAME}: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
       else if (!this._data.children.length) html += `<div class="empty">Keine Kinder gefunden.</div>`;
       else for (const c of this._data.children) html += this._planHtml(c);
@@ -1477,13 +1480,13 @@
         if (errs.length) meta.push(`<span class="err" title="${esc(errs.join("\n"))}">⚠️ ${errs.length} Fehler beim Abruf</span>`);
         if (d.version) {
           const url = `${d.repo_url || "https://github.com/FabusMingAI/ha-schulmanager"}/releases/tag/v${d.version}`;
-          meta.push(`<a href="${esc(url)}" target="_blank" rel="noopener" title="Schulmanager auf GitHub">v${esc(d.version)} ↗</a>`);
+          meta.push(`<a href="${esc(url)}" target="_blank" rel="noopener" title="${NAME} auf GitHub">v${esc(d.version)} ↗</a>`);
         }
       }
-      if (isAdmin && cfg.settings_path !== false) meta.push(`<a data-nav="${esc(cfg.settings_path || "/config/integrations/integration/schulmanager")}">⚙️ Einstellungen</a>`);
+      if (isAdmin && cfg.settings_path !== false) meta.push(`<a data-nav="${esc(cfg.settings_path || `/config/integrations/integration/${DOMAIN}`)}">⚙️ Einstellungen</a>`);
       const html = `<style>${HEADER_STYLE}</style><ha-card class="hd"><div class="top">
           ${cfg.icon ? `<img src="${esc(cfg.icon)}" alt="">` : ""}
-          <div class="tt"><div class="ttl">${esc(cfg.title || "Schulmanager")}</div>
+          <div class="tt"><div class="ttl">${esc(cfg.title || NAME)}</div>
             <div class="sub">${esc(cfg.subtitle || "")}${cfg.subtitle ? " · " : ""}Eltern-Portal, Aufgaben und Fristen</div></div>
           <div class="meta">${meta.join("")}</div>
         </div></ha-card>`;
@@ -1504,19 +1507,21 @@
       );
     }
   }
-  // 0.10.0 hieß die Karte „schulmanager-heute“ – Name bleibt für bestehende Dashboards gültig
+  // 0.10.0 hieß die Kopfzeile „…-heute“ – Name bleibt für bestehende Dashboards gültig
   class SchulmanagerHeuteCard extends SchulmanagerHeaderCard {}
 
-  const define = (tag, cls, name, description) => {
+  const define = (tag, cls, name, description, picker = true) => {
     if (customElements.get(tag)) return;
     customElements.define(tag, cls);
+    if (!picker) return;
     window.customCards = window.customCards || [];
     window.customCards.push({ type: tag, name, description, preview: false });
   };
-  define("schulmanager-card", SchulmanagerCard, "Schulmanager", "Aufgaben und Mitteilungen aus dem Eltern-Portal – klickbar mit Status, Kommentar und PDF.");
-  define("schulmanager-termine", SchulmanagerTermineCard, "Schulmanager: Termine", "Termine, Fristen und Vertretungen mit KI-Kurzbeschreibung und Legende.");
-  define("schulmanager-header", SchulmanagerHeaderCard, "Schulmanager: Kopfzeile", "Titel mit letztem Abruf aus dem Eltern-Portal, Version und Link zu den Einstellungen.");
-  if (!customElements.get("schulmanager-heute")) customElements.define("schulmanager-heute", SchulmanagerHeuteCard);
-  define("schulmanager-stundenplan", SchulmanagerStundenplanCard, "Schulmanager: Stundenplan", "Stundenplan mit Vertretungen und Ausfällen.");
-  console.info(`%c SCHULMANAGER-CARD %c ${VERSION} `, "background:#03a9f4;color:#fff", "");
+  const P = "eltern-portal-schulmanager";
+  define(`${P}-card`, SchulmanagerCard, NAME, "Aufgaben und Mitteilungen aus dem Eltern-Portal – klickbar mit Status, Kommentar und PDF.");
+  define(`${P}-termine`, SchulmanagerTermineCard, `${NAME}: Termine`, "Termine, Fristen und Vertretungen mit KI-Kurzbeschreibung und Legende.");
+  define(`${P}-header`, SchulmanagerHeaderCard, `${NAME}: Kopfzeile`, "Titel mit letztem Abruf aus dem Eltern-Portal, Version und Link zu den Einstellungen.");
+  define(`${P}-heute`, SchulmanagerHeuteCard, "", "", false);
+  define(`${P}-stundenplan`, SchulmanagerStundenplanCard, `${NAME}: Stundenplan`, "Stundenplan mit Vertretungen und Ausfällen.");
+  console.info(`%c ELTERN-PORTAL-SCHULMANAGER-CARD %c ${VERSION} `, "background:#03a9f4;color:#fff", "");
 })();

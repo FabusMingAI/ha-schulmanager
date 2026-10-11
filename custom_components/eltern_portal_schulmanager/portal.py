@@ -1,7 +1,7 @@
 """Zugriff auf das Eltern-Portal (eltern-portal.org).
 
 Baut auf der Bibliothek ``pyelternportal`` auf, ergänzt aber, was ein
-Schulmanager braucht und die Bibliothek nicht liefert:
+die Integration braucht und die Bibliothek nicht liefert:
 
 * stabile IDs für Nachrichten und Aushänge,
 * Download-Links von Elternbrief-PDFs und Nachrichten-Anhängen,
@@ -668,6 +668,37 @@ def substitution_kind(entry: dict[str, Any]) -> str:
     return "vertretung"
 
 
+# Spalten des Vertretungsplans. Je nach Schule zeigt das Portal 6 Spalten (mit „Fach“,
+# altes Fach durchgestrichen) oder 5 Spalten ohne „Fach“ (pyelternportal #7/#8).
+_DEFAULT_SUBST_COLUMNS = ("lesson", "teacher", "substitute", "subject", "room", "info")
+_SHORT_SUBST_COLUMNS = ("lesson", "teacher", "substitute", "room", "info")
+_SUBST_HEADERS = (
+    ("lesson", ("std", "stunde")),
+    ("teacher", ("betrifft", "lehrer", "lehrkraft")),
+    ("substitute", ("vertretung", "vertreter")),
+    ("subject", ("fach",)),
+    ("room", ("raum",)),
+    ("info", ("info", "bemerkung", "hinweis", "text")),
+)
+
+
+def _substitution_columns(row: Any) -> tuple[str, ...] | None:
+    """Spaltenzuordnung aus der Kopfzeile (``tr.vp_plan_head``)."""
+    cols: list[str] = []
+    for cell in row.find_all("td", recursive=False):
+        text = cell.get_text(" ", strip=True).lower().rstrip(".")
+        key = next(
+            (k for k, words in _SUBST_HEADERS if any(text.startswith(w) for w in words)),
+            None,
+        )
+        if key is None or key in cols:
+            return None
+        cols.append(key)
+    if not {"lesson", "room", "info"} <= set(cols):
+        return None
+    return tuple(cols)
+
+
 def parse_substitutions(html: str, parser: str = "html.parser") -> dict[str, Any]:
     """Vertretungsplan: {'available', 'stand', 'days': [{'date', 'entries'}]}."""
     soup = bs4.BeautifulSoup(html, parser)
@@ -689,28 +720,41 @@ def parse_substitutions(html: str, parser: str = "html.parser") -> dict[str, Any
             continue
         if tag.name != "table" or day is None:
             continue
+        cols = _DEFAULT_SUBST_COLUMNS
         for row in tag.select("tr"):
             if "vp_plan_head" in (row.get("class") or []):
+                cols = _substitution_columns(row) or cols
                 continue
             cells = row.find_all("td", recursive=False)
-            if len(cells) < 6:
-                continue
-            old = [
-                s.get_text(strip=True)
-                for s in cells[3].select("span[style*='line-through']")
-            ]
-            for span in cells[3].select("span[style*='line-through']"):
-                span.decompose()
+            if len(cells) < 5:
+                continue  # z. B. "Keine Vertretungen für …" (eine Zelle)
+            if len(cols) != len(cells):
+                cols = _DEFAULT_SUBST_COLUMNS if len(cells) >= 6 else _SHORT_SUBST_COLUMNS
+            cell = dict(zip(cols, cells))
+            subject_cell = cell.get("subject")
+            old: list[str] = []
+            if subject_cell is not None:
+                old = [
+                    sp.get_text(strip=True)
+                    for sp in subject_cell.select("span[style*='line-through']")
+                ]
+                for span in subject_cell.select("span[style*='line-through']"):
+                    span.decompose()
+
+            def _text(key: str, sep: str = "") -> str:
+                c = cell.get(key)
+                return c.get_text(sep, strip=True) if c is not None else ""
+
             entry = {
                 "lesson": re.sub(
-                    r"\.(?=\s*[-–])", "", cells[0].get_text(strip=True)
+                    r"\.(?=\s*[-–])", "", _text("lesson")
                 ).removesuffix("."),
-                "teacher": cells[1].get_text(strip=True),
-                "substitute": cells[2].get_text(strip=True),
-                "subject": cells[3].get_text(" ", strip=True),
+                "teacher": _text("teacher"),
+                "substitute": _text("substitute"),
+                "subject": _text("subject", " "),
                 "old_subject": " ".join(o for o in old if o) or None,
-                "room": cells[4].get_text(strip=True),
-                "info": cells[5].get_text(" ", strip=True),
+                "room": _text("room"),
+                "info": _text("info", " "),
             }
             if entry["old_subject"] == entry["subject"]:
                 entry["old_subject"] = None

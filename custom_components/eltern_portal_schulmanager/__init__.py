@@ -1,4 +1,8 @@
-"""Schulmanager – Eltern-Portal-Mitteilungen, Aufgaben und Fristen in Home Assistant."""
+"""Eltern Portal Manager Bavaria – Eltern-Portal-Mitteilungen, Aufgaben und Fristen in Home Assistant.
+
+Bis 0.13 hieß die Integration „Schulmanager“ (Domain ``schulmanager``); die Übernahme
+bestehender Installationen steht in ``migration.py``.
+"""
 
 from __future__ import annotations
 
@@ -27,8 +31,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.typing import ConfigType
 
-from . import dashboard, ics, websocket
+from . import dashboard, ics, migration, websocket
 from .const import (
+    CARD_FILE,
     CARD_URL,
     DOMAIN,
     LOCAL_CARD_FILE,
@@ -37,6 +42,7 @@ from .const import (
     ICS_LINK_VALIDITY,
     ICS_URL_BASE,
     LOGGER,
+    NAME,
     PLATFORMS,
     SIGNAL_UPDATED,
     TASK_STATUSES,
@@ -56,7 +62,7 @@ ATTR_CHILD = "child"
 def get_manager(hass: HomeAssistant) -> SchulManager:
     for entry in hass.config_entries.async_loaded_entries(DOMAIN):
         return entry.runtime_data
-    raise HomeAssistantError("Schulmanager ist nicht eingerichtet")
+    raise HomeAssistantError(f"{NAME} ist nicht eingerichtet")
 
 
 def file_url(hass: HomeAssistant, uid: str, index: int) -> str:
@@ -92,7 +98,7 @@ class SchulIcsView(HomeAssistantView):
     """Ein einzelner Termin als .ics – nur mit Anmeldung oder signiertem Link."""
 
     url = ICS_URL_BASE + "/{child}/{uid}"
-    name = "api:schulmanager:ics"
+    name = f"api:{DOMAIN}:ics"
     requires_auth = True
 
     async def get(self, request: web.Request, child: str, uid: str) -> web.StreamResponse:
@@ -124,7 +130,7 @@ class SchulFileView(HomeAssistantView):
     """Liefert abgelegte Anhänge aus – nur mit Anmeldung oder signiertem Link."""
 
     url = FILE_URL_BASE + "/{uid}/{index}"
-    name = "api:schulmanager:datei"
+    name = f"api:{DOMAIN}:datei"
     requires_auth = True
 
     async def get(self, request: web.Request, uid: str, index: str) -> web.StreamResponse:
@@ -154,18 +160,19 @@ class SchulFileView(HomeAssistantView):
 def _card_path() -> str:
     """Karte als .js oder – z.B. nach Versand per E-Mail – als .txt."""
     www = os.path.join(os.path.dirname(__file__), "www")
-    for name in ("schulmanager-card.js", "schulmanager-card.txt"):
+    stem = CARD_FILE.removesuffix(".js")
+    for name in (CARD_FILE, f"{stem}.txt"):
         path = os.path.join(www, name)
         if os.path.isfile(path):
             return path
-    raise FileNotFoundError("www/schulmanager-card.js fehlt")
+    raise FileNotFoundError(f"www/{CARD_FILE} fehlt")
 
 
 class SchulCardView(HomeAssistantView):
     """Liefert die Dashboard-Karte aus (reiner Oberflächen-Code, ohne Daten)."""
 
     url = CARD_URL
-    name = "schulmanager:karte"
+    name = f"{DOMAIN}:karte"
     requires_auth = False
 
     def __init__(self, path: str) -> None:
@@ -205,18 +212,18 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 def _publish_card(hass: HomeAssistant, card: str) -> str | None:
-    """Karte nach /config/www/schulmanager kopieren und Versions-Hash liefern.
+    """Karte nach /config/www/eltern_portal_schulmanager kopieren und Versions-Hash liefern.
 
     /local wird von Home Assistant ab der ersten Sekunde ausgeliefert. So ist die
     Karte auch dann ladbar, wenn ein Client die Seite öffnet, während Home
-    Assistant noch startet und der Schulmanager noch nicht eingerichtet ist.
+    Assistant noch startet und die Integration noch nicht eingerichtet ist.
     """
     www = hass.config.path("www")
     if not os.path.isdir(www):
         return None  # /local ist ohne www-Ordner beim Start nicht registriert
     with open(card, "rb") as fh:
         data = fh.read()
-    target_dir = os.path.join(www, "schulmanager")
+    target_dir = os.path.join(www, DOMAIN)
     os.makedirs(target_dir, exist_ok=True)
     target = os.path.join(target_dir, LOCAL_CARD_FILE)
     try:
@@ -271,12 +278,16 @@ async def _async_register_resource(hass: HomeAssistant, card: str) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SchulConfigEntry) -> bool:
+    if entry.data.get(migration.CONF_MIGRATED_FROM):
+        # Übernahme einer „Schulmanager“-Einrichtung (bis 0.13) – vor den Entitäten
+        await migration.async_migrate(hass, entry)
+    migration.async_watch_legacy_references(hass, entry)
     manager = SchulManager(hass, entry)
     await manager.async_load()
     if manager.children:
         # Daten vorhanden: Start nicht blockieren, Portale im Hintergrund abrufen
         entry.async_create_background_task(
-            hass, manager.async_refresh(), "schulmanager_start_abruf"
+            hass, manager.async_refresh(), f"{DOMAIN}_start_abruf"
         )
     else:
         await manager.async_refresh(initial=True)
@@ -301,12 +312,12 @@ def _setup_dashboard(hass: HomeAssistant, entry: SchulConfigEntry, manager: Schu
     @callback
     def _updated() -> None:
         if set(manager.children) != known:
-            entry.async_create_background_task(hass, _apply(), "schulmanager_dashboard")
+            entry.async_create_background_task(hass, _apply(), f"{DOMAIN}_dashboard")
 
     entry.async_on_unload(
         async_dispatcher_connect(hass, f"{SIGNAL_UPDATED}_{entry.entry_id}", _updated)
     )
-    entry.async_create_background_task(hass, _apply(), "schulmanager_dashboard")
+    entry.async_create_background_task(hass, _apply(), f"{DOMAIN}_dashboard")
 
 
 async def _async_reload(hass: HomeAssistant, entry: SchulConfigEntry) -> None:
@@ -514,4 +525,4 @@ def _register_services(hass: HomeAssistant) -> None:
         schema=vol.Schema({vol.Optional(ATTR_CHILD): cv.string}),
         supports_response=SupportsResponse.ONLY,
     )
-    LOGGER.debug("Schulmanager-Aktionen registriert")
+    LOGGER.debug("Aktionen von %s registriert", DOMAIN)

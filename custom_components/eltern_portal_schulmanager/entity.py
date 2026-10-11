@@ -1,4 +1,4 @@
-"""Gemeinsame Basis der Schulmanager-Entitäten."""
+"""Gemeinsame Basis der Entitäten von „Eltern Portal Manager Bavaria“."""
 
 from __future__ import annotations
 

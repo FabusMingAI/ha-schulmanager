@@ -1,4 +1,4 @@
-"""Einrichtung des Schulmanagers in der Home-Assistant-Oberfläche."""
+"""Einrichtung von „Eltern Portal Manager Bavaria“ in der Home-Assistant-Oberfläche."""
 
 from __future__ import annotations
 
@@ -19,7 +19,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
 
+from .migration import CONF_MIGRATED_FROM, legacy_entries
 from .const import (
+    NAME,
     CONF_AI_ENTITY,
     CONF_ANALYZE_DAYS,
     CONF_AUTO_DOWNLOAD,
@@ -130,6 +132,8 @@ class SchulmanagerConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
+        if not self._portals and legacy_entries(self.hass):
+            return await self.async_step_migrate()
         errors: dict[str, str] = {}
         if user_input is not None:
             school = school_from_input(user_input[CONF_SCHOOL])
@@ -150,6 +154,31 @@ class SchulmanagerConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_migrate(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Bestehende Einrichtung von „Schulmanager“ (bis 0.13) übernehmen."""
+        old = legacy_entries(self.hass)
+        if not old:
+            return await self.async_step_user()
+        legacy = old[0]
+        if user_input is not None:
+            return self.async_create_entry(
+                title=NAME,
+                data={**legacy.data, CONF_MIGRATED_FROM: legacy.entry_id},
+                options=dict(legacy.options),
+            )
+        return self.async_show_form(
+            step_id="migrate",
+            description_placeholders={
+                "schools": ", ".join(
+                    p.get(CONF_SCHOOL_NAME) or p.get(CONF_SCHOOL, "?")
+                    for p in legacy.data.get(CONF_PORTALS, [])
+                ),
+                "title": legacy.title,
+            },
+        )
+
     async def async_step_more(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="more",
@@ -161,7 +190,7 @@ class SchulmanagerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_finish(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_create_entry(
-            title="Schulmanager",
+            title=NAME,
             data={CONF_PORTALS: self._portals},
             options={},
         )

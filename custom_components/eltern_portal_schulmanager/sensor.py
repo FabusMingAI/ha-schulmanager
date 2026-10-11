@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 from . import SchulConfigEntry, file_url
 from .analyzer import fmt_eur
 from .const import (
+    NAME,
     AMPEL_GREEN,
     AMPEL_RED,
     AMPEL_YELLOW,
@@ -364,7 +365,7 @@ class SchulUpdateSensor(SensorEntity):
         self._attr_unique_id = f"{manager.entry.entry_id}_letzter_abruf"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, manager.entry.entry_id)},
-            "name": "Schulmanager",
+            "name": NAME,
             "manufacturer": "Eltern-Portal",
             "entry_type": DeviceEntryType.SERVICE,
         }

@@ -1,6 +1,8 @@
 {
-  "name": "Schulmanager (Eltern-Portal)",
+  "name": "Eltern Portal Manager Bavaria",
   "homeassistant": "2025.8.0",
-  "country": ["DE"],
+  "country": [
+    "DE"
+  ],
   "render_readme": true
 }

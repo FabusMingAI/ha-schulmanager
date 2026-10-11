@@ -1,4 +1,4 @@
-"""WebSocket-API für die Schulmanager-Karte im Dashboard."""
+"""WebSocket-API für die Karten von „Eltern Portal Manager Bavaria“ im Dashboard."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from .analyzer import fmt_eur
 from .const import (
+    NAME,
     DOMAIN,
     EVENT_CATEGORIES,
     TASK_TYPE_ICONS as _ICONS,
@@ -182,13 +183,13 @@ def _item_full(hass: HomeAssistant, m, i: dict[str, Any]) -> dict[str, Any]:
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): "schulmanager/data", vol.Optional("child"): str}
+    {vol.Required("type"): f"{DOMAIN}/data", vol.Optional("child"): str}
 )
 @callback
 def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     m = _manager(hass)
     if m is None:
-        connection.send_error(msg["id"], "not_loaded", "Schulmanager ist nicht geladen")
+        connection.send_error(msg["id"], "not_loaded", f"{NAME} ist nicht geladen")
         return
     today = dt_util.now().date()
     children = []
@@ -259,7 +260,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): "schulmanager/item", vol.Required("item_id"): str}
+    {vol.Required("type"): f"{DOMAIN}/item", vol.Required("item_id"): str}
 )
 @callback
 def ws_item(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
@@ -272,7 +273,7 @@ def ws_item(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): "schulmanager/task", vol.Required("task_id"): str}
+    {vol.Required("type"): f"{DOMAIN}/task", vol.Required("task_id"): str}
 )
 @callback
 def ws_task(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
@@ -303,7 +304,7 @@ def ws_task(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "schulmanager/event_links",
+        vol.Required("type"): f"{DOMAIN}/event_links",
         vol.Required("child"): str,
         vol.Required("event_id"): str,
     }
@@ -321,12 +322,12 @@ def ws_event_links(hass: HomeAssistant, connection: websocket_api.ActiveConnecti
     connection.send_result(msg["id"], links)
 
 
-@websocket_api.websocket_command({vol.Required("type"): "schulmanager/subscribe"})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/subscribe"})
 @callback
 def ws_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     m = _manager(hass)
     if m is None:
-        connection.send_error(msg["id"], "not_loaded", "Schulmanager ist nicht geladen")
+        connection.send_error(msg["id"], "not_loaded", f"{NAME} ist nicht geladen")
         return
 
     @callback

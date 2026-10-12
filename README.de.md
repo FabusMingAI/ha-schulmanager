@@ -10,7 +10,7 @@
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
 
 > [!IMPORTANT]
-> **Früher „Schulmanager“.** Bis Version 0.13 hieß diese Integration *Schulmanager* und nutzte die Domain `schulmanager`. Dieselbe Domain nutzt **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – eine andere Integration für Schulen mit *schulmanager-online.de* –, deshalb ließen sich beide nicht gleichzeitig installieren. Seit 0.14 heißt diese Integration **Eltern Portal Manager Bavaria** (Domain `eltern_portal_schulmanager`), und beide laufen nebeneinander, z. B. ein Kind an einer Schule mit Eltern-Portal und eines an einer Schule mit Schulmanager Online. Update von 0.13 oder älter? Siehe [Umbenannt: früher Schulmanager](#umbenannt-früher-schulmanager) – ein Klick übernimmt die bestehende Einrichtung.
+> **Früher „Schulmanager“.** Bis Version 0.13 hieß diese Integration *Schulmanager* und nutzte die Domain `schulmanager`. Dieselbe Domain nutzt **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – eine andere Integration für Schulen mit *schulmanager-online.de* –, deshalb ließen sich beide nicht gleichzeitig installieren. Seit 0.14 heißt diese Integration **Eltern Portal Manager Bavaria** (Domain `eltern_portal_schulmanager`), und beide laufen nebeneinander, z. B. ein Kind an einer Schule mit Eltern-Portal und eines an einer Schule mit Schulmanager Online. Update von 0.13 oder älter? Siehe [Umbenannt: früher Schulmanager](#umbenannt-früher-schulmanager) – ab 0.14.1 wird die bestehende Einrichtung automatisch übernommen.
 
 ## Was passiert automatisch
 
@@ -101,11 +101,16 @@ Den Ordner `custom_components/eltern_portal_schulmanager` nach `/config/custom_c
 
 ## Umbenannt: früher Schulmanager
 
-Bestehende Installationen werden vollständig übernommen: Zugangsdaten, Einstellungen, Aufgaben, Mitteilungen mit Status und Kommentaren, das Archiv, KI-Zusammenfassungen, abgelegte Dateien, Entity-IDs und deren Verlauf. Home Assistant kann eine Einrichtung nicht selbst in eine neue Domain verschieben, deshalb braucht es nach dem Update einen Klick:
+Bestehende Installationen werden vollständig übernommen: Zugangsdaten, Einstellungen, Aufgaben, Mitteilungen mit Status und Kommentaren, das Archiv, KI-Zusammenfassungen, abgelegte Dateien, Entity-IDs und deren Verlauf.
 
-1. **In HACS aktualisieren** wie gewohnt (das Update heißt jetzt *Eltern Portal Manager Bavaria* 0.14.0) und Home Assistant neu starten. Bis zum nächsten Schritt läuft die alte Einrichtung unverändert weiter.
-2. **Einstellungen → Geräte & Dienste → Integration hinzufügen → Eltern Portal Manager Bavaria** (oder [diesen Link](https://my.home-assistant.io/redirect/config_flow_start/?domain=eltern_portal_schulmanager) öffnen). Die Einrichtung findet die alte und bietet **Übernehmen** an – Passwörter müssen nicht neu eingegeben werden.
-3. **Home Assistant noch einmal neu starten.** Eine Benachrichtigung bestätigt die Übernahme.
+**Ab 0.14.1 passiert das automatisch.** Einfach das Update installieren, das HACS (bzw. *Einstellungen → Updates*) anbietet, und Home Assistant neu starten. Version 0.14.1 kommt noch einmal unter dem alten Namen *Schulmanager*, installiert *Eltern Portal Manager Bavaria* und übernimmt die Einrichtung von selbst. Eine Benachrichtigung bestätigt das – danach **Home Assistant noch einmal neu starten**. Fertig.
+
+> **Zusätzlich [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) im Einsatz?** Er nutzt denselben Ordner `custom_components/schulmanager`. Wer schon mit 0.14.0 von Hand übernommen *und* danach Schulmanager Online installiert hat, überspringt das Update auf 0.14.1 und wartet auf 0.14.2 – sonst würde HACS 0.14.1 in den Ordner von Schulmanager Online installieren.
+
+Klappt die automatische Übernahme nicht, steht unter *Einstellungen → Reparaturen* **„Schulmanager konnte nicht zu Eltern Portal Manager Bavaria umziehen“**. Einmal neu starten; bleibt der Hinweis, von Hand übernehmen:
+
+1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → Eltern Portal Manager Bavaria** (oder [diesen Link](https://my.home-assistant.io/redirect/config_flow_start/?domain=eltern_portal_schulmanager) öffnen). Die Einrichtung findet die alte und bietet **Übernehmen** an – Passwörter müssen nicht neu eingegeben werden.
+2. **Home Assistant noch einmal neu starten.** Eine Benachrichtigung bestätigt die Übernahme.
 
 [![Integration hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=eltern_portal_schulmanager)
 

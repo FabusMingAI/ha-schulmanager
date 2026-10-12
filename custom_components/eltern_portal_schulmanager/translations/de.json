@@ -41,7 +41,8 @@
     },
     "abort": {
       "already_configured": "Eltern Portal Manager Bavaria ist bereits eingerichtet. Weitere Schulen fügst du über „Konfigurieren“ hinzu.",
-      "reauth_successful": "Anmeldung aktualisiert."
+      "reauth_successful": "Anmeldung aktualisiert.",
+      "no_legacy_entry": "Es wurde keine bestehende Schulmanager-Einrichtung zum Übernehmen gefunden."
     }
   },
   "options": {

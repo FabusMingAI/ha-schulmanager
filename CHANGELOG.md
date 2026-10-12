@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1 – unreleased (bridge release)
+
+- **Existing setups are now taken over automatically.** With 0.14.0, HACS installed the renamed integration next to the old folder, but Home Assistant kept running the old 0.13 code and nothing told users to click *Take over* – they stayed on 0.13 without noticing. 0.14.1 is released once more under the old domain `schulmanager`: HACS installs it over 0.13 as a normal update, it installs *Eltern Portal Manager Bavaria*, starts the takeover by itself and asks for one more restart. Entries of Schulmanager Online are never touched. If the automatic takeover fails, a repair notice explains the manual way. / **Bestehende Einrichtungen werden jetzt automatisch übernommen.** Mit 0.14.0 lief nach dem Update unbemerkt weiter 0.13. 0.14.1 kommt noch einmal unter der alten Domain, installiert Eltern Portal Manager Bavaria und übernimmt die Einrichtung selbst; danach einmal neu starten.
+- Adding *Schulmanager* during this period installs *Eltern Portal Manager Bavaria* and points to it. / Wer jetzt „Schulmanager“ hinzufügt, bekommt Eltern Portal Manager Bavaria installiert und den Hinweis darauf.
+- A leftover `custom_components/schulmanager` of this project is removed at startup once no old setup is left, so it never stands in the way of Schulmanager Online. / Ein übrig gebliebener Ordner `custom_components/schulmanager` dieses Projekts wird beim Start entfernt.
+- **Note for users of Schulmanager Online:** if you already took over by hand with 0.14.0 and installed Schulmanager Online afterwards, skip 0.14.1 and wait for 0.14.2 (same folder). / **Hinweis für Nutzer von Schulmanager Online:** wer schon von Hand übernommen und danach Schulmanager Online installiert hat, überspringt 0.14.1.
+
 ## 0.14.0 – 2026-10-11
 
 - **Renamed: Schulmanager is now "Eltern Portal Manager Bavaria"** (domain `eltern_portal_schulmanager`). The old domain `schulmanager` is also used by [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant), so the two could not be installed side by side; now they can. Closes #18. / **Umbenannt: Der Schulmanager heißt jetzt „Eltern Portal Manager Bavaria“** (Domain `eltern_portal_schulmanager`) und lässt sich neben Schulmanager Online installieren.

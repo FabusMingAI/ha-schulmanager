@@ -1,0 +1,14 @@
+{
+  "config": {
+    "abort": {
+      "moved": "Der Schulmanager heißt jetzt **{new_name}** und wurde bereits installiert. Bitte stattdessen **{new_name}** hinzufügen (Einstellungen → Geräte & Dienste → Integration hinzufügen). Steht er noch nicht in der Liste, Home Assistant einmal neu starten.",
+      "install_failed": "{new_name} ließ sich nicht automatisch installieren. Bitte das Log prüfen oder ihn über HACS installieren."
+    }
+  },
+  "issues": {
+    "handover_failed": {
+      "title": "Schulmanager konnte nicht zu {new_name} umziehen",
+      "description": "Der Schulmanager heißt jetzt **{new_name}**. Der automatische Umzug deiner Einrichtung ist fehlgeschlagen: `{error}`\n\nBitte Home Assistant einmal neu starten. Steht dieser Hinweis danach noch da: *Einstellungen → Geräte & Dienste → Integration hinzufügen → {new_name}* und **Übernehmen** klicken – Einstellungen, Aufgaben, Mitteilungen und Verlauf bleiben erhalten."
+    }
+  }
+}

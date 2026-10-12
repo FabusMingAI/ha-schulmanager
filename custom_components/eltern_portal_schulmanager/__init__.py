@@ -201,6 +201,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(SchulCardView(card))
     websocket.async_register(hass)
     _register_services(hass)
+    if await migration.async_remove_leftover_bridge(hass):
+        LOGGER.info("Übrig gebliebene Brücken-Version „schulmanager“ entfernt")
     if not await _async_register_resource(hass, card):
         # Fallback (z. B. Dashboards im YAML-Modus): Karte als Zusatzmodul laden
         version = str(int(await hass.async_add_executor_job(os.path.getmtime, card)))

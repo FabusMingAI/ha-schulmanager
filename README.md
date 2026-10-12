@@ -17,7 +17,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
 
 > [!IMPORTANT]
-> **Formerly "Schulmanager".** Up to version 0.13 this integration was called *Schulmanager* and used the domain `schulmanager`. The same domain is used by **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – a different integration for schools that use *schulmanager-online.de* – so the two could not be installed side by side. Since 0.14 this integration is **Eltern Portal Manager Bavaria** (domain `eltern_portal_schulmanager`) and both work together, e.g. one child at an Eltern-Portal school and the other at a Schulmanager Online school. Updating from 0.13 or older? See [Renamed from Schulmanager](#renamed-from-schulmanager) – one click takes over your existing setup.
+> **Formerly "Schulmanager".** Up to version 0.13 this integration was called *Schulmanager* and used the domain `schulmanager`. The same domain is used by **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – a different integration for schools that use *schulmanager-online.de* – so the two could not be installed side by side. Since 0.14 this integration is **Eltern Portal Manager Bavaria** (domain `eltern_portal_schulmanager`) and both work together, e.g. one child at an Eltern-Portal school and the other at a Schulmanager Online school. Updating from 0.13 or older? See [Renamed from Schulmanager](#renamed-from-schulmanager) – from 0.14.1 your existing setup is taken over automatically.
 
 ## Features
 
@@ -108,11 +108,16 @@ Copy `custom_components/eltern_portal_schulmanager` to `/config/custom_component
 
 ## Renamed from Schulmanager
 
-Existing installations are taken over completely: credentials, settings, tasks, messages with status and comments, the archive, AI summaries, stored files, entity IDs and their history. Home Assistant cannot move a setup to a new domain by itself, so it takes one click after the update:
+Existing installations are taken over completely: credentials, settings, tasks, messages with status and comments, the archive, AI summaries, stored files, entity IDs and their history.
 
-1. **Update in HACS** as usual (the update is now called *Eltern Portal Manager Bavaria* 0.14.0) and restart Home Assistant. Until the next step your old setup keeps running unchanged.
-2. **Settings → Devices & services → Add integration → Eltern Portal Manager Bavaria** (or open [this link](https://my.home-assistant.io/redirect/config_flow_start/?domain=eltern_portal_schulmanager)). It finds the old setup and offers **Take over** – no need to enter passwords again.
-3. **Restart Home Assistant** once more. A notification confirms the takeover.
+**From 0.14.1 this happens automatically.** Just install the update offered in HACS (or under *Settings → Updates*) as usual and restart Home Assistant. Version 0.14.1 arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
+
+> **Using [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) as well?** It uses the same folder `custom_components/schulmanager`. If you already took over by hand with 0.14.0 *and* installed Schulmanager Online afterwards, skip the update to 0.14.1 and wait for 0.14.2 – otherwise HACS would install 0.14.1 into Schulmanager Online's folder.
+
+If the automatic takeover fails, *Settings → Repairs* shows **"Schulmanager could not be moved to Eltern Portal Manager Bavaria"**. Restart once; if the notice stays, take over by hand:
+
+1. **Settings → Devices & services → Add integration → Eltern Portal Manager Bavaria** (or open [this link](https://my.home-assistant.io/redirect/config_flow_start/?domain=eltern_portal_schulmanager)). It finds the old setup and offers **Take over** – no need to enter passwords again.
+2. **Restart Home Assistant** once more. A notification confirms the takeover.
 
 [![Add integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=eltern_portal_schulmanager)
 

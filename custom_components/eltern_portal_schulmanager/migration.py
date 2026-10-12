@@ -345,6 +345,18 @@ def _remove_legacy_folder(hass: HomeAssistant) -> bool:
     return True
 
 
+async def async_remove_leftover_bridge(hass: HomeAssistant) -> bool:
+    """Übrig gebliebenen Ordner der Brücken-Version (0.14.1, Domain ``schulmanager``) entfernen.
+
+    HACS installiert die Brücke auch dort, wo die Übernahme schon erledigt ist. Solange
+    keine eigene alte Einrichtung mehr existiert, wird der Ordner nicht mehr gebraucht –
+    und er würde „Schulmanager Online“ im Weg stehen. Fremde Ordner bleiben unangetastet.
+    """
+    if legacy_entries(hass):
+        return False
+    return await hass.async_add_executor_job(_remove_legacy_folder, hass)
+
+
 # ----------------------------------------------------------------------
 # Reparatur-Hinweis: Automationen und Skripte mit alten Namen
 # ----------------------------------------------------------------------

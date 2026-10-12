@@ -41,7 +41,8 @@
     },
     "abort": {
       "already_configured": "Eltern Portal Manager Bavaria is already set up. Add more schools via “Configure”.",
-      "reauth_successful": "Credentials updated."
+      "reauth_successful": "Credentials updated.",
+      "no_legacy_entry": "No existing Schulmanager setup was found to take over."
     }
   },
   "options": {

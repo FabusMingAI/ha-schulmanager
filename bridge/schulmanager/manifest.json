@@ -1,0 +1,14 @@
+{
+  "domain": "schulmanager",
+  "name": "Schulmanager → Eltern Portal Manager Bavaria",
+  "codeowners": [
+    "@FabusMingAI"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/FabusMingAI/ha-schulmanager",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/FabusMingAI/ha-schulmanager/issues",
+  "requirements": [],
+  "version": "0.14.1"
+}

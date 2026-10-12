@@ -179,6 +179,21 @@ class SchulmanagerConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+        """Automatic takeover started by the bridge release (0.14.1, old domain)."""
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
+        old_id = import_data.get(CONF_MIGRATED_FROM)
+        legacy = next((e for e in legacy_entries(self.hass) if e.entry_id == old_id), None)
+        if legacy is None:
+            return self.async_abort(reason="no_legacy_entry")
+        LOGGER.info("Automatische Übernahme von „%s“ (%s)", legacy.title, legacy.entry_id)
+        return self.async_create_entry(
+            title=NAME,
+            data={**legacy.data, CONF_MIGRATED_FROM: legacy.entry_id},
+            options=dict(legacy.options),
+        )
+
     async def async_step_more(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="more",

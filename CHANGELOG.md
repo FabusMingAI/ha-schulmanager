@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.14.1 – unreleased (bridge release)
+## 0.14.1 – 2026-10-12 (bridge release)
 
 - **Existing setups are now taken over automatically.** With 0.14.0, HACS installed the renamed integration next to the old folder, but Home Assistant kept running the old 0.13 code and nothing told users to click *Take over* – they stayed on 0.13 without noticing. 0.14.1 is released once more under the old domain `schulmanager`: HACS installs it over 0.13 as a normal update, it installs *Eltern Portal Manager Bavaria*, starts the takeover by itself and asks for one more restart. Entries of Schulmanager Online are never touched. If the automatic takeover fails, a repair notice explains the manual way. / **Bestehende Einrichtungen werden jetzt automatisch übernommen.** Mit 0.14.0 lief nach dem Update unbemerkt weiter 0.13. 0.14.1 kommt noch einmal unter der alten Domain, installiert Eltern Portal Manager Bavaria und übernimmt die Einrichtung selbst; danach einmal neu starten.
 - Adding *Schulmanager* during this period installs *Eltern Portal Manager Bavaria* and points to it. / Wer jetzt „Schulmanager“ hinzufügt, bekommt Eltern Portal Manager Bavaria installiert und den Hinweis darauf.

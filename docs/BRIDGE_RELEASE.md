@@ -7,6 +7,10 @@ so the tag must contain only `custom_components/schulmanager` (bridge + payload)
 
 ## Steps
 
+**Easiest:** GitHub → *Actions* → **Bridge release** → **Run workflow**. It runs the tests on `main`, builds the bridge branch, pushes the tag and publishes the release with the notes from the CHANGELOG. Pushes made by the workflow do not trigger the other workflows, so there is no red test run on the bridge branch.
+
+By hand:
+
 ```bash
 git checkout main && git pull
 pytest -q                                   # incl. tests/test_bridge.py

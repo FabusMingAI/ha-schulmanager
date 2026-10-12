@@ -1,0 +1,14 @@
+{
+  "config": {
+    "abort": {
+      "moved": "Schulmanager is now called **{new_name}**. It has been installed – please add **{new_name}** instead (Settings → Devices & services → Add integration). If it is not listed yet, restart Home Assistant once.",
+      "install_failed": "{new_name} could not be installed automatically. Please check the log, or install it via HACS."
+    }
+  },
+  "issues": {
+    "handover_failed": {
+      "title": "Schulmanager could not be moved to {new_name}",
+      "description": "Schulmanager is now called **{new_name}**. Moving your setup automatically failed: `{error}`\n\nPlease restart Home Assistant once. If this notice is still shown, go to *Settings → Devices & services → Add integration → {new_name}* and click **Take over** – your settings, tasks, messages and history are kept."
+    }
+  }
+}

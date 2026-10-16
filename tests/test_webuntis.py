@@ -1,7 +1,12 @@
 """Regression tests for WebUntis examples from issue #17."""
 
 import json
-from custom_components.eltern_portal_schulmanager.webuntis import parse_webuntis_event
+from pathlib import Path
+
+from custom_components.eltern_portal_schulmanager.webuntis import (
+    parse_webuntis_event,
+    parse_webuntis_events,
+)
 
 
 def event(**fields):
@@ -42,3 +47,24 @@ def test_missing_current_teacher_is_not_automatically_cancelled():
 
 def test_invalid_description_ignored():
     assert parse_webuntis_event({"description": "not JSON"}) is None
+
+
+def test_fixture_batch_preserves_changes_and_ignores_ambiguous_lessons():
+    """Exercise a synthetic calendar response without school accounts or network."""
+    events = json.loads(
+        (Path(__file__).parent / "fixtures" / "webuntis" / "events.json").read_text()
+    )
+    parsed = parse_webuntis_events(events)
+    assert [(entry["uid"], entry["kind"]) for entry in parsed] == [
+        ("webuntis:102", "entfall"),
+        ("webuntis:103", "vertretung"),
+        ("webuntis:104", "raum"),
+    ]
+    substitution = parsed[1]
+    assert substitution["start"] == "2026-10-16T10:00:00+02:00"
+    assert substitution["end"] == "2026-10-16T10:45:00+02:00"
+    assert substitution["teacher"] == "DEMO-C"
+    assert substitution["original_teacher"] == "DEMO-D"
+    assert substitution["room"] == "201"
+    assert substitution["original_room"] == "202"
+    assert substitution["source"] == "webuntis"

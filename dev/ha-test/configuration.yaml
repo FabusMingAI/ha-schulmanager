@@ -1,0 +1,11 @@
+homeassistant:
+  name: WebUntis isolated test
+  time_zone: Europe/Berlin
+frontend:
+config:
+api:
+http:
+logger:
+  default: warning
+  logs:
+    custom_components.eltern_portal_schulmanager: debug

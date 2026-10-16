@@ -1,0 +1,33 @@
+[
+  {
+    "start": "2026-10-16T08:00:00+02:00",
+    "end": "2026-10-16T08:45:00+02:00",
+    "summary": "Mathematik",
+    "description": "{\"id\": 101, \"subjects\": [{\"name\": \"M\"}], \"teachers\": [{\"name\": \"DEMO-A\"}], \"rooms\": [{\"name\": \"101\"}]}"
+  },
+  {
+    "start": "2026-10-16T09:00:00+02:00",
+    "end": "2026-10-16T09:45:00+02:00",
+    "summary": "Cancelled: Englisch",
+    "description": "{\"id\": 102, \"code\": \"cancelled\", \"subjects\": [{\"name\": \"E\"}], \"original_teachers\": [{\"name\": \"DEMO-B\"}], \"rooms\": []}"
+  },
+  {
+    "start": "2026-10-16T10:00:00+02:00",
+    "end": "2026-10-16T10:45:00+02:00",
+    "summary": "Biologie",
+    "description": "{\"id\": 103, \"subjects\": [{\"name\": \"B\"}], \"teachers\": [{\"name\": \"DEMO-C\"}], \"original_teachers\": [{\"name\": \"DEMO-D\"}], \"rooms\": [{\"name\": \"201\"}], \"original_rooms\": [{\"name\": \"202\"}], \"substText\": \"Demodaten: Vertretung und Raumwechsel\"}"
+  },
+  {
+    "start": "2026-10-16T11:00:00+02:00",
+    "end": "2026-10-16T11:45:00+02:00",
+    "summary": "Kunst",
+    "description": "{\"id\": 104, \"subjects\": [{\"name\": \"Ku\"}], \"teachers\": [{\"name\": \"DEMO-E\"}], \"rooms\": [{\"name\": \"301\"}], \"original_rooms\": [{\"name\": \"302\"}]}"
+  },
+  {
+    "start": "2026-10-16T12:00:00+02:00",
+    "end": "2026-10-16T12:45:00+02:00",
+    "summary": "Sport",
+    "description": "{\"id\": 105, \"subjects\": [{\"name\": \"S\"}], \"original_teachers\": [{\"name\": \"DEMO-F\"}]}"
+  },
+  {"summary": "Invalid example", "description": "not JSON"}
+]

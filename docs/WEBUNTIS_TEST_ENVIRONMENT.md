@@ -67,7 +67,7 @@ failures, not evidence that the WebUntis parser worked or failed.
 ## Set up a dedicated configuration
 
 Set `HA_TEST_DIR` to a dedicated directory outside the repository. For a new
-environment, create `config/custom_components` and `logs` there, copy
+environment, create `config/custom_components`, `config/www` and `logs` there, copy
 `dev/ha-test/configuration.yaml` into `config/configuration.yaml`, and copy
 `custom_components/eltern_portal_schulmanager` into
 `config/custom_components/eltern_portal_schulmanager`. Do not copy any production
@@ -185,3 +185,8 @@ change and one room-only change added). The dashboard showed all three new
 events. Removing the mapping returned the count to five; restoring it returned
 to eight. Diagnostics remained empty. The demo source remains assigned for
 further review. No live WebUntis integration/account has been tested yet.
+
+The test profile also needs `config/www` before startup for persistent automatic
+Lovelace resource registration. It was initially missing in this minimal profile;
+creating it and restarting the test container enables the normal `/local` card
+resource instead of relying on the frontend fallback module.

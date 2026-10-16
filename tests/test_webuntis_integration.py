@@ -3,6 +3,7 @@
 from copy import deepcopy
 from datetime import timedelta
 import json
+import hashlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -306,3 +307,82 @@ async def test_portal_and_webuntis_changes_share_one_notification(hass, source):
     assert sources == {"portal", "webuntis"}
     substitution_calls = [c for c in notify.call_args_list if "Vertretungsplan" in c.args[0]]
     assert len(substitution_calls) == 1
+
+
+@pytest.mark.parametrize("arrival", ["together", "portal_first", "webuntis_first"])
+async def test_realistic_cross_source_notification_slots(hass, source, arrival):
+    """Independent source spellings stay displayed but notify a time slot once."""
+    webuntis = source.events[2]
+    source.events = []
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    result = portal_result()
+    day = dt_util.as_local(webuntis.start).date()
+    result.children[0].timetable = [{
+        "weekday": day.isoweekday(), "lesson": "3", "start": "10:00", "end": "10:45", "subject": "Biologie",
+    }]
+    result.children[0].substitutions = {"available": True, "days": [{"date": day.isoformat(), "entries": []}]}
+    notifications = async_capture_events(hass, EVENT_SUBSTITUTION)
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=result):
+        await manager.async_refresh()  # Quiet, empty baseline for both sources.
+        if arrival != "webuntis_first":
+            result.children[0].substitutions["days"][0]["entries"] = [{
+                "kind": "vertretung", "lesson": "3", "subject": "Biologie",
+                "teacher": "Herr Demolehrer D", "substitute": "Frau Demolehrerin C",
+                "room": "Raum 201", "info": "Bitte Buch mitbringen",
+            }]
+        if arrival != "portal_first":
+            source.events = [webuntis]
+        await manager.async_refresh()
+        if arrival == "portal_first":
+            source.events = [webuntis]
+            await manager.async_refresh()
+        elif arrival == "webuntis_first":
+            result.children[0].substitutions["days"][0]["entries"] = [{
+                "kind": "vertretung", "lesson": "3", "subject": "Biologie",
+                "teacher": "Herr Demolehrer D", "substitute": "Frau Demolehrerin C",
+                "room": "Raum 201", "info": "Bitte Buch mitbringen",
+            }]
+            await manager.async_refresh()
+        await hass.async_block_till_done()
+    assert len(changed(manager)) == 2  # Display still combines both original records.
+    assert len(notifications) == 1
+    assert len(notifications[0].data["entries"]) == 1
+    if arrival == "together":
+        note = notifications[0].data["entries"][0]["info"]
+        assert "Bitte Buch mitbringen" in note and "Demodaten" in note
+    # The source's later actual content change must still notify.
+    payload = json.loads(webuntis.description)
+    payload["substText"] = "Neuer Hinweis am Folgetag"
+    source.events = [CalendarEvent(start=webuntis.start, end=webuntis.end,
+                                  summary=webuntis.summary, description=json.dumps(payload))]
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=result):
+        await manager.async_refresh()
+        await hass.async_block_till_done()
+    assert len(notifications) == 2
+
+
+@pytest.mark.parametrize("legacy_seen", [False, True])
+async def test_timetable_change_does_not_notify_unchanged_webuntis(hass, source, legacy_seen):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    notifications = async_capture_events(hass, EVENT_SUBSTITUTION)
+    if legacy_seen:
+        cache = manager.data["webuntis"]["anna"]
+        cache.pop("seen_version")
+        cache["seen"] = [hashlib.sha1(json.dumps(e, sort_keys=True).encode()).hexdigest()
+                         for day in cache["days"] for e in day["entries"]]
+    day = dt_util.as_local(source.events[2].start).date()
+    result = portal_result()
+    result.children[0].timetable = [{
+        "weekday": day.isoweekday(), "lesson": "3", "start": "10:00", "end": "10:45", "subject": "Biologie",
+    }]
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=result):
+        await manager.async_refresh()
+        await hass.async_block_till_done()
+    assert changed(manager)[1]["lesson"] == "3" and notifications == []
+    payload = json.loads(source.events[2].description)
+    payload["substText"] = "Actual source update"
+    event = source.events[2]
+    source.events[2] = CalendarEvent(start=event.start, end=event.end,
+                                    summary=event.summary, description=json.dumps(payload))
+    await refresh(manager)
+    assert len(notifications) == 1

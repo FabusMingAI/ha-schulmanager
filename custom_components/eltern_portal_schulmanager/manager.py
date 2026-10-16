@@ -274,11 +274,14 @@ class SchulManager:
             "substitutions": stored.get("substitutions", {}),
             "webuntis": stored.get("webuntis", {}),
             "subs_seen": stored.get("subs_seen", {}),
+            "substitution_notifications": stored.get("substitution_notifications", {}),
             "sicknotes": stored.get("sicknotes", {}),
             "archived": stored.get("archived", {}),
             # Stundenplankürzel je Schule: {school: {"updated": iso, "list": {kürzel: name}}}
             "teachers": stored.get("teachers", {}),
         }
+        # Seed older installations from their cached imports, without notifying.
+        self._remember_substitution_slots()
 
     async def async_start(self) -> None:
         interval = timedelta(
@@ -335,6 +338,7 @@ class SchulManager:
         async with self._lock:
             errors: list[str] = []
             webuntis_errors: list[str] = []
+            self._remember_substitution_slots()
             # Collect substitution notifications of both sources during this refresh
             # and send one combined message per child afterwards. Both sources use
             # the same companion-app tag, so separate messages would replace each other.
@@ -1567,11 +1571,19 @@ class SchulManager:
                     days.setdefault(day, []).append(entry)
                 previous = cache.get(child)
                 seen = set(previous.get("seen", [])) if previous else set()
+                if previous and previous.get("seen_version") != 2:
+                    # Old hashes included the derived lesson number. Rebuild the
+                    # baseline from the saved snapshot, so upgrading stays quiet
+                    # while actual source changes can still be detected.
+                    seen.update(
+                        self._webuntis_fingerprint(entry)
+                        for day in previous.get("days", []) for entry in day["entries"]
+                    )
                 fresh = []
                 current = []
                 for day, entries in days.items():
                     for entry in entries:
-                        fingerprint = hashlib.sha1(json.dumps(entry, sort_keys=True).encode()).hexdigest()
+                        fingerprint = self._webuntis_fingerprint(entry)
                         current.append(fingerprint)
                         if fingerprint not in seen:
                             fresh.append((day, entry))
@@ -1581,6 +1593,7 @@ class SchulManager:
                     "stand": dt_util.now().strftime("%d.%m.%Y %H:%M"), "updated": now,
                     "days": [{"date": day, "entries": entries} for day, entries in sorted(days.items())],
                     "seen": (current + sorted(seen - set(current)))[:300],
+                    "seen_version": 2,
                     "skipped": skipped,
                 }
                 if skipped:
@@ -1600,6 +1613,12 @@ class SchulManager:
                     f"WebUntis {self.children[child]['name']} ({entity_id}): "
                     f"unerwarteter Fehler ({type(err).__name__}: {err})"
                 )
+
+    @staticmethod
+    def _webuntis_fingerprint(entry: dict[str, Any]) -> str:
+        """Only calendar content, never a timetable-derived lesson or identifier."""
+        content = {key: value for key, value in entry.items() if key not in ("lesson", "uid")}
+        return hashlib.sha1(json.dumps(content, sort_keys=True).encode()).hexdigest()
 
     def substitution_plan(self, child: str) -> dict[str, Any]:
         """Combine the portal and selected WebUntis source without mutating either."""
@@ -1780,6 +1799,9 @@ class SchulManager:
     async def _send_substitutions(
         self, child: str, fresh: list[tuple[str, dict[str, Any]]]
     ) -> None:
+        fresh = self._notification_entries(child, fresh)
+        if not fresh:
+            return
         name = self.children.get(child, {}).get("name", child)
         today = dt_util.now().date()
         lines = []
@@ -1797,6 +1819,82 @@ class SchulManager:
                 "entries": [{"date": d, **e} for d, e in fresh],
             },
         )
+
+    def _substitution_slot(self, child: str, day: str, entry: dict[str, Any]) -> str | None:
+        """Identify a notification by date, actual start/end and change kind."""
+        try:
+            lesson_start, lesson_end = self.lesson_times(child, date.fromisoformat(day), entry.get("lesson") or "")
+            tz = dt_util.get_default_time_zone()
+            begin = datetime.fromisoformat(entry["start"]) if entry.get("start") else (
+                datetime.combine(date.fromisoformat(day), time.fromisoformat(lesson_start), tz) if lesson_start else None
+            )
+            finish = datetime.fromisoformat(entry["end"]) if entry.get("end") else (
+                datetime.combine(date.fromisoformat(day), time.fromisoformat(lesson_end), tz) if lesson_end else None
+            )
+            if not begin or not finish or not begin.tzinfo or not finish.tzinfo:
+                return None  # Unknown times cannot safely identify a cross-source duplicate.
+            identity = [day, dt_util.as_utc(begin).isoformat(), dt_util.as_utc(finish).isoformat(), entry.get("kind")]
+            return hashlib.sha1(json.dumps(identity).encode()).hexdigest()
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _substitution_source(entry: dict[str, Any]) -> str:
+        return (entry.get("source_entity") or "webuntis") if entry.get("source") == "webuntis" else "portal"
+
+    def _remember_substitution_slots(self) -> None:
+        """Persist observed source slots, including the quiet initial imports."""
+        history = self.data["substitution_notifications"]
+        today = dt_util.now().date().isoformat()
+        for child in list(history):
+            if child not in self.children:
+                history.pop(child)
+                continue
+            history[child] = {key: value for key, value in history[child].items() if value["date"] >= today}
+        for child in self.children:
+            plans = [self.data["substitutions"].get(child, {})]
+            external = self.data["webuntis"].get(child, {})
+            if external.get("entity_id") == self.opt(CONF_WEBUNTIS_CALENDARS, {}).get(child):
+                plans.append(external)
+            for plan in plans:
+                for day in plan.get("days", []):
+                    if day["date"] < today:
+                        continue
+                    for entry in day["entries"]:
+                        if slot := self._substitution_slot(child, day["date"], entry):
+                            record = history.setdefault(child, {}).setdefault(slot, {"date": day["date"], "sources": []})
+                            source = self._substitution_source(entry)
+                            if source not in record["sources"]:
+                                record["sources"].append(source)
+
+    def _notification_entries(
+        self, child: str, fresh: list[tuple[str, dict[str, Any]]]
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Coalesce cross-source slots in notifications only; leave displays intact."""
+        history = self.data["substitution_notifications"].setdefault(child, {})
+        groups: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+        for index, (day, entry) in enumerate(fresh):
+            slot = self._substitution_slot(child, day, entry)
+            groups.setdefault(slot or f"unknown-{index}", []).append((day, entry))
+        result = []
+        for slot, entries in groups.items():
+            sources = {self._substitution_source(entry) for _, entry in entries}
+            previous = set(history.get(slot, {}).get("sources", []))
+            allowed = [item for item in entries if not previous or self._substitution_source(item[1]) in previous]
+            if not slot.startswith("unknown-"):
+                history[slot] = {"date": entries[0][0], "sources": sorted(previous | sources)}
+            if not allowed:
+                continue  # A newly arriving source repeats a slot observed earlier.
+            if len(sources) == 1:
+                result.extend(allowed)
+            else:
+                day, first = allowed[0]
+                combined = {**first, "sources": sorted(sources)}
+                combined["info"] = " / ".join(dict.fromkeys(
+                    entry["info"].strip() for _, entry in entries if (entry.get("info") or "").strip()
+                ))
+                result.append((day, combined))
+        return result
 
     # ------------------------------------------------------------------
     # Benachrichtigungen

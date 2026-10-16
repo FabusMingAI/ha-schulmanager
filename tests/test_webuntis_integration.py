@@ -227,3 +227,82 @@ async def test_without_webuntis_installation_or_mapping(hass):
     entry, manager = await setup_manager(hass)
     assert CONF_WEBUNTIS_CALENDARS not in entry.options
     assert manager.last_errors == [] and changed(manager) == []
+
+
+def serve_all(calendar):
+    """Return every fixture event unfiltered, including all-day entries."""
+    async def all_events(hass, start_date, end_date):
+        return list(calendar.events)
+    calendar.async_get_events = all_events
+
+
+async def test_single_invalid_event_does_not_block_other_changes(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    assert len(changed(manager)) == 3
+    lesson = json.loads(source.events[0].description)
+    lesson["code"] = "cancelled"
+    source.events[0] = CalendarEvent(start=source.events[0].start, end=source.events[0].end,
+                                     summary="Cancelled: M", description=json.dumps(lesson))
+    day = dt_util.now().date() + timedelta(days=2)
+    source.events.append(CalendarEvent(
+        start=day, end=day + timedelta(days=1), summary="Cancelled: X",
+        description=json.dumps({"id": 999, "code": "cancelled", "subjects": [{"name": "X"}]}),
+    ))
+    serve_all(source)
+    await refresh(manager)
+    assert len(changed(manager)) == 4  # the new cancellation is imported
+    assert manager.data["webuntis"]["anna"]["skipped"] == 1
+    assert any("übersprungen" in error for error in manager.last_errors)
+
+
+async def test_unexpected_calendar_exception_keeps_refresh_running(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    before_data = deepcopy(changed(manager))
+    before_update = manager.last_update
+    source.error = OSError("socket closed")
+    await refresh(manager)  # must not raise
+    assert manager.last_update != before_update
+    assert changed(manager) == before_data
+    assert "OSError" in manager.last_errors[0]
+
+
+async def test_webuntis_error_does_not_block_portal_archive_cleanup(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    source.error = HomeAssistantError("Calendar offline")
+    with patch.object(SchulManager, "_prune_archived") as prune:
+        await refresh(manager)
+    assert prune.called and manager.last_errors
+
+
+async def test_portal_and_webuntis_changes_share_one_notification(hass, source):
+    notifications = async_capture_events(hass, EVENT_SUBSTITUTION)
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    assert notifications == []
+    tomorrow = (dt_util.now().date() + timedelta(days=1)).isoformat()
+    result = portal_result()
+    result.children[0].substitutions = {"available": True, "days": [{"date": tomorrow, "entries": [
+        {"kind": "entfall", "lesson": "6", "subject": "Portal-Demo"},
+    ]}]}
+    lesson = json.loads(source.events[0].description)
+    lesson["code"] = "cancelled"
+    source.events[0] = CalendarEvent(start=source.events[0].start, end=source.events[0].end,
+                                     summary="Cancelled: M", description=json.dumps(lesson))
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=result), \
+            patch.object(SchulManager, "_notify") as notify:
+        # first portal plan is the initial import (no notification) ...
+        await manager.async_refresh()
+        await hass.async_block_till_done()
+        notifications.clear()
+        notify.reset_mock()
+        result.children[0].substitutions["days"][0]["entries"].append(
+            {"kind": "vertretung", "lesson": "7", "subject": "Portal-Neu"})
+        lesson["substText"] = "Neu aus WebUntis"
+        source.events[0] = CalendarEvent(start=source.events[0].start, end=source.events[0].end,
+                                         summary="Cancelled: M", description=json.dumps(lesson))
+        await manager.async_refresh()
+        await hass.async_block_till_done()
+    assert len(notifications) == 1
+    sources = {entry.get("source", "portal") for entry in notifications[0].data["entries"]}
+    assert sources == {"portal", "webuntis"}
+    substitution_calls = [c for c in notify.call_args_list if "Vertretungsplan" in c.args[0]]
+    assert len(substitution_calls) == 1

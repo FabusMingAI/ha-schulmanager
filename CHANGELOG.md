@@ -4,6 +4,7 @@
 
 - Optional per-child calendar assignment under **Configure → WebUntis calendar**. Users install and configure WebUntis themselves (JSON descriptions, cancelled lessons and room changes enabled). No selection means no WebUntis queries. / Optionale Zuordnung eines vorhandenen WebUntis-Kalenders pro Kind; ohne Auswahl bleibt alles wie bisher.
 - Selected calendars are read for the next 14 days and combined with the Eltern-Portal substitution plan. Changes reach sensors, calendar, dashboard and substitution notifications; exact duplicates are suppressed. Failed/unavailable sources retain their last data and appear in diagnostics; successful empty results remove obsolete entries. / Beide Quellen werden zusammengeführt; Fehler löschen keine bekannten Daten.
+- Robustness (review of #26): a single WebUntis entry without valid times is skipped instead of blocking the calendar; unexpected calendar errors no longer abort the portal refresh; WebUntis errors no longer prevent archive cleanup; portal and WebUntis changes of one refresh are sent as one notification per child. / Ein fehlerhafter Eintrag blockiert nicht mehr alle Änderungen, WebUntis-Fehler stören das Portal nicht mehr, und beide Quellen kommen in einer gemeinsamen Meldung.
 
 ## 0.14.1 – 2026-10-12 (bridge release)
 

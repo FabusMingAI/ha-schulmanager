@@ -206,6 +206,8 @@ class SchulManager:
         self.data: dict[str, Any] = {}
         self.last_update: datetime | None = None
         self.last_errors: list[str] = []
+        # während eines Abrufs gesammelte Vertretungsmeldungen je Kind (sonst None)
+        self._queued_substitutions: dict[str, list[tuple[str, dict[str, Any]]]] | None = None
         self._lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._worker: asyncio.Task | None = None
@@ -332,29 +334,41 @@ class SchulManager:
         """Alle Portale abrufen und neue Eingänge verarbeiten."""
         async with self._lock:
             errors: list[str] = []
-            for portal in self.entry.data.get(CONF_PORTALS, []):
-                school = portal[CONF_SCHOOL]
-                try:
-                    result = await self._async_fetch_portal(portal)
-                except PortalAuthError as err:
-                    msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
-                    if initial:
-                        raise ConfigEntryAuthFailed(msg) from err
-                    errors.append(msg)
-                    continue
-                except PortalConnectionError as err:
-                    msg = f"{school}: Portal nicht erreichbar ({err})"
-                    if initial and not self.children:
-                        raise ConfigEntryNotReady(msg) from err
-                    errors.append(msg)
-                    continue
-                errors.extend(f"{school}: {e}" for e in result.errors)
-                self._store_teachers(result)
-                await self._merge(result)
-            await self._async_refresh_webuntis(errors)
-            self.last_errors = errors
+            webuntis_errors: list[str] = []
+            # Collect substitution notifications of both sources during this refresh
+            # and send one combined message per child afterwards. Both sources use
+            # the same companion-app tag, so separate messages would replace each other.
+            self._queued_substitutions = {}
+            try:
+                for portal in self.entry.data.get(CONF_PORTALS, []):
+                    school = portal[CONF_SCHOOL]
+                    try:
+                        result = await self._async_fetch_portal(portal)
+                    except PortalAuthError as err:
+                        msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
+                        if initial:
+                            raise ConfigEntryAuthFailed(msg) from err
+                        errors.append(msg)
+                        continue
+                    except PortalConnectionError as err:
+                        msg = f"{school}: Portal nicht erreichbar ({err})"
+                        if initial and not self.children:
+                            raise ConfigEntryNotReady(msg) from err
+                        errors.append(msg)
+                        continue
+                    errors.extend(f"{school}: {e}" for e in result.errors)
+                    self._store_teachers(result)
+                    await self._merge(result)
+                await self._async_refresh_webuntis(webuntis_errors)
+            finally:
+                queued, self._queued_substitutions = self._queued_substitutions or {}, None
+            for key, fresh in queued.items():
+                await self._send_substitutions(key, fresh)
+            self.last_errors = errors + webuntis_errors
             self.last_update = dt_util.now()
             if not errors:
+                # only portal errors matter here; the optional WebUntis source must
+                # not block cleaning up the portal archive
                 self._prune_archived()
             self._changed()
             if self._pending() or self._missing_translations():
@@ -1513,6 +1527,7 @@ class SchulManager:
                 if events and not any(isinstance(e, dict) and webuntis_payload(e) is not None for e in events):
                     raise HomeAssistantError("WebUntis-Kalenderbeschreibung muss auf JSON eingestellt sein")
                 days: dict[str, list[dict[str, Any]]] = {}
+                skipped = 0
                 for event in events:
                     parsed = parse_webuntis_event(event) if isinstance(event, dict) else None
                     if parsed is None:
@@ -1523,7 +1538,10 @@ class SchulManager:
                         if begin.tzinfo is None or finish.tzinfo is None or finish <= begin:
                             raise ValueError
                     except (ValueError, TypeError):
-                        raise HomeAssistantError("WebUntis-Eintrag ohne gültige Beginn-/Endzeit") from None
+                        # One unusable entry (e.g. all-day) must not block all other changes.
+                        skipped += 1
+                        LOGGER.debug("WebUntis-Eintrag ohne gültige Beginn-/Endzeit übersprungen: %s", event)
+                        continue
                     if finish <= start or begin >= end:
                         continue
                     begin, finish = dt_util.as_local(begin), dt_util.as_local(finish)
@@ -1563,13 +1581,25 @@ class SchulManager:
                     "stand": dt_util.now().strftime("%d.%m.%Y %H:%M"), "updated": now,
                     "days": [{"date": day, "entries": entries} for day, entries in sorted(days.items())],
                     "seen": (current + sorted(seen - set(current)))[:300],
+                    "skipped": skipped,
                 }
+                if skipped:
+                    errors.append(
+                        f"WebUntis {self.children[child]['name']} ({entity_id}): "
+                        f"{skipped} Eintrag/Einträge ohne gültige Beginn-/Endzeit übersprungen"
+                    )
                 visible = {e["uid"] for d in self.substitution_plan(child)["days"] for e in d["entries"]}
                 fresh = [(day, e) for day, e in fresh if e["uid"] in visible]
                 if previous and fresh:
                     await self._notify_substitutions(child, fresh)
             except (HomeAssistantError, TimeoutError, ValueError, TypeError) as err:
                 errors.append(f"WebUntis {self.children[child]['name']} ({entity_id}): {err or type(err).__name__}")
+            except Exception as err:  # noqa: BLE001 - an optional source must never abort the portal refresh
+                LOGGER.exception("WebUntis-Abruf für %s fehlgeschlagen", entity_id)
+                errors.append(
+                    f"WebUntis {self.children[child]['name']} ({entity_id}): "
+                    f"unerwarteter Fehler ({type(err).__name__}: {err})"
+                )
 
     def substitution_plan(self, child: str) -> dict[str, Any]:
         """Combine the portal and selected WebUntis source without mutating either."""
@@ -1739,6 +1769,15 @@ class SchulManager:
         return text
 
     async def _notify_substitutions(
+        self, child: str, fresh: list[tuple[str, dict[str, Any]]]
+    ) -> None:
+        """Melden oder – während eines Abrufs – für eine gemeinsame Meldung sammeln."""
+        if self._queued_substitutions is not None:
+            self._queued_substitutions.setdefault(child, []).extend(fresh)
+            return
+        await self._send_substitutions(child, fresh)
+
+    async def _send_substitutions(
         self, child: str, fresh: list[tuple[str, dict[str, Any]]]
     ) -> None:
         name = self.children.get(child, {}).get("name", child)

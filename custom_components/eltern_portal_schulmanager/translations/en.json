@@ -172,7 +172,7 @@
       },
       "webuntis_calendar": {
         "title": "WebUntis calendar for {child}",
-        "description": "Select this child’s WebUntis calendar. In the WebUntis integration, enable JSON calendar descriptions, cancelled lessons and room changes. Clear the field to remove the mapping. This integration’s own calendars are excluded.",
+        "description": "Select this child’s WebUntis calendar. JSON calendar descriptions and showing cancelled lessons are required in WebUntis. Its room changes option only controls the title prefix. Teacher changes cannot be detected without teacher data. Clear the field to remove the mapping. This integration’s own calendars are excluded.",
         "data": {
           "calendar": "WebUntis calendar (optional)"
         }

@@ -145,7 +145,9 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
 Nutzt die Schule WebUntis, zuerst die separate
 [WebUntis-Integration](https://github.com/JonasJoKuJonas/homeassistant-WebUntis)
 installieren und einrichten. Dort **Kalender-Beschreibung: JSON** sowie
-**ausfallende Stunden** und **Raumwechsel** einschalten. Anschließend hier unter
+**ausfallende Stunden anzeigen** einschalten. Die Option **Raumwechsel** steuert
+dort nur das Präfix des Kalendertitels; zum Lesen von Raumwechseln aus JSON ist
+sie nicht erforderlich. Anschließend hier unter
 **Konfigurieren → WebUntis-Kalender (optional)** das Kind und seinen Kalender
 auswählen. Für weitere Kinder wiederholen. Ein leeres Kalenderfeld entfernt die
 Zuordnung. Ohne Auswahl ist WebUntis nicht erforderlich und wird nicht abgefragt.
@@ -153,6 +155,17 @@ Zuordnung. Ohne Auswahl ist WebUntis nicht erforderlich und wird nicht abgefragt
 zusammengeführt. Bei Fehlern bleiben die letzten Daten erhalten; der Fehler
 erscheint im Diagnose-Sensor. Normale Stunden werden nicht als eigener
 WebUntis-Stundenplan importiert.
+
+Lehrerdaten hängen von Kontorechten, Backend und WebUntis-Version ab. Fehlen die
+Lehrerfelder oder sind sie über `exclude_data` ausgeschlossen, können keine
+Lehrerwechsel erkannt werden; Ausfälle und Raumwechsel funktionieren weiter.
+Ein Kalender, der bisher kein Feld `teachers` geliefert hat, erscheint in der
+Diagnose. Upstream besitzt einen Fallback für Lehrerdaten; die JSON-Ausgabe kann
+bei `no right for getTeachers()` aber `teachers` dauerhaft zu `exclude_data`
+hinzufügen. Bei fehlenden Lehrerdaten diese Optionen prüfen, insbesondere bei
+Eltern-/Schülerkonten. Das fehlende Recht allein bedeutet nicht, dass der aktuelle
+Fallback scheitert.
+Siehe [Kompatibilitätsprüfung und offene Entscheidungen](docs/WEBUNTIS_COMPATIBILITY.md).
 
 1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Eltern Portal Manager Bavaria“**
 2. Schulkennung eingeben (der Teil vor `.eltern-portal.org`) oder einfach den Link aus einer Benachrichtigungs-Mail des Portals einfügen, dazu E-Mail und Passwort. Weitere Schulen direkt im selben Dialog hinzufügen.

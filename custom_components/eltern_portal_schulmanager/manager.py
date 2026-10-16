@@ -1537,7 +1537,13 @@ class SchulManager:
                     raise HomeAssistantError("WebUntis-Kalenderbeschreibung muss auf JSON eingestellt sein")
                 days: dict[str, list[dict[str, Any]]] = {}
                 skipped = 0
+                teachers_observed = bool(cache.get(child, {}).get("teachers_observed"))
+                structured_events = False
                 for event in events:
+                    payload = webuntis_payload(event) if isinstance(event, dict) else None
+                    if payload is not None:
+                        structured_events = True
+                        teachers_observed |= isinstance(payload.get("teachers"), list)
                     parsed = parse_webuntis_event(event) if isinstance(event, dict) else None
                     if parsed is None:
                         continue
@@ -1592,7 +1598,14 @@ class SchulManager:
                     "seen": (current + sorted(seen - set(current)))[:300],
                     "seen_version": 2,
                     "skipped": skipped,
+                    "teachers_observed": teachers_observed,
                 }
+                if structured_events and not teachers_observed:
+                    errors.append(
+                        f"WebUntis {self.children[child]['name']} ({entity_id}): "
+                        "bisher keine teachers-Daten; Lehrerwechsel nicht erkennbar "
+                        "(Rechte und exclude_data in WebUntis prüfen)"
+                    )
                 if skipped:
                     errors.append(
                         f"WebUntis {self.children[child]['name']} ({entity_id}): "
@@ -1685,7 +1698,7 @@ class SchulManager:
                         seen.add(identity)
         return {
             "available": bool(portal.get("available") or external.get("available")),
-            "stand": external.get("stand") or portal.get("stand"),
+            "stand": portal.get("stand") or external.get("stand"),
             "updated": max(portal.get("updated") or "", external.get("updated") or "") or None,
             "days": [{"date": day, "entries": entries} for day, entries in sorted(by_day.items())],
         }
@@ -1809,7 +1822,8 @@ class SchulManager:
                 text += f" – {info}"
             return text
         if e.get("kind") == "raum":
-            text = f"{head}: Raum {e.get('room') or '?'}"
+            previous_room = f"{e['original_room']} → " if e.get("original_room") else ""
+            text = f"{head}: Raum {previous_room}{e.get('room') or '?'}"
             if re.fullmatch(r"(?i)raum(änderung|wechsel)\.?", info):
                 info = ""
         else:

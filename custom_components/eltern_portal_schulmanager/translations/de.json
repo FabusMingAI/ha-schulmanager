@@ -172,7 +172,7 @@
       },
       "webuntis_calendar": {
         "title": "WebUntis-Kalender für {child}",
-        "description": "Wähle den WebUntis-Kalender dieses Kindes. In der WebUntis-Integration müssen die Kalender-Beschreibung auf JSON sowie Ausfälle und Raumwechsel aktiviert sein. Feld leeren, um die Zuordnung zu entfernen. Eigene Kalender dieser Integration sind ausgeschlossen.",
+        "description": "Wähle den WebUntis-Kalender dieses Kindes. In WebUntis sind JSON-Kalenderbeschreibungen und die Anzeige von Ausfällen erforderlich. Die Option Raumwechsel steuert dort nur das Titel-Präfix. Ohne Lehrerdaten sind Lehrerwechsel nicht erkennbar. Feld leeren, um die Zuordnung zu entfernen. Eigene Kalender dieser Integration sind ausgeschlossen.",
         "data": {
           "calendar": "WebUntis-Kalender (optional)"
         }

@@ -990,7 +990,7 @@
       return t;
     }
     if (e.kind === "raum") {
-      t = `Raumänderung${r ? ": Raum " + r : ""}`;
+      t = `Raumänderung${r ? ": Raum " + (e.original_room ? room(e.original_room) + " → " : "") + r : ""}`;
       if (info && !/^raum(änderung|wechsel)\.?$/i.test(info)) t += ` – ${info}`;
       return t;
     }

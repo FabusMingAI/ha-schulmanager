@@ -426,3 +426,104 @@ async def test_calendar_waits_for_started_without_repeating_portal(hass, source)
         portal.assert_not_called()
     assert source.calls == 1 and len(changed(manager)) == 3
     assert manager.last_errors == []
+
+
+async def test_two_children_with_independent_calendars_and_one_failure(hass, source):
+    second = FixtureCalendar()
+    second.entity_id = "calendar.webuntis_ben"
+    second._attr_unique_id = "webuntis-ben"
+    second.events = [source.events[3]]
+    await hass.data["calendar"].async_add_entities([second])
+    await hass.async_block_till_done()
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {
+        "anna": source.entity_id, "ben": second.entity_id,
+    }})
+    anna = deepcopy(changed(manager))
+    source.error = HomeAssistantError("Anna's source offline")
+    event = second.events[0]
+    payload = json.loads(event.description)
+    payload["rooms"] = [{"name": "BEN-NEW"}]
+    second.events = [CalendarEvent(start=event.start, end=event.end,
+                                  summary=event.summary, description=json.dumps(payload))]
+    await refresh(manager)
+    assert changed(manager) == anna
+    assert changed(manager, "ben")[0]["room"] == "BEN-NEW"
+    assert hass.states.get("sensor.schule_ben_vertretungen").state == "1"
+    assert len(manager.last_errors) == 1 and "Anna" in manager.last_errors[0]
+
+
+async def test_restart_with_persisted_cache_does_not_renotify(hass, source):
+    entry, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    await refresh(manager)
+    before = deepcopy(changed(manager))
+    assert await hass.config_entries.async_unload(entry.entry_id)  # Saves the real HA Store.
+    notifications = async_capture_events(hass, EVENT_SUBSTITUTION)
+    hass.state = CoreState.starting
+    calls = source.calls
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=portal_result()):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert changed(entry.runtime_data) == before and source.calls == calls
+        hass.state = CoreState.running
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+        await hass.async_block_till_done()
+    assert source.calls == calls + 1 and notifications == []
+    assert entry.runtime_data.data["substitution_notifications"]["anna"]
+
+
+async def test_missing_teacher_fields_reports_capability_without_losing_changes(hass, source):
+    events = []
+    for event in source.events:
+        try:
+            payload = json.loads(event.description)
+        except ValueError:
+            continue
+        payload.pop("teachers", None)
+        payload.pop("original_teachers", None)
+        events.append(CalendarEvent(start=event.start, end=event.end,
+                                    summary=event.summary, description=json.dumps(payload)))
+    source.events = events
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    assert [entry["kind"] for entry in changed(manager)] == ["entfall", "raum", "raum"]
+    assert any("keine teachers-Daten" in error for error in manager.last_errors)
+    assert not manager.data["webuntis"]["anna"]["teachers_observed"]
+    event = source.events[0]
+    payload = json.loads(event.description)
+    payload["teachers"] = [{"name": "RECOVERED"}]
+    source.events[0] = CalendarEvent(start=event.start, end=event.end,
+                                    summary=event.summary, description=json.dumps(payload))
+    await refresh(manager)
+    assert manager.last_errors == []
+    assert manager.data["webuntis"]["anna"]["teachers_observed"]
+
+
+async def test_portal_status_and_original_room_text_are_preserved(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    manager.data["substitutions"]["anna"] = {"available": True, "stand": "Portal: 07:35", "days": []}
+    assert manager.substitution_plan("anna")["stand"] == "Portal: 07:35"
+    room = next(entry for entry in changed(manager) if entry["kind"] == "raum")
+    assert "Raum 302 → 301" in manager.substitution_text(room)
+
+
+async def test_calendar_window_across_dst_keeps_local_days(hass, source, freezer):
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    freezer.move_to("2026-10-20T10:00:00Z")
+    template = source.events[1]  # Cancellation, independent of teacher permissions.
+    payload = json.loads(template.description)
+    payload["teachers"] = []
+    source.events = [CalendarEvent(
+        start=dt_util.parse_datetime(f"2026-10-{day}T08:00:00{offset}"),
+        end=dt_util.parse_datetime(f"2026-10-{day}T08:45:00{offset}"),
+        summary=template.summary, description=json.dumps({**payload, "id": day}),
+    ) for day, offset in [(24, "+02:00"), (26, "+01:00")]]
+    with patch.object(source, "async_get_events", wraps=source.async_get_events) as fetch:
+        _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    _, start, end = fetch.call_args.args
+    assert start.date().isoformat() == "2026-10-20" and start.hour == 0
+    assert end.date().isoformat() == "2026-11-03" and end.hour == 0
+    assert (dt_util.as_utc(end) - dt_util.as_utc(start)).total_seconds() == 337 * 3600
+    entries = changed(manager)
+    assert [entry["start"] for entry in entries] == [
+        "2026-10-24T08:00:00+02:00", "2026-10-26T08:00:00+01:00",
+    ]
+    assert manager.last_errors == []

@@ -151,14 +151,27 @@ Not carried over: PDF and calendar links in push notifications sent before the u
 
 If your school uses WebUntis, first install and configure the separate
 [WebUntis integration](https://github.com/JonasJoKuJonas/homeassistant-WebUntis).
-Enable **JSON calendar descriptions**, **cancelled lessons** and **room changes**
-there. Then open this integration's **Configure → WebUntis calendar (optional)**,
+Enable **JSON calendar descriptions** and **show cancelled lessons**
+there. Its **room changes** option only controls the calendar title prefix;
+it is not required for reading room changes from JSON.
+Then open this integration's **Configure → WebUntis calendar (optional)**,
 choose the child and select their calendar. Repeat for other children as needed.
 Clear a child's calendar field to remove the assignment. Without an assignment,
 no WebUntis calendar is queried and WebUntis does not need to be installed.
 Changes from the next 14 days are combined with the Eltern-Portal substitution
 plan. A failed source retains its last results and is reported in diagnostics.
 Normal lessons are not imported as a separate WebUntis timetable.
+
+Teacher data depends on account permissions, backend and WebUntis version. If
+teacher fields are absent or excluded through `exclude_data`, teacher changes
+cannot be recognized; cancellations and room changes still work. A calendar
+that has not supplied a `teachers` field is reported in diagnostics. Upstream
+has a teacher-data fallback, but its JSON serializer can persistently add
+`teachers` to `exclude_data` when it encounters `no right for getTeachers()`.
+Check those options if teacher data is missing, especially with parent/student
+accounts. This limitation is conditional; lacking that permission alone does
+not prove that the current fallback will fail.
+See [compatibility notes and open decisions](docs/WEBUNTIS_COMPATIBILITY.md).
 
 1. **Settings → Devices & services → Add integration → Eltern Portal Manager Bavaria**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.

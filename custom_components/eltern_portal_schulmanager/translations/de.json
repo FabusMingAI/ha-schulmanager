@@ -52,7 +52,8 @@
         "menu_options": {
           "settings": "Einstellungen (KI, Erinnerungen, Ansagen)",
           "add_portal": "Schule hinzufügen",
-          "remove_portal": "Schule entfernen"
+          "remove_portal": "Schule entfernen",
+          "webuntis": "WebUntis-Kalender (optional)"
         }
       },
       "settings": {
@@ -161,6 +162,20 @@
         "data": {
           "school": "Schule"
         }
+      },
+      "webuntis": {
+        "title": "WebUntis – Kind auswählen",
+        "description": "Optional: Ordne einem Kind einen bereits in Home Assistant eingerichteten WebUntis-Kalender zu. Ohne Zuordnung bleibt alles wie bisher. Beide Vertretungsquellen werden zusammengeführt.",
+        "data": {
+          "child": "Kind"
+        }
+      },
+      "webuntis_calendar": {
+        "title": "WebUntis-Kalender für {child}",
+        "description": "Wähle den WebUntis-Kalender dieses Kindes. In WebUntis sind JSON-Kalenderbeschreibungen und die Anzeige von Ausfällen erforderlich. Die Option Raumwechsel steuert dort nur das Titel-Präfix. Ohne Lehrerdaten sind Lehrerwechsel nicht erkennbar. Feld leeren, um die Zuordnung zu entfernen. Eigene Kalender dieser Integration sind ausgeschlossen.",
+        "data": {
+          "calendar": "WebUntis-Kalender (optional)"
+        }
       }
     },
     "error": {
@@ -169,12 +184,15 @@
       "cannot_connect": "Portal nicht erreichbar oder existiert nicht.",
       "already_added": "Diese Schule ist schon eingetragen.",
       "unknown": "Unerwarteter Fehler – siehe Protokoll.",
-      "too_many_languages": "Bitte höchstens 4 Sprachen wählen."
+      "too_many_languages": "Bitte höchstens 4 Sprachen wählen.",
+      "webuntis_invalid_child": "Bitte ein vorhandenes Kind auswählen.",
+      "webuntis_invalid_calendar": "Bitte einen vorhandenen externen Kalender auswählen."
     },
     "abort": {
       "portal_added": "Schule hinzugefügt. Die Integration lädt neu.",
       "portal_removed": "Schule entfernt.",
-      "last_portal": "Die letzte Schule kann nicht entfernt werden – lösche stattdessen die Integration."
+      "last_portal": "Die letzte Schule kann nicht entfernt werden – lösche stattdessen die Integration.",
+      "webuntis_no_children": "Noch keine Kinder verfügbar. Bitte zuerst das Eltern-Portal abrufen."
     }
   },
   "entity": {

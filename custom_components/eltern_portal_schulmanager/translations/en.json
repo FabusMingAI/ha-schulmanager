@@ -52,7 +52,8 @@
         "menu_options": {
           "settings": "Settings (AI, reminders, announcements)",
           "add_portal": "Add school",
-          "remove_portal": "Remove school"
+          "remove_portal": "Remove school",
+          "webuntis": "WebUntis calendar (optional)"
         }
       },
       "settings": {
@@ -161,6 +162,20 @@
         "data": {
           "school": "School"
         }
+      },
+      "webuntis": {
+        "title": "WebUntis – select child",
+        "description": "Optional: assign an existing Home Assistant WebUntis calendar to a child. Without a mapping, existing behavior is unchanged. Both substitution sources are combined.",
+        "data": {
+          "child": "Child"
+        }
+      },
+      "webuntis_calendar": {
+        "title": "WebUntis calendar for {child}",
+        "description": "Select this child’s WebUntis calendar. JSON calendar descriptions and showing cancelled lessons are required in WebUntis. Its room changes option only controls the title prefix. Teacher changes cannot be detected without teacher data. Clear the field to remove the mapping. This integration’s own calendars are excluded.",
+        "data": {
+          "calendar": "WebUntis calendar (optional)"
+        }
       }
     },
     "error": {
@@ -169,12 +184,15 @@
       "cannot_connect": "Portal not reachable or does not exist.",
       "already_added": "This school has already been added.",
       "unknown": "Unexpected error – see the log.",
-      "too_many_languages": "Please choose at most 4 languages."
+      "too_many_languages": "Please choose at most 4 languages.",
+      "webuntis_invalid_child": "Select an existing child.",
+      "webuntis_invalid_calendar": "Select an existing external calendar."
     },
     "abort": {
       "portal_added": "School added. The integration is reloading.",
       "portal_removed": "School removed.",
-      "last_portal": "The last school cannot be removed – delete the integration instead."
+      "last_portal": "The last school cannot be removed – delete the integration instead.",
+      "webuntis_no_children": "No children available yet. Fetch the Eltern-Portal first."
     }
   },
   "entity": {

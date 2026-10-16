@@ -1302,10 +1302,15 @@ async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     assert bell["reminder_days"].default() == "1,0"
     # so, wie die Oberfläche das Formular bekommt: Abschnitte ohne eigenen Vorgabewert,
     # die gespeicherten Werte stecken in den Feldern (sonst bleiben die Felder leer)
-    import voluptuous_serialize
     from homeassistant.helpers import config_validation as cv
 
-    ui = voluptuous_serialize.convert(result["data_schema"], custom_serializer=cv.custom_serializer)
+    # HA 2026.10 uses probatio; earlier supported versions use voluptuous-serialize.
+    if serializer := getattr(cv, "probatio", None):
+        ui = serializer.to_field_list(result["data_schema"], custom_serializer=cv.custom_serializer)
+    else:
+        import voluptuous_serialize
+
+        ui = voluptuous_serialize.convert(result["data_schema"], custom_serializer=cv.custom_serializer)
     by_name = {f["name"]: f for f in ui}
     assert all("default" not in f for f in ui)
     fields = {f["name"]: f for f in by_name["benachrichtigungen"]["schema"]}
@@ -1912,7 +1917,11 @@ async def test_migration_from_schulmanager(hass: HomeAssistant, media_dir) -> No
     # Gerät samt Raum bleibt erhalten
     dev = dev_reg.async_get(device.id)
     assert dev is not None and dev.area_id == "kinderzimmer"
-    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers and new.entry_id in dev.config_entries
+    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers
+    if hasattr(dev, "config_entry_id"):
+        assert dev.config_entry_id == new.entry_id
+    else:
+        assert new.entry_id in dev.config_entries
     # Daten übernommen
     m = new.runtime_data
     assert m.tasks["t1"]["status"] == "in_arbeit" and m.tasks["t1"]["comment"] == "schon angefangen"

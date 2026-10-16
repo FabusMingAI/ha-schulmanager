@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 import hashlib
+import json
 import os
 import re
 from typing import Any
@@ -13,7 +14,7 @@ from typing import Any
 import aiohttp
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, CoreState, Event, HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
@@ -25,6 +26,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 from homeassistant.util.ssl import get_default_context
@@ -64,6 +66,7 @@ from .const import (
     CONF_SCHOOL,
     CONF_SUMMARY_LANGUAGES,
     CONF_TEACHER_NAMES,
+    CONF_WEBUNTIS_CALENDARS,
     CONF_TTS_END,
     CONF_TTS_ENGINE,
     CONF_TTS_START,
@@ -113,6 +116,7 @@ from .const import (
     TRANSLATE_RETRY,
     TRANSLATE_SECONDS_PER_ITEM,
 )
+from .webuntis import parse_webuntis_event, webuntis_payload
 
 # Kennung für Benachrichtigungen (tag/group) der Companion-App
 TAG = "eltern-portal"
@@ -203,6 +207,8 @@ class SchulManager:
         self.data: dict[str, Any] = {}
         self.last_update: datetime | None = None
         self.last_errors: list[str] = []
+        # während eines Abrufs gesammelte Vertretungsmeldungen je Kind (sonst None)
+        self._queued_substitutions: dict[str, list[tuple[str, dict[str, Any]]]] | None = None
         self._lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._worker: asyncio.Task | None = None
@@ -267,14 +273,20 @@ class SchulManager:
             "dashboard": stored.get("dashboard", {}),
             "timetable": stored.get("timetable", {}),
             "substitutions": stored.get("substitutions", {}),
+            "webuntis": stored.get("webuntis", {}),
             "subs_seen": stored.get("subs_seen", {}),
+            "substitution_notifications": stored.get("substitution_notifications", {}),
             "sicknotes": stored.get("sicknotes", {}),
             "archived": stored.get("archived", {}),
             # Stundenplankürzel je Schule: {school: {"updated": iso, "list": {kürzel: name}}}
             "teachers": stored.get("teachers", {}),
         }
+        # Seed older installations from their cached imports, without notifying.
+        self._remember_substitution_slots()
 
     async def async_start(self) -> None:
+        if self.opt(CONF_WEBUNTIS_CALENDARS, {}) and self.hass.state is not CoreState.running:
+            self._unsubs.append(async_at_started(self.hass, self._async_webuntis_started))
         interval = timedelta(
             minutes=max(10, int(self.opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)))
         )
@@ -328,28 +340,42 @@ class SchulManager:
         """Alle Portale abrufen und neue Eingänge verarbeiten."""
         async with self._lock:
             errors: list[str] = []
-            for portal in self.entry.data.get(CONF_PORTALS, []):
-                school = portal[CONF_SCHOOL]
-                try:
-                    result = await self._async_fetch_portal(portal)
-                except PortalAuthError as err:
-                    msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
-                    if initial:
-                        raise ConfigEntryAuthFailed(msg) from err
-                    errors.append(msg)
-                    continue
-                except PortalConnectionError as err:
-                    msg = f"{school}: Portal nicht erreichbar ({err})"
-                    if initial and not self.children:
-                        raise ConfigEntryNotReady(msg) from err
-                    errors.append(msg)
-                    continue
-                errors.extend(f"{school}: {e}" for e in result.errors)
-                self._store_teachers(result)
-                await self._merge(result)
-            self.last_errors = errors
+            webuntis_errors: list[str] = []
+            self._remember_substitution_slots()
+            # Collect substitution notifications of both sources during this refresh
+            # and send one combined message per child afterwards. Both sources use
+            # the same companion-app tag, so separate messages would replace each other.
+            self._queued_substitutions = {}
+            try:
+                for portal in self.entry.data.get(CONF_PORTALS, []):
+                    school = portal[CONF_SCHOOL]
+                    try:
+                        result = await self._async_fetch_portal(portal)
+                    except PortalAuthError as err:
+                        msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
+                        if initial:
+                            raise ConfigEntryAuthFailed(msg) from err
+                        errors.append(msg)
+                        continue
+                    except PortalConnectionError as err:
+                        msg = f"{school}: Portal nicht erreichbar ({err})"
+                        if initial and not self.children:
+                            raise ConfigEntryNotReady(msg) from err
+                        errors.append(msg)
+                        continue
+                    errors.extend(f"{school}: {e}" for e in result.errors)
+                    self._store_teachers(result)
+                    await self._merge(result)
+                await self._async_refresh_webuntis(webuntis_errors)
+            finally:
+                queued, self._queued_substitutions = self._queued_substitutions or {}, None
+            for key, fresh in queued.items():
+                await self._send_substitutions(key, fresh)
+            self.last_errors = errors + webuntis_errors
             self.last_update = dt_util.now()
             if not errors:
+                # only portal errors matter here; the optional WebUntis source must
+                # not block cleaning up the portal archive
                 self._prune_archived()
             self._changed()
             if self._pending() or self._missing_translations():
@@ -1367,7 +1393,7 @@ class SchulManager:
                 }
             )
         since = subst_from or dt_util.now().date() - timedelta(days=7)
-        for d in self.data["substitutions"].get(child, {}).get("days", []):
+        for d in self.substitution_plan(child).get("days", []):
             day = date.fromisoformat(d["date"])
             if day < since:
                 continue
@@ -1375,7 +1401,9 @@ class SchulManager:
                 kind = e.get("kind") if e.get("kind") in SUBSTITUTION_KINDS else "vertretung"
                 icon = EVENT_CATEGORIES[kind][0]
                 begin, finish = self.lesson_times(child, day, e.get("lesson") or "")
-                if begin:
+                if e.get("start") and e.get("end"):
+                    entry = {"start": datetime.fromisoformat(e["start"]), "end": datetime.fromisoformat(e["end"])}
+                elif begin:
                     start = datetime.combine(day, time.fromisoformat(begin), tz)
                     stop = (
                         datetime.combine(day, time.fromisoformat(finish), tz)
@@ -1470,6 +1498,211 @@ class SchulManager:
     # ------------------------------------------------------------------
     # Stundenplan und Vertretungsplan
     # ------------------------------------------------------------------
+    async def _async_refresh_webuntis(self, errors: list[str]) -> None:
+        """Read only explicitly assigned calendars; preserve last data on failures."""
+        if self.hass.state is not CoreState.running:
+            return  # Calendar platforms may not have been set up yet.
+        calendars = self.opt(CONF_WEBUNTIS_CALENDARS, {})
+        cache = self.data["webuntis"]
+        for child in list(cache):
+            if child not in self.children or calendars.get(child) != cache[child].get("entity_id"):
+                cache.pop(child)
+        start = dt_util.start_of_local_day()
+        end = start + timedelta(days=14)
+        for child, entity_id in calendars.items():
+            if child not in self.children:
+                continue
+            try:
+                # Also check at runtime: options may have been restored or edited.
+                from homeassistant.helpers import entity_registry as er
+
+                registered = er.async_get(self.hass).async_get(entity_id)
+                state = self.hass.states.get(entity_id)
+                if (
+                    not entity_id.startswith("calendar.")
+                    or registered is not None and registered.platform == DOMAIN
+                    or state is None or state.state in ("unavailable", "unknown")
+                ):
+                    raise HomeAssistantError("Kalender fehlt, ist nicht verfügbar oder ist ein eigener Kalender")
+                async with asyncio.timeout(30):
+                    response = await self.hass.services.async_call(
+                        "calendar", "get_events",
+                        {"entity_id": entity_id, "start_date_time": start.isoformat(), "end_date_time": end.isoformat()},
+                        blocking=True, return_response=True,
+                    )
+                events = response.get(entity_id, {}).get("events") if isinstance(response, dict) else None
+                if not isinstance(events, list):
+                    raise HomeAssistantError("Kalender lieferte keine gültige Ereignisliste")
+                if events and not any(isinstance(e, dict) and webuntis_payload(e) is not None for e in events):
+                    raise HomeAssistantError("WebUntis-Kalenderbeschreibung muss auf JSON eingestellt sein")
+                days: dict[str, list[dict[str, Any]]] = {}
+                skipped = 0
+                teachers_observed = bool(cache.get(child, {}).get("teachers_observed"))
+                structured_events = False
+                for event in events:
+                    payload = webuntis_payload(event) if isinstance(event, dict) else None
+                    if payload is not None:
+                        structured_events = True
+                        teachers_observed |= isinstance(payload.get("teachers"), list)
+                    parsed = parse_webuntis_event(event) if isinstance(event, dict) else None
+                    if parsed is None:
+                        continue
+                    try:
+                        begin = datetime.fromisoformat(parsed["start"])
+                        finish = datetime.fromisoformat(parsed["end"])
+                        if begin.tzinfo is None or finish.tzinfo is None or finish <= begin:
+                            raise ValueError
+                    except (ValueError, TypeError):
+                        # One unusable entry (e.g. all-day) must not block all other changes.
+                        skipped += 1
+                        LOGGER.debug("WebUntis-Eintrag ohne gültige Beginn-/Endzeit übersprungen: %s", event)
+                        continue
+                    if finish <= start or begin >= end:
+                        continue
+                    begin, finish = dt_util.as_local(begin), dt_util.as_local(finish)
+                    day = begin.date().isoformat()
+                    lesson = self._webuntis_lesson(child, begin, finish)
+                    entry = {
+                        "uid": hashlib.sha1(f"{entity_id}|{parsed['uid']}|{begin.isoformat()}".encode()).hexdigest()[:12],
+                        "kind": parsed["kind"], "lesson": lesson, "subject": parsed["summary"],
+                        "teacher": parsed["original_teacher"] or parsed["teacher"],
+                        "substitute": parsed["teacher"] if parsed["kind"] != "entfall" else "",
+                        "room": parsed["room"], "original_room": parsed["original_room"],
+                        "info": parsed["description"], "start": begin.isoformat(), "end": finish.isoformat(),
+                        "source": "webuntis", "source_entity": entity_id,
+                    }
+                    days.setdefault(day, []).append(entry)
+                previous = cache.get(child)
+                seen = set(previous.get("seen", [])) if previous else set()
+                if previous and previous.get("seen_version") != 2:
+                    # Old hashes included the derived lesson number. Rebuild the
+                    # baseline from the saved snapshot, so upgrading stays quiet
+                    # while actual source changes can still be detected.
+                    seen.update(
+                        self._webuntis_fingerprint(entry)
+                        for day in previous.get("days", []) for entry in day["entries"]
+                    )
+                fresh = []
+                current = []
+                for day, entries in days.items():
+                    for entry in entries:
+                        fingerprint = self._webuntis_fingerprint(entry)
+                        current.append(fingerprint)
+                        if fingerprint not in seen:
+                            fresh.append((day, entry))
+                now = dt_util.now().isoformat()
+                cache[child] = {
+                    "entity_id": entity_id, "available": True,
+                    "stand": dt_util.now().strftime("%d.%m.%Y %H:%M"), "updated": now,
+                    "days": [{"date": day, "entries": entries} for day, entries in sorted(days.items())],
+                    "seen": (current + sorted(seen - set(current)))[:300],
+                    "seen_version": 2,
+                    "skipped": skipped,
+                    "teachers_observed": teachers_observed,
+                }
+                if structured_events and not teachers_observed:
+                    errors.append(
+                        f"WebUntis {self.children[child]['name']} ({entity_id}): "
+                        "bisher keine teachers-Daten; Lehrerwechsel nicht erkennbar "
+                        "(Rechte und exclude_data in WebUntis prüfen)"
+                    )
+                if skipped:
+                    errors.append(
+                        f"WebUntis {self.children[child]['name']} ({entity_id}): "
+                        f"{skipped} Eintrag/Einträge ohne gültige Beginn-/Endzeit übersprungen"
+                    )
+                visible = {e["uid"] for d in self.substitution_plan(child)["days"] for e in d["entries"]}
+                fresh = [(day, e) for day, e in fresh if e["uid"] in visible]
+                if previous and fresh:
+                    await self._notify_substitutions(child, fresh)
+            except (HomeAssistantError, TimeoutError, ValueError, TypeError) as err:
+                errors.append(f"WebUntis {self.children[child]['name']} ({entity_id}): {err or type(err).__name__}")
+            except Exception as err:  # noqa: BLE001 - an optional source must never abort the portal refresh
+                LOGGER.exception("WebUntis-Abruf für %s fehlgeschlagen", entity_id)
+                errors.append(
+                    f"WebUntis {self.children[child]['name']} ({entity_id}): "
+                    f"unerwarteter Fehler ({type(err).__name__}: {err})"
+                )
+
+    async def _async_webuntis_started(self, _hass: HomeAssistant) -> None:
+        """Finish the deferred calendar import without repeating the portal fetch."""
+        async with self._lock:
+            self._remember_substitution_slots()
+            errors: list[str] = []
+            await self._async_refresh_webuntis(errors)
+            self.last_errors.extend(errors)
+            self._changed()
+
+    def _webuntis_lesson(self, child: str, begin: datetime, finish: datetime) -> str:
+        """Match at least half a portal period; ambiguous matches keep clock times."""
+        matches: dict[str, tuple[datetime, datetime, float]] = {}
+        for lesson in self.data["timetable"].get(child, {}).get("lessons", []):
+            if lesson.get("weekday") != begin.isoweekday():
+                continue
+            try:
+                start = datetime.combine(begin.date(), time.fromisoformat(lesson["start"]), begin.tzinfo)
+                end = datetime.combine(begin.date(), time.fromisoformat(lesson["end"]), begin.tzinfo)
+                duration = (end - start).total_seconds()
+                overlap = (min(end, finish) - max(start, begin)).total_seconds()
+                number = str(lesson["lesson"])
+                if not number.isdigit() or duration <= 0 or overlap < duration / 2:
+                    continue
+            except (KeyError, ValueError, TypeError):
+                continue
+            if number in matches and matches[number][:2] != (start, end):
+                return ""  # Conflicting times for the same period.
+            matches[number] = (start, end, overlap / duration)
+        nums = sorted(matches, key=int)
+        if len(nums) > 1:
+            # A boundary-straddling single lesson is not a double lesson. Nor
+            # are overlapping or non-consecutive portal periods unambiguous.
+            if any(matches[n][2] <= 0.5 for n in nums) or any(
+                int(right) != int(left) + 1 or matches[left][1] > matches[right][0]
+                for left, right in zip(nums, nums[1:])
+            ):
+                return ""
+            return f"{nums[0]}-{nums[-1]}"
+        return nums[0] if nums else ""
+
+    @staticmethod
+    def _webuntis_fingerprint(entry: dict[str, Any]) -> str:
+        """Only calendar content, never a timetable-derived lesson or identifier."""
+        content = {key: value for key, value in entry.items() if key not in ("lesson", "uid")}
+        return hashlib.sha1(json.dumps(content, sort_keys=True).encode()).hexdigest()
+
+    def substitution_plan(self, child: str) -> dict[str, Any]:
+        """Combine the portal and selected WebUntis source without mutating either."""
+        portal = self.data["substitutions"].get(child, {})
+        external = self.data.get("webuntis", {}).get(child, {})
+        if not self.opt(CONF_WEBUNTIS_CALENDARS, {}).get(child) or (
+            external.get("entity_id") != self.opt(CONF_WEBUNTIS_CALENDARS, {}).get(child)
+        ):
+            external = {}
+        by_day: dict[str, list[dict[str, Any]]] = {}
+        seen = set()
+        for plan in (portal, external):
+            for day in plan.get("days", []):
+                entries = by_day.setdefault(day["date"], [])
+                for entry in day["entries"]:
+                    times = self.lesson_times(child, date.fromisoformat(day["date"]), entry.get("lesson") or "")
+                    begin = datetime.fromisoformat(entry["start"]).strftime("%H:%M") if entry.get("start") else times[0] or entry.get("lesson")
+                    finish = datetime.fromisoformat(entry["end"]).strftime("%H:%M") if entry.get("end") else times[1]
+                    identity = (day["date"], begin, finish, *(
+                        entry.get(field) or "" for field in (
+                            "kind", "subject", "old_subject", "teacher", "substitute",
+                            "room", "original_room", "info",
+                        )
+                    ))
+                    if identity not in seen:
+                        entries.append(entry)
+                        seen.add(identity)
+        return {
+            "available": bool(portal.get("available") or external.get("available")),
+            "stand": portal.get("stand") or external.get("stand"),
+            "updated": max(portal.get("updated") or "", external.get("updated") or "") or None,
+            "days": [{"date": day, "entries": entries} for day, entries in sorted(by_day.items())],
+        }
+
     def _merge_substitutions(
         self, key: str, subst: dict[str, Any]
     ) -> list[tuple[str, dict[str, Any]]]:
@@ -1568,7 +1801,7 @@ class SchulManager:
     def child_substitutions(self, child: str, include_past: bool = False) -> list[dict[str, Any]]:
         """Tage des Vertretungsplans ab heute (mit Einträgen und leeren Tagen)."""
         today = dt_util.now().date()
-        plan = self.data["substitutions"].get(child, {})
+        plan = self.substitution_plan(child)
         return [
             d for d in plan.get("days", [])
             if include_past or date.fromisoformat(d["date"]) >= today
@@ -1577,7 +1810,9 @@ class SchulManager:
     def substitution_text(
         self, e: dict[str, Any], with_teacher: bool = True, child: str | None = None
     ) -> str:
-        lesson = f"{e['lesson']}. Std." if e.get("lesson") else ""
+        lesson = f"{e['lesson']}. Std." if e.get("lesson") else (
+            datetime.fromisoformat(e["start"]).strftime("%H:%M") if e.get("start") else ""
+        )
         subj = e.get("subject") or e.get("old_subject") or ""
         head = " ".join(x for x in (lesson, subj) if x)
         info = (e.get("info") or "").strip()
@@ -1587,7 +1822,8 @@ class SchulManager:
                 text += f" – {info}"
             return text
         if e.get("kind") == "raum":
-            text = f"{head}: Raum {e.get('room') or '?'}"
+            previous_room = f"{e['original_room']} → " if e.get("original_room") else ""
+            text = f"{head}: Raum {previous_room}{e.get('room') or '?'}"
             if re.fullmatch(r"(?i)raum(änderung|wechsel)\.?", info):
                 info = ""
         else:
@@ -1605,6 +1841,18 @@ class SchulManager:
     async def _notify_substitutions(
         self, child: str, fresh: list[tuple[str, dict[str, Any]]]
     ) -> None:
+        """Melden oder – während eines Abrufs – für eine gemeinsame Meldung sammeln."""
+        if self._queued_substitutions is not None:
+            self._queued_substitutions.setdefault(child, []).extend(fresh)
+            return
+        await self._send_substitutions(child, fresh)
+
+    async def _send_substitutions(
+        self, child: str, fresh: list[tuple[str, dict[str, Any]]]
+    ) -> None:
+        fresh = self._notification_entries(child, fresh)
+        if not fresh:
+            return
         name = self.children.get(child, {}).get("name", child)
         today = dt_util.now().date()
         lines = []
@@ -1622,6 +1870,82 @@ class SchulManager:
                 "entries": [{"date": d, **e} for d, e in fresh],
             },
         )
+
+    def _substitution_slot(self, child: str, day: str, entry: dict[str, Any]) -> str | None:
+        """Identify a notification by date, actual start/end and change kind."""
+        try:
+            lesson_start, lesson_end = self.lesson_times(child, date.fromisoformat(day), entry.get("lesson") or "")
+            tz = dt_util.get_default_time_zone()
+            begin = datetime.fromisoformat(entry["start"]) if entry.get("start") else (
+                datetime.combine(date.fromisoformat(day), time.fromisoformat(lesson_start), tz) if lesson_start else None
+            )
+            finish = datetime.fromisoformat(entry["end"]) if entry.get("end") else (
+                datetime.combine(date.fromisoformat(day), time.fromisoformat(lesson_end), tz) if lesson_end else None
+            )
+            if not begin or not finish or not begin.tzinfo or not finish.tzinfo:
+                return None  # Unknown times cannot safely identify a cross-source duplicate.
+            identity = [day, dt_util.as_utc(begin).isoformat(), dt_util.as_utc(finish).isoformat(), entry.get("kind")]
+            return hashlib.sha1(json.dumps(identity).encode()).hexdigest()
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _substitution_source(entry: dict[str, Any]) -> str:
+        return (entry.get("source_entity") or "webuntis") if entry.get("source") == "webuntis" else "portal"
+
+    def _remember_substitution_slots(self) -> None:
+        """Persist observed source slots, including the quiet initial imports."""
+        history = self.data["substitution_notifications"]
+        today = dt_util.now().date().isoformat()
+        for child in list(history):
+            if child not in self.children:
+                history.pop(child)
+                continue
+            history[child] = {key: value for key, value in history[child].items() if value["date"] >= today}
+        for child in self.children:
+            plans = [self.data["substitutions"].get(child, {})]
+            external = self.data["webuntis"].get(child, {})
+            if external.get("entity_id") == self.opt(CONF_WEBUNTIS_CALENDARS, {}).get(child):
+                plans.append(external)
+            for plan in plans:
+                for day in plan.get("days", []):
+                    if day["date"] < today:
+                        continue
+                    for entry in day["entries"]:
+                        if slot := self._substitution_slot(child, day["date"], entry):
+                            record = history.setdefault(child, {}).setdefault(slot, {"date": day["date"], "sources": []})
+                            source = self._substitution_source(entry)
+                            if source not in record["sources"]:
+                                record["sources"].append(source)
+
+    def _notification_entries(
+        self, child: str, fresh: list[tuple[str, dict[str, Any]]]
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Coalesce cross-source slots in notifications only; leave displays intact."""
+        history = self.data["substitution_notifications"].setdefault(child, {})
+        groups: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+        for index, (day, entry) in enumerate(fresh):
+            slot = self._substitution_slot(child, day, entry)
+            groups.setdefault(slot or f"unknown-{index}", []).append((day, entry))
+        result = []
+        for slot, entries in groups.items():
+            sources = {self._substitution_source(entry) for _, entry in entries}
+            previous = set(history.get(slot, {}).get("sources", []))
+            allowed = [item for item in entries if not previous or self._substitution_source(item[1]) in previous]
+            if not slot.startswith("unknown-"):
+                history[slot] = {"date": entries[0][0], "sources": sorted(previous | sources)}
+            if not allowed:
+                continue  # A newly arriving source repeats a slot observed earlier.
+            if len(sources) == 1:
+                result.extend(allowed)
+            else:
+                day, first = allowed[0]
+                combined = {**first, "sources": sorted(sources)}
+                combined["info"] = " / ".join(dict.fromkeys(
+                    entry["info"].strip() for _, entry in entries if (entry.get("info") or "").strip()
+                ))
+                result.append((day, combined))
+        return result
 
     # ------------------------------------------------------------------
     # Benachrichtigungen
@@ -1874,6 +2198,7 @@ class SchulManager:
             self.data["appointments"].pop(k, None)
             self.data["timetable"].pop(k, None)
             self.data["substitutions"].pop(k, None)
+            self.data.get("webuntis", {}).pop(k, None)
             self.data["subs_seen"].pop(k, None)
             self.data["sicknotes"].pop(k, None)
         for uid in [u for u, i in self.items.items() if i.get("school") == school]:

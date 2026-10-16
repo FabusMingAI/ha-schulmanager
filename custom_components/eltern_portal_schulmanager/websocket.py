@@ -197,6 +197,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
         if msg.get("child") and key != msg["child"]:
             continue
         s = m.child_summary(key)
+        substitution_plan = m.substitution_plan(key)
         tasks = []
         for t in m.child_tasks(key, include_done=True):
             if t["status"] == STATUS_DONE and t.get("completed"):
@@ -222,9 +223,9 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 "timetable": m.data["timetable"].get(key, {}).get("lessons", []),
                 "sicknotes": m.child_sicknotes(key)[:30],
                 "substitutions": {
-                    "available": m.data["substitutions"].get(key, {}).get("available", False),
-                    "stand": m.data["substitutions"].get(key, {}).get("stand"),
-                    "updated": m.data["substitutions"].get(key, {}).get("updated"),
+                    "available": substitution_plan.get("available", False),
+                    "stand": substitution_plan.get("stand"),
+                    "updated": substitution_plan.get("updated"),
                     "days": [
                         {
                             "date": d["date"],

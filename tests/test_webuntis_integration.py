@@ -1,7 +1,7 @@
 """Optional calendar configuration and real HA calendar-service integration."""
 
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 import json
 import hashlib
 from pathlib import Path
@@ -10,7 +10,8 @@ from unittest.mock import patch
 import pytest
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, CoreState
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.data_entry_flow import InvalidData
 from homeassistant.setup import async_setup_component
@@ -25,6 +26,7 @@ from custom_components.eltern_portal_schulmanager.portal import PortalChild, Por
 @pytest.fixture(autouse=True)
 def custom_integrations(hass, enable_custom_integrations):
     hass.config.language = "de"
+    hass.state = CoreState.running
     yield
 
 
@@ -386,3 +388,41 @@ async def test_timetable_change_does_not_notify_unchanged_webuntis(hass, source,
                                     summary=event.summary, description=json.dumps(payload))
     await refresh(manager)
     assert len(notifications) == 1
+
+
+@pytest.mark.parametrize(("begin", "finish", "expected"), [
+    ("10:05", "10:50", "3"),
+    ("10:05", "11:30", "3-4"),
+    ("14:00", "14:45", ""),
+    ("10:22:30", "11:07:30", ""),  # Exactly half of two adjacent periods.
+])
+async def test_tolerant_period_assignment_preserves_event_times(hass, source, begin, finish, expected):
+    original = source.events[2]
+    day = dt_util.as_local(original.start).date()
+    start = datetime.combine(day, time.fromisoformat(begin), dt_util.get_default_time_zone())
+    end = datetime.combine(day, time.fromisoformat(finish), dt_util.get_default_time_zone())
+    source.events = [CalendarEvent(start=start, end=end, summary=original.summary, description=original.description)]
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    manager.data["timetable"]["anna"] = {"lessons": [
+        {"weekday": day.isoweekday(), "lesson": "3", "start": "10:00", "end": "10:45"},
+        {"weekday": day.isoweekday(), "lesson": "4", "start": "10:45", "end": "11:30"},
+    ]}
+    await refresh(manager)
+    entry = changed(manager)[0]
+    assert entry["lesson"] == expected
+    event = next(e for e in manager.child_events("anna") if e["category"] == "vertretung")
+    assert event["start"] == start and event["end"] == end
+
+
+async def test_calendar_waits_for_started_without_repeating_portal(hass, source):
+    hass.state = CoreState.starting
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    assert manager.children and source.calls == 0
+    assert manager.last_errors == [] and changed(manager) == []
+    with patch.object(SchulManager, "_async_fetch_portal") as portal:
+        hass.state = CoreState.running
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+        await hass.async_block_till_done()
+        portal.assert_not_called()
+    assert source.calls == 1 and len(changed(manager)) == 3
+    assert manager.last_errors == []

@@ -14,7 +14,7 @@ from typing import Any
 import aiohttp
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, CoreState, Event, HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
@@ -26,6 +26,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 from homeassistant.util.ssl import get_default_context
@@ -284,6 +285,8 @@ class SchulManager:
         self._remember_substitution_slots()
 
     async def async_start(self) -> None:
+        if self.opt(CONF_WEBUNTIS_CALENDARS, {}) and self.hass.state is not CoreState.running:
+            self._unsubs.append(async_at_started(self.hass, self._async_webuntis_started))
         interval = timedelta(
             minutes=max(10, int(self.opt(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)))
         )
@@ -1497,6 +1500,8 @@ class SchulManager:
     # ------------------------------------------------------------------
     async def _async_refresh_webuntis(self, errors: list[str]) -> None:
         """Read only explicitly assigned calendars; preserve last data on failures."""
+        if self.hass.state is not CoreState.running:
+            return  # Calendar platforms may not have been set up yet.
         calendars = self.opt(CONF_WEBUNTIS_CALENDARS, {})
         cache = self.data["webuntis"]
         for child in list(cache):
@@ -1550,15 +1555,7 @@ class SchulManager:
                         continue
                     begin, finish = dt_util.as_local(begin), dt_util.as_local(finish)
                     day = begin.date().isoformat()
-                    lessons = [
-                        lesson for lesson in self.data["timetable"].get(child, {}).get("lessons", [])
-                        if lesson.get("weekday") == begin.isoweekday()
-                        and lesson.get("start") and lesson.get("end")
-                        and lesson["start"] >= begin.strftime("%H:%M")
-                        and lesson["end"] <= finish.strftime("%H:%M")
-                    ]
-                    nums = sorted({lesson["lesson"] for lesson in lessons}, key=lambda n: int(n) if n.isdigit() else 999)
-                    lesson = "-".join([nums[0], nums[-1]]) if len(nums) > 1 else nums[0] if nums else ""
+                    lesson = self._webuntis_lesson(child, begin, finish)
                     entry = {
                         "uid": hashlib.sha1(f"{entity_id}|{parsed['uid']}|{begin.isoformat()}".encode()).hexdigest()[:12],
                         "kind": parsed["kind"], "lesson": lesson, "subject": parsed["summary"],
@@ -1613,6 +1610,46 @@ class SchulManager:
                     f"WebUntis {self.children[child]['name']} ({entity_id}): "
                     f"unerwarteter Fehler ({type(err).__name__}: {err})"
                 )
+
+    async def _async_webuntis_started(self, _hass: HomeAssistant) -> None:
+        """Finish the deferred calendar import without repeating the portal fetch."""
+        async with self._lock:
+            self._remember_substitution_slots()
+            errors: list[str] = []
+            await self._async_refresh_webuntis(errors)
+            self.last_errors.extend(errors)
+            self._changed()
+
+    def _webuntis_lesson(self, child: str, begin: datetime, finish: datetime) -> str:
+        """Match at least half a portal period; ambiguous matches keep clock times."""
+        matches: dict[str, tuple[datetime, datetime, float]] = {}
+        for lesson in self.data["timetable"].get(child, {}).get("lessons", []):
+            if lesson.get("weekday") != begin.isoweekday():
+                continue
+            try:
+                start = datetime.combine(begin.date(), time.fromisoformat(lesson["start"]), begin.tzinfo)
+                end = datetime.combine(begin.date(), time.fromisoformat(lesson["end"]), begin.tzinfo)
+                duration = (end - start).total_seconds()
+                overlap = (min(end, finish) - max(start, begin)).total_seconds()
+                number = str(lesson["lesson"])
+                if not number.isdigit() or duration <= 0 or overlap < duration / 2:
+                    continue
+            except (KeyError, ValueError, TypeError):
+                continue
+            if number in matches and matches[number][:2] != (start, end):
+                return ""  # Conflicting times for the same period.
+            matches[number] = (start, end, overlap / duration)
+        nums = sorted(matches, key=int)
+        if len(nums) > 1:
+            # A boundary-straddling single lesson is not a double lesson. Nor
+            # are overlapping or non-consecutive portal periods unambiguous.
+            if any(matches[n][2] <= 0.5 for n in nums) or any(
+                int(right) != int(left) + 1 or matches[left][1] > matches[right][0]
+                for left, right in zip(nums, nums[1:])
+            ):
+                return ""
+            return f"{nums[0]}-{nums[-1]}"
+        return nums[0] if nums else ""
 
     @staticmethod
     def _webuntis_fingerprint(entry: dict[str, Any]) -> str:

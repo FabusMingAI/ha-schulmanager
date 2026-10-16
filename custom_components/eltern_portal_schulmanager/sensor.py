@@ -242,7 +242,7 @@ class SubstitutionSensor(SchulEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         m = self.manager
-        plan = m.data["substitutions"].get(self.child, {})
+        plan = m.substitution_plan(self.child)
         days = m.child_substitutions(self.child)
         today = dt_util.now().date().isoformat()
         tomorrow = (dt_util.now().date() + timedelta(days=1)).isoformat()

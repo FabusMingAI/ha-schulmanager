@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased – WebUntis (draft #26)
+
+- Optional per-child calendar assignment under **Configure → WebUntis calendar**. Users install and configure WebUntis themselves (JSON descriptions, cancelled lessons and room changes enabled). No selection means no WebUntis queries. / Optionale Zuordnung eines vorhandenen WebUntis-Kalenders pro Kind; ohne Auswahl bleibt alles wie bisher.
+- Selected calendars are read for the next 14 days and combined with the Eltern-Portal substitution plan. Changes reach sensors, calendar, dashboard and substitution notifications; exact duplicates are suppressed. Failed/unavailable sources retain their last data and appear in diagnostics; successful empty results remove obsolete entries. / Beide Quellen werden zusammengeführt; Fehler löschen keine bekannten Daten.
+
 ## 0.14.1 – 2026-10-12 (bridge release)
 
 - **Existing setups are now taken over automatically.** With 0.14.0, HACS installed the renamed integration next to the old folder, but Home Assistant kept running the old 0.13 code and nothing told users to click *Take over* – they stayed on 0.13 without noticing. 0.14.1 is released once more under the old domain `schulmanager`: HACS installs it over 0.13 as a normal update, it installs *Eltern Portal Manager Bavaria*, starts the takeover by itself and asks for one more restart. Entries of Schulmanager Online are never touched. If the automatic takeover fails, a repair notice explains the manual way. / **Bestehende Einrichtungen werden jetzt automatisch übernommen.** Mit 0.14.0 lief nach dem Update unbemerkt weiter 0.13. 0.14.1 kommt noch einmal unter der alten Domain, installiert Eltern Portal Manager Bavaria und übernimmt die Einrichtung selbst; danach einmal neu starten.

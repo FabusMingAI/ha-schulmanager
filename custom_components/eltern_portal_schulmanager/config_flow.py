@@ -18,6 +18,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
+from homeassistant.helpers import entity_registry as er
 
 from .migration import CONF_MIGRATED_FROM, legacy_entries
 from .const import (
@@ -28,6 +29,7 @@ from .const import (
     CONF_APPOINTMENT_KINDS,
     CONF_OWN_CLASS_ONLY,
     CONF_TEACHER_NAMES,
+    CONF_WEBUNTIS_CALENDARS,
     TEACHER_NAMES_MODES,
     CONF_SUMMARY_LANGUAGES,
     CONF_DASHBOARD,
@@ -264,7 +266,73 @@ class SchulmanagerOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
-            step_id="init", menu_options=["settings", "add_portal", "remove_portal"]
+            step_id="init", menu_options=["settings", "webuntis", "add_portal", "remove_portal"]
+        )
+
+    async def async_step_webuntis(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Choose a child explicitly; no automatic calendar assignment."""
+        manager = getattr(self.config_entry, "runtime_data", None)
+        children = manager.children if manager is not None else {}
+        if not children:
+            return self.async_abort(reason="webuntis_no_children")
+        errors = {}
+        if user_input is not None:
+            if user_input.get("child") in children:
+                self._webuntis_child = user_input["child"]
+                return await self.async_step_webuntis_calendar()
+            errors["child"] = "webuntis_invalid_child"
+        return self.async_show_form(
+            step_id="webuntis",
+            data_schema=vol.Schema({vol.Required("child"): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=[
+                    {"value": key, "label": f"{info['name']} · {info.get('school_name', '')}"}
+                    for key, info in children.items()
+                ])
+            )}),
+            errors=errors,
+        )
+
+    async def async_step_webuntis_calendar(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """An empty selection removes the child's optional calendar mapping."""
+        child = self._webuntis_child
+        manager = self.config_entry.runtime_data
+        registry = er.async_get(self.hass)
+        own_calendars = [
+            entity.entity_id for entity in registry.entities.values()
+            if entity.domain == "calendar" and entity.platform == DOMAIN
+        ]
+        calendars = dict(self.config_entry.options.get(CONF_WEBUNTIS_CALENDARS, {}))
+        errors = {}
+        if user_input is not None:
+            entity_id = user_input.get("calendar")
+            if entity_id and (
+                not entity_id.startswith("calendar.")
+                or entity_id in own_calendars
+                or self.hass.states.get(entity_id) is None
+            ):
+                errors["calendar"] = "webuntis_invalid_calendar"
+            else:
+                if entity_id:
+                    calendars[child] = entity_id
+                else:
+                    calendars.pop(child, None)
+                return self.async_create_entry(data={
+                    **self.config_entry.options, CONF_WEBUNTIS_CALENDARS: calendars,
+                })
+        selected = (user_input or {}).get("calendar", calendars.get(child))
+        return self.async_show_form(
+            step_id="webuntis_calendar",
+            description_placeholders={"child": manager.children[child]["name"]},
+            data_schema=vol.Schema({
+                vol.Optional("calendar", description={"suggested_value": selected}): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="calendar", exclude_entities=own_calendars)
+                ),
+            }),
+            errors=errors,
         )
 
     async def async_step_settings(

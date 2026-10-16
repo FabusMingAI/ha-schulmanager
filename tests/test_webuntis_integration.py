@@ -1,0 +1,229 @@
+"""Optional calendar configuration and real HA calendar-service integration."""
+
+from copy import deepcopy
+from datetime import timedelta
+import json
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from homeassistant.components.calendar import CalendarEntity, CalendarEvent
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.data_entry_flow import InvalidData
+from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events
+
+from custom_components.eltern_portal_schulmanager.const import CONF_WEBUNTIS_CALENDARS, DOMAIN, EVENT_SUBSTITUTION
+from custom_components.eltern_portal_schulmanager.manager import SchulManager
+from custom_components.eltern_portal_schulmanager.portal import PortalChild, PortalResult
+
+
+@pytest.fixture(autouse=True)
+def custom_integrations(hass, enable_custom_integrations):
+    hass.config.language = "de"
+    yield
+
+
+class FixtureCalendar(CalendarEntity):
+    _attr_name = "WebUntis Demo"
+    _attr_unique_id = "webuntis-demo"
+    _attr_should_poll = False
+    entity_id = "calendar.webuntis_demo"
+
+    def __init__(self):
+        self.events = []
+        self.calls = 0
+        self.error = None
+
+    @property
+    def event(self):
+        return None
+
+    async def async_get_events(self, hass, start_date, end_date):
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return [event for event in self.events if event.end > start_date and event.start < end_date]
+
+
+@pytest.fixture
+async def source(hass):
+    assert await async_setup_component(hass, "calendar", {})
+    calendar = FixtureCalendar()
+    day = dt_util.start_of_local_day() + timedelta(days=1)
+    raw = json.loads((Path(__file__).parent / "fixtures/webuntis/events.json").read_text())
+    calendar.events = [
+        CalendarEvent(
+            start=day + timedelta(hours=8 + i), end=day + timedelta(hours=8 + i, minutes=45),
+            summary=event["summary"], description=event["description"],
+        ) for i, event in enumerate(raw)
+    ]
+    await hass.data["calendar"].async_add_entities([calendar])
+    await hass.async_block_till_done()
+    return calendar
+
+
+def portal_result():
+    return PortalResult(
+        school="demo", school_name="Demo", base_url="https://demo.eltern-portal.org/",
+        children=[PortalChild(student_id=name, firstname=name, fullname=name, classname="5a") for name in ("Anna", "Ben")],
+    )
+
+
+async def setup_manager(hass, options=None):
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=DOMAIN, data={
+        "portals": [{"school": "demo", "school_name": "Demo", "username": "demo", "password": "demo"}],
+    }, options=options or {})
+    entry.add_to_hass(hass)
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=portal_result()):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    return entry, entry.runtime_data
+
+
+async def refresh(manager):
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=portal_result()):
+        await manager.async_refresh()
+        await manager.hass.async_block_till_done()
+
+
+def changed(manager, child="anna"):
+    return [e for day in manager.child_substitutions(child) for e in day["entries"]]
+
+
+async def test_no_calendar_configured_does_not_query_webuntis(hass, source):
+    _, manager = await setup_manager(hass)
+    calls = source.calls
+    await refresh(manager)
+    assert source.calls == calls
+    assert changed(manager) == [] and manager.last_errors == []
+
+
+async def test_calendar_service_to_child_sensor_and_events(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    entries = changed(manager)
+    assert [e["kind"] for e in entries] == ["entfall", "vertretung", "raum"]
+    assert changed(manager, "ben") == []
+    assert source.calls > 0
+    assert hass.states.get("sensor.schule_anna_vertretungen").state == "3"
+    events = [e for e in manager.child_events("anna") if e["category"] in ("entfall", "vertretung", "raum")]
+    assert len(events) == 3 and all(e["start"].tzinfo is not None for e in events)
+    assert events[1]["start"] == source.events[2].start
+    assert events[1]["end"] == source.events[2].end
+    assert manager.last_errors == []
+
+
+async def test_changes_removals_failures_and_notifications(hass, source):
+    notifications = async_capture_events(hass, EVENT_SUBSTITUTION)
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    assert notifications == []  # No flood on initial import.
+    before = deepcopy(changed(manager))
+    source.error = HomeAssistantError("Calendar offline")
+    await refresh(manager)
+    assert changed(manager) == before and "Calendar offline" in manager.last_errors[0]
+    source.error = None
+    description = json.loads(source.events[2].description)
+    description["rooms"] = [{"name": "NEW-ROOM"}]
+    source.events[2] = CalendarEvent(start=source.events[2].start, end=source.events[2].end,
+                                   summary="Changed", description=json.dumps(description))
+    await refresh(manager)
+    assert len(notifications) == 1
+    assert changed(manager)[1]["room"] == "NEW-ROOM"
+    assert changed(manager)[1]["uid"] == before[1]["uid"]
+    await refresh(manager)
+    assert len(notifications) == 1  # Unchanged records are not notified again.
+    source.events = []
+    await refresh(manager)
+    assert changed(manager) == [] and manager.last_errors == []
+    assert hass.states.get("sensor.schule_anna_vertretungen").state == "0"
+
+
+async def test_unavailable_or_non_json_calendar_preserves_previous_data(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    before = deepcopy(changed(manager))
+    source._attr_available = False
+    source.async_write_ha_state()
+    await refresh(manager)
+    assert changed(manager) == before and manager.last_errors
+    source._attr_available = True
+    source.events = [CalendarEvent(start=source.events[0].start, end=source.events[0].end,
+                                  summary="Wrong source format", description="plain text")]
+    source.async_write_ha_state()
+    await refresh(manager)
+    assert changed(manager) == before and "JSON" in manager.last_errors[0]
+
+
+async def test_options_assign_and_remove_calendar_per_child(hass, source):
+    entry, manager = await setup_manager(hass, {"reminder_days": "2,0"})
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    assert "webuntis" in flow["menu_options"]
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "webuntis"})
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"child": "anna"})
+    assert flow["step_id"] == "webuntis_calendar"
+    own_id = "calendar.schule_anna_kalender"
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(flow["flow_id"], {"calendar": own_id})
+    invalid = await hass.config_entries.options.async_configure(flow["flow_id"], {"calendar": "calendar.missing"})
+    assert invalid["errors"]["calendar"] == "webuntis_invalid_calendar"
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=portal_result()):
+        result = await hass.config_entries.options.async_configure(flow["flow_id"], {"calendar": source.entity_id})
+        await hass.async_block_till_done()
+    assert result["type"] == "create_entry"
+    assert entry.options[CONF_WEBUNTIS_CALENDARS] == {"anna": source.entity_id}
+    assert entry.options["reminder_days"] == "2,0"
+    assert len(changed(entry.runtime_data)) == 3
+    # Editing unrelated settings must retain the optional source mapping.
+    general = await hass.config_entries.options.async_init(entry.entry_id)
+    general = await hass.config_entries.options.async_configure(general["flow_id"], {"next_step_id": "settings"})
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=portal_result()):
+        await hass.config_entries.options.async_configure(general["flow_id"], {"dashboard": {"dashboard": "off"}})
+        await hass.async_block_till_done()
+    assert entry.options[CONF_WEBUNTIS_CALENDARS] == {"anna": source.entity_id}
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "webuntis"})
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"child": "anna"})
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=portal_result()):
+        await hass.config_entries.options.async_configure(flow["flow_id"], {})
+        await hass.async_block_till_done()
+    assert entry.options[CONF_WEBUNTIS_CALENDARS] == {}
+    assert changed(entry.runtime_data) == []
+
+
+async def test_both_sources_combined_and_duplicate_suppressed(hass, source):
+    _, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    external = deepcopy(changed(manager)[1])
+    day = dt_util.as_local(source.events[2].start).date().isoformat()
+    external["uid"] = "portal-duplicate"
+    external.pop("source")
+    manager.data["substitutions"]["anna"] = {"available": True, "days": [{"date": day, "entries": [
+        external, {"uid": "portal-extra", "kind": "entfall", "lesson": "8", "subject": "Demo extra"},
+    ]}]}
+    entries = changed(manager)
+    assert len(entries) == 4
+    assert any(e["uid"] == "portal-extra" for e in entries)
+    assert sum(e.get("room") == external["room"] for e in entries) == 1
+    # A distinct note from the other source must remain visible.
+    manager.data["substitutions"]["anna"]["days"][0]["entries"].append({
+        **external, "uid": "portal-different-note", "info": "Additional portal information",
+    })
+    assert len(changed(manager)) == 5
+
+
+async def test_switching_source_drops_old_cached_changes(hass, source):
+    entry, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    assert len(changed(manager)) == 3
+    # A stored source switch must not expose changes from the old calendar.
+    with patch("custom_components.eltern_portal_schulmanager._async_reload"):
+        hass.config_entries.async_update_entry(entry, options={CONF_WEBUNTIS_CALENDARS: {"anna": "calendar.missing"}})
+        await hass.async_block_till_done()
+    await refresh(manager)
+    assert changed(manager) == [] and manager.last_errors
+
+
+async def test_without_webuntis_installation_or_mapping(hass):
+    entry, manager = await setup_manager(hass)
+    assert CONF_WEBUNTIS_CALENDARS not in entry.options
+    assert manager.last_errors == [] and changed(manager) == []

@@ -7,11 +7,23 @@ as part of setting up or running these tests.
 
 ## Scope
 
-`webuntis.py` currently parses structured descriptions from calendar events.
-It is **not connected to configuration, the refresh lifecycle or child events**.
-A passing parser test or a running HA container does not establish WebUntis
-end-to-end functionality. The fixtures are synthetic and contain no real pupils,
-teachers or account details.
+WebUntis is an optional per-child calendar source selected under **Configure →
+WebUntis calendar (optional)**. Without an assignment, the integration never
+queries a WebUntis calendar. Configured sources use the HA calendar service for
+the next 14 days, feed the existing substitutions model and appear in child
+sensors, calendar events and the dashboard. Existing portal substitutions stay
+available. The fixtures are synthetic and contain no real pupils, teachers or
+account details. A passing fixture test does not establish compatibility with
+every live WebUntis account or integration version.
+
+To reproduce the optional configuration in the running test instance, create a
+**Local Calendar** named **WebUntis Demo** and add synthetic events whose
+description is JSON in the format of `tests/fixtures/webuntis/events.json`.
+Use future dates within the next 14 days. This substitutes for the upstream
+WebUntis calendar provider without using school credentials. In the integration's
+Configure menu choose **WebUntis calendar (optional)**, then the demo child,
+then `calendar.webuntis_demo`. The integration's own calendar is deliberately
+excluded to prevent a feedback loop. Clearing the selection removes the mapping.
 
 ## Versions and isolation
 
@@ -158,7 +170,18 @@ as a routine shutdown action. Logs and `.env` stay outside Git.
   WebUntis tests (five existing cases plus the new synthetic fixture batch).
   This result applies to the pinned HA 2026.10.1 test environment.
 
-Remaining feature work in #17: configuration of a WebUntis calendar source,
-refresh lifecycle integration, per-child assignment and combined events.
-The fixture tests and HTTP startup checks do not cover those paths. Production
-was not accessed, and no PR was merged by this work.
+The above 51-test run is the historical environment baseline before calendar
+assignment was implemented. `tests/test_webuntis_integration.py` now additionally
+exercises optional configuration, the real HA calendar service, per-child
+assignment, combined events, updates, deletions, source failures and removal of
+the mapping. Live WebUntis credentials have not been used. Production was not
+accessed, and no PR was merged by this work.
+
+Follow-up on 16 October: the full extended suite passed **59 tests**. In the
+running container, the new options flow was exercised through the browser with
+the synthetic Local Calendar. The child substitution sensor changed from five
+portal entries to eight combined entries (one cancellation, one teacher/room
+change and one room-only change added). The dashboard showed all three new
+events. Removing the mapping returned the count to five; restoring it returned
+to eight. Diagnostics remained empty. The demo source remains assigned for
+further review. No live WebUntis integration/account has been tested yet.

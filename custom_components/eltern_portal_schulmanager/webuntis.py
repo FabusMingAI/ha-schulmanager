@@ -21,11 +21,8 @@ def _names(value: Any) -> list[str]:
     ]
 
 
-def parse_webuntis_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Return a normalized substitution or None for ordinary/ambiguous lessons.
-
-    Expected input: one event from Home Assistant calendar.get_events.
-    """
+def webuntis_payload(event: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Recognize structured WebUntis descriptions, including ordinary lessons."""
     description = event.get("description")
     if not isinstance(description, str):
         return None
@@ -33,7 +30,20 @@ def parse_webuntis_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
         data = json.loads(description)
     except (ValueError, TypeError):
         return None
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or not any(
+        key in data for key in ("subjects", "teachers", "original_teachers", "rooms", "code")
+    ):
+        return None
+    return data
+
+
+def parse_webuntis_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Return a normalized substitution or None for ordinary/ambiguous lessons.
+
+    Expected input: one event from Home Assistant calendar.get_events.
+    """
+    data = webuntis_payload(event)
+    if data is None:
         return None
 
     summary = str(event.get("summary") or "")
@@ -43,8 +53,8 @@ def parse_webuntis_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
     original_rooms = _names(data.get("original_rooms"))
     teachers = _names(data.get("teachers"))
     original_teachers = _names(data.get("original_teachers"))
-    room_changed = bool(original_rooms and rooms and rooms != original_rooms)
-    teacher_changed = bool(original_teachers and teachers and teachers != original_teachers)
+    room_changed = bool(original_rooms and rooms and set(rooms) != set(original_rooms))
+    teacher_changed = bool(original_teachers and teachers and set(teachers) != set(original_teachers))
 
     # WebUntis sometimes omits teachers entirely while retaining original_teachers.
     # This is not sufficient evidence of cancellation or substitution.
@@ -70,4 +80,7 @@ def parse_webuntis_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
 
 def parse_webuntis_events(events: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Extract changed lessons from a calendar event list."""
-    return [parsed for event in events if (parsed := parse_webuntis_event(event)) is not None]
+    return [
+        parsed for event in events
+        if isinstance(event, Mapping) and (parsed := parse_webuntis_event(event)) is not None
+    ]

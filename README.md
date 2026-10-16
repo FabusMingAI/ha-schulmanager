@@ -147,6 +147,19 @@ Not carried over: PDF and calendar links in push notifications sent before the u
 
 ## Setup
 
+### Optional WebUntis calendar (unreleased, draft #26)
+
+If your school uses WebUntis, first install and configure the separate
+[WebUntis integration](https://github.com/JonasJoKuJonas/homeassistant-WebUntis).
+Enable **JSON calendar descriptions**, **cancelled lessons** and **room changes**
+there. Then open this integration's **Configure → WebUntis calendar (optional)**,
+choose the child and select their calendar. Repeat for other children as needed.
+Clear a child's calendar field to remove the assignment. Without an assignment,
+no WebUntis calendar is queried and WebUntis does not need to be installed.
+Changes from the next 14 days are combined with the Eltern-Portal substitution
+plan. A failed source retains its last results and is reported in diagnostics.
+Normal lessons are not imported as a separate WebUntis timetable.
+
 1. **Settings → Devices & services → Add integration → Eltern Portal Manager Bavaria**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.
 3. **Configure → Settings** – grouped into collapsible sections (*KI & Sprachen*, *Benachrichtigungen & Erinnerungen*, *Termine & Klassen* open; *Sprachansagen*, *Abruf & Ablage*, *Dashboard* collapsed), every field with a short explanation: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, **which portal appointments to show** (default: exams and tests; optionally also school appointments), **only appointments of the child's class** (default on: hides entries such as "Schullandheim 5b+5c" or "Jgst. 10" that name only other classes or grades), **how teachers are shown** in timetable and substitution plan (default *abbreviation and name*, e.g. "Mü (Maria Müller)"; or *name only*, or *abbreviation only*) and the **languages of the AI summary** (checkboxes for German, English, Spanish, Catalan, up to 4; default German and English; the first one is used for push notifications). If an already analysed message lacks a language – also after you add one – the AI translates just the summary in the background; tasks, appointments and status stay untouched. With 5 or more translations you get a Home Assistant notification when they start (with an estimated duration) and when they are done; a failed translation is retried after 6 hours, up to 3 attempts.

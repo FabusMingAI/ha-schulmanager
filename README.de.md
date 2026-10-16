@@ -140,6 +140,20 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
 
 ## Einrichtung
 
+### Optionaler WebUntis-Kalender (noch unveröffentlicht, Draft #26)
+
+Nutzt die Schule WebUntis, zuerst die separate
+[WebUntis-Integration](https://github.com/JonasJoKuJonas/homeassistant-WebUntis)
+installieren und einrichten. Dort **Kalender-Beschreibung: JSON** sowie
+**ausfallende Stunden** und **Raumwechsel** einschalten. Anschließend hier unter
+**Konfigurieren → WebUntis-Kalender (optional)** das Kind und seinen Kalender
+auswählen. Für weitere Kinder wiederholen. Ein leeres Kalenderfeld entfernt die
+Zuordnung. Ohne Auswahl ist WebUntis nicht erforderlich und wird nicht abgefragt.
+Änderungen der nächsten 14 Tage werden mit dem Vertretungsplan des Eltern-Portals
+zusammengeführt. Bei Fehlern bleiben die letzten Daten erhalten; der Fehler
+erscheint im Diagnose-Sensor. Normale Stunden werden nicht als eigener
+WebUntis-Stundenplan importiert.
+
 1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Eltern Portal Manager Bavaria“**
 2. Schulkennung eingeben (der Teil vor `.eltern-portal.org`) oder einfach den Link aus einer Benachrichtigungs-Mail des Portals einfügen, dazu E-Mail und Passwort. Weitere Schulen direkt im selben Dialog hinzufügen.
 3. **Integration → Konfigurieren → Einstellungen** – in einklappbaren Abschnitten: *KI & Sprachen*, *Benachrichtigungen & Erinnerungen* und *Termine & Klassen* stehen offen, *Sprachansagen*, *Abruf & Ablage* und *Dashboard* sind zugeklappt. Jedes Feld hat einen kurzen Erklärtext.

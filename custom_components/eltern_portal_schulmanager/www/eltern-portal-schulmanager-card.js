@@ -1382,13 +1382,12 @@
       const rest = entries.filter((e, i) => !used.has(i));
       if (rest.length) {
         html += `<div class="day">Weitere Änderungen</div>`;
-        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${esc(e.lesson || "")}.</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div>${this._chgHtml(c, e)}</div><span class="rm">${esc(e.room || "")}</span></div>`;
+        for (const e of rest) html += `<div class="les ${e.kind}"><span class="nr">${e.lesson ? esc(e.lesson) + "." : esc(e.start ? e.start.slice(11, 16) : "")}</span><div class="main"><div class="sj">${esc(fullName(e.subject || e.old_subject || ""))}<span class="badge ${e.kind}">${KIND_LABEL[e.kind] || e.kind}</span></div>${this._chgHtml(c, e)}</div><span class="rm">${esc(e.room || "")}</span></div>`;
       }
       return html;
     }
 
     _weekHtml(c, today, byDate) {
-      if (!c.timetable.length) return `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
       const nums = [...new Set(c.timetable.map((l) => l.lesson))].sort((a, b) => Number(a) - Number(b));
       const times = {};
       for (const l of c.timetable) if (l.start && !times[l.lesson]) times[l.lesson] = l.start;
@@ -1397,7 +1396,8 @@
       const dates = [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
       const k = esc(c.key);
       const rel = off === 0 ? "diese Woche" : off === 1 ? "nächste Woche" : off === -1 ? "letzte Woche" : off > 0 ? `in ${off} Wochen` : `vor ${-off} Wochen`;
-      let html = `<div class="wkn">
+      let html = c.timetable.length ? "" : `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
+      html += `<div class="wkn">
           <button class="pill" data-child="${k}" data-wkoff="-1" title="Woche zurück" aria-label="Woche zurück">‹</button>
           <span class="lbl"><b>KW ${isoWeek(mon)}</b> · ${fmtShort(dates[0])}–${fmtShort(dates[4])} · ${rel}</span>
           ${off !== 0 ? `<button class="pill" data-child="${k}" data-wkoff="0" title="Zur aktuellen Woche">Heute</button>` : ""}
@@ -1419,6 +1419,10 @@
         html += `</tr>`;
       }
       html += `</table></div>`;
+      const unmatched = dates.flatMap((iso) => (byDate[iso] || [])
+        .filter((e) => !lessonNums(e.lesson).some((nr) => nums.includes(String(nr))))
+        .map((e) => `<div class="info">${esc(dayLabel(iso, today))} · ${esc(e.text || changeText(e))}</div>`));
+      if (unmatched.length) html += `<div class="day">Weitere Änderungen</div>${unmatched.join("")}`;
       if (dates[4] < today) html += `<div class="info">Vergangene Woche: Vertretungen werden nur ab heute angezeigt.</div>`;
       else if (dates[0] > addDays(today, 7)) html += `<div class="info">Vertretungen stehen meist erst kurzfristig im Portal.</div>`;
       return html + this._legendHtml("woche", `<div>Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum). Umrandet: 📝 Schulaufgabe (lila), ✏️ Test (blau).</div>`);

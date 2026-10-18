@@ -26,7 +26,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 - **AI analysis** via Home Assistant's [AI Task](https://www.home-assistant.io/integrations/ai_task/) (Anthropic, OpenAI, Google, Ollama …): summary, urgency, tasks, deadlines, amounts, IBAN and payment reference, appointments. Without AI a simple rule-based detection is used.
 - **Tasks with status** *open / in progress / done*, comments, due dates – as a to-do list, calendar and sensors.
 - **Reminders** by push notification (with *Done* and *Remind me tomorrow* buttons), a daily morning summary and optional voice announcements.
-- **Exams and tests in the timetable** – exams (*Schulaufgaben*) and tests (*Tests, Kurzarbeiten, Stegreifaufgaben*) from the portal's appointments are highlighted in the timetable and appear in the calendar; the morning summary mentions tomorrow's exams. Other school appointments (holidays, office hours …) are hidden by default and can be switched on in the settings.
+- **Exams and tests in the timetable** – exams (*Schulaufgaben*) and tests (*Tests, Kurzarbeiten, Stegreifaufgaben*) from the portal's appointments are highlighted in the timetable and appear in the calendar; the morning summary mentions tomorrow's exams. Other school appointments (holidays, office hours …) are hidden by default and can be switched on in the settings. Portal appointments that come with a time (e.g. "14:00 - 16:00") get that time in the calendar, all others are all-day entries.
 - **Timetable & substitutions** – cancelled lessons, substitute teachers and room changes appear in the timetable card, the calendar (with lesson times) and the morning summary; a new change triggers a push notification.
 - **Traffic light per child** – red / yellow / green for dashboards and automations.
 - **Four dashboard cards included**, set up automatically in the "Schule" dashboard – see [The cards](#the-cards).
@@ -160,7 +160,7 @@ On the first run the last 120 days are imported; only the last 21 days (and all 
 |---|---|
 | `sensor.schule_<child>_status` | Traffic light `rot` / `gelb` / `gruen`; attributes contain open tasks and recent messages |
 | `todo.schule_<child>_aufgaben` | Task list – complete, reschedule, add your own tasks |
-| `calendar.schule_<child>_kalender` | Deadlines, appointments from letters, exams and tests (school appointments if enabled), substitutions, cancelled lessons and sick notes |
+| `calendar.schule_<child>_kalender` | Deadlines, appointments from letters, exams and tests (school appointments if enabled; with their time if the portal gives one), substitutions, cancelled lessons and sick notes |
 | `sensor.schule_<child>_offene_zahlungen` | Open payments in € |
 | `sensor.schule_<child>_nachste_frist`, `…_uberfallig`, `…_offene_aufgaben`, `…_ungelesene_mitteilungen` | Counters and next deadline |
 | `sensor.schule_<child>_stundenplan` | Timetable: lessons today; day and week plan as attributes |

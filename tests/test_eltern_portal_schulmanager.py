@@ -898,6 +898,87 @@ async def test_optional_section_disconnect_keeps_fetch(hass: HomeAssistant, medi
     await hass.config_entries.async_unload(entry.entry_id)
 
 
+def test_clean_appointment_title() -> None:
+    """Termintitel mit Uhrzeit kommen als HTML aus dem Portal (#24)."""
+    from custom_components.eltern_portal_schulmanager.portal import clean_appointment_title
+
+    assert clean_appointment_title("14:00 - 16:00<br />5: Lernwerkstatt") == ("5: Lernwerkstatt", "14:00", "16:00")
+    assert clean_appointment_title("8:30 - 9:15<br>Elternabend<br>") == ("Elternabend", "08:30", "09:15")
+    assert clean_appointment_title("19.00 Uhr<br/>Info &amp; Austausch") == ("Info & Austausch", "19:00", None)
+    assert clean_appointment_title("Wandertag<br />Klassen 5–7") == ("Wandertag Klassen 5–7", None, None)
+    assert clean_appointment_title("<b>SA</b> in Deutsch (Mü)") == ("SA in Deutsch (Mü)", None, None)
+    assert clean_appointment_title("SA in Deutsch (Mü)") == ("SA in Deutsch (Mü)", None, None)
+    assert clean_appointment_title("8.30 Uhr Gottesdienst") == ("8.30 Uhr Gottesdienst", None, None)
+    assert clean_appointment_title("25:00 - 26:00<br />Ungültig") == ("25:00 - 26:00 Ungültig", None, None)
+    assert clean_appointment_title(None) == ("", None, None)
+
+
+async def test_appointment_html_and_time(hass: HomeAssistant, media_dir) -> None:
+    """Termine mit Uhrzeit: keine HTML-Tags, Beginn/Ende aus dem Titel, auch für alte Daten (#24)."""
+    from custom_components.eltern_portal_schulmanager.ics import build_ics
+    from custom_components.eltern_portal_schulmanager.portal import portal_appointment
+
+    today = dt_util.now().date()
+    tomorrow = dt_util.start_of_local_day(today + timedelta(days=1))
+    end = tomorrow + timedelta(hours=2)
+
+    timed = portal_appointment("t1", "14:00 - 16:00<br />5: Lernwerkstatt", "14:00 - 16:00<br />5: Lernwerkstatt", "event-info", tomorrow, end)
+    assert timed["title"] == "5: Lernwerkstatt" and timed["detail"] is None
+    assert (timed["time"], timed["time_end"]) == ("14:00", "16:00") and timed["kind"] == "schule"
+    # Uhrzeit nur im langen Titel (pyelternportal hat sie im Kurztitel schon entfernt)
+    exam = portal_appointment("t2", "SA in Englisch", "10:00 - 11:30<br />Schulaufgabe in Englisch", "event-important", tomorrow, end)
+    assert exam["title"] == "SA in Englisch" and exam["detail"] == "Schulaufgabe in Englisch"
+    assert exam["time"] == "10:00" and exam["kind"] == "schulaufgabe"
+    plain = portal_appointment("t3", "kLN in Chemie (Sch)", "kLN in Chemie (Sch)", "event-warning", tomorrow, end)
+    assert plain["time"] is None and plain["detail"] is None
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        res = _fake_result(today)
+        res.children[0].appointments = [timed, exam, plain]
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"appointment_kinds": ["schulaufgabe", "test", "schule"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        ev = {e["uid"]: e for e in m.child_events("anna")}
+        for e in ev.values():
+            assert "<" not in e["summary"] and "<" not in e["hover"]
+        t1 = ev["t1"]
+        assert t1["title"] == "5: Lernwerkstatt" and t1["summary"].endswith("5: Lernwerkstatt")
+        assert isinstance(t1["start"], datetime) and dt_util.as_local(t1["start"]).strftime("%H:%M") == "14:00"
+        assert dt_util.as_local(t1["end"]).strftime("%H:%M") == "16:00"
+        assert t1["start"].date() == tomorrow.date()
+        t2 = ev["t2"]
+        assert dt_util.as_local(t2["start"]).strftime("%H:%M") == "10:00" and t2["subject"] == "Englisch"
+        assert ev["t3"]["start"] == tomorrow.date()  # ohne Uhrzeit weiter ganztägig
+        assert "📝 Morgen: SA in Englisch" in m.digest_text()
+
+        ics = build_ics(t1, "anna", "Anna")
+        assert "DTSTART:" in ics and "VALUE=DATE" not in ics.split("DTSTART")[1].split("\n")[0]
+        assert "<br" not in ics
+
+        # Daten aus älteren Versionen (ungereinigt gespeichert) werden beim Anzeigen bereinigt
+        m.data["appointments"]["anna"] = [
+            {"uid": "old", "title": "14:00 - 16:00<br />5: Lernwerkstatt", "detail": None, "kind": "schule",
+             "start": tomorrow.isoformat(), "end": end.isoformat()}
+        ]
+        old = {e["uid"]: e for e in m.child_events("anna")}["old"]
+        assert old["title"] == "5: Lernwerkstatt"
+        assert dt_util.as_local(old["start"]).strftime("%H:%M") == "14:00"
+
+        state = hass.states.get("calendar.schule_anna_kalender")
+        assert state is not None
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_appointment_kinds_and_setting(hass: HomeAssistant, media_dir) -> None:
     """Portal-Termine: Standard nur Schulaufgaben und Tests, Termine der Schule per Einstellung."""
     from custom_components.eltern_portal_schulmanager.portal import appointment_kind, appointment_subject

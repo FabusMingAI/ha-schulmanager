@@ -146,7 +146,7 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
    - **KI-Dienst**: eure AI-Task-Entität. Ohne KI greift nur die einfache Regel-Erkennung.
    - **Push an**: z. B. `mobile_app_<handy_1>` und `mobile_app_<handy_2>`
    - **Sprachansagen auf**: Assist-Satelliten (Ansage direkt) oder Lautsprecher (dafür zusätzlich einen TTS-Dienst wählen)
-   - **Termine aus dem Portal anzeigen**: Standard sind nur Schulaufgaben und Tests (Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe). „Termine der Schule“ (Ferien, Sekretariat, Veranstaltungen …) lassen sich dazuschalten.
+   - **Termine aus dem Portal anzeigen**: Standard sind nur Schulaufgaben und Tests (Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe). „Termine der Schule“ (Ferien, Sekretariat, Veranstaltungen …) lassen sich dazuschalten. Gibt das Portal eine Uhrzeit an (z. B. „14:00 - 16:00“), steht der Termin mit dieser Uhrzeit im Kalender, sonst ganztägig.
    - **Nur Termine der eigenen Klasse** (Standard: an): blendet Einträge aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen, z. B. „Schullandheim 5b+5c“ oder „Grundwissenstest Jgst. 10“. Termine ohne Klassenangabe bleiben sichtbar.
    - **Lehrkräfte im Stunden- und Vertretungsplan**: Standard *Kürzel und Name*, z. B. „Mü (Maria Müller)“; alternativ *Nur Name* oder *Nur Kürzel*.
    - **Sprachen der KI-Zusammenfassung**: Häkchen bei Deutsch, Englisch, Spanisch und/oder Katalanisch (bis zu 4, Standard Deutsch und Englisch). Jede Sprache wird ein eigener Reiter in der Zusammenfassung; die erste gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache (auch nach dem Hinzufügen einer Sprache), übersetzt die KI im Hintergrund nur die Zusammenfassung – Aufgaben, Termine und Status bleiben unverändert. Ab 5 Übersetzungen kommt eine Benachrichtigung in Home Assistant beim Start (mit geschätzter Dauer) und am Ende; eine fehlgeschlagene Übersetzung wird nach 6 Stunden erneut versucht, höchstens dreimal.
@@ -161,7 +161,7 @@ Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur 
   - **gelb**: etwas ist offen oder ungelesen
   - **grün**: alles erledigt
 - `todo.schule_<kind>_aufgaben`: Aufgabenliste. Abhaken, Datum ändern und eigene Aufgaben ergänzen geht ganz normal, auch per Sprachassistent.
-- `calendar.schule_<kind>_kalender`: Fristen, Termine aus den Briefen, Schulaufgaben und Tests aus dem Portal (Termine der Schule, wenn eingeschaltet), Vertretungen und Ausfälle (mit Uhrzeit laut Stundenplan) sowie Krankmeldungen
+- `calendar.schule_<kind>_kalender`: Fristen, Termine aus den Briefen, Schulaufgaben und Tests aus dem Portal (Termine der Schule, wenn eingeschaltet; mit Uhrzeit, wenn das Portal eine angibt), Vertretungen und Ausfälle (mit Uhrzeit laut Stundenplan) sowie Krankmeldungen
 - `sensor.schule_<kind>_offene_zahlungen` (€), `…_nachste_frist`, `…_uberfallig`, `…_offene_aufgaben`, `…_ungelesene_mitteilungen`
 - `sensor.schule_<kind>_stundenplan`: Zahl der Stunden heute; Tages-, Folgetags- und Wochenplan als Attribute
 - `sensor.schule_<kind>_vertretungen`: Zahl der Änderungen ab heute; Attribute `heute`, `morgen` und alle Einträge (Stunde, Fach, Vertretung, Raum, Info, Art: `entfall`/`vertretung`/`raum`, dazu `lehrkraft_name` und `vertretung_name`, wenn das Kürzel bekannt ist). Neue Einträge kommen als Push, heutige stehen in der Tagesübersicht, alle im Kalender.

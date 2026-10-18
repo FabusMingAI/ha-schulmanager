@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
+import html
 import re
 from typing import Any
 from urllib import parse
@@ -440,14 +441,14 @@ class SchulPortal(ElternPortalAPI):
                         if n.start
                     ]
                 child.appointments = [
-                    {
-                        "uid": f"{self.school}-{st.student_id}-termin-{a.appointment_id}",
-                        "title": a.short or a.title,
-                        "detail": a.title if a.short and a.title != a.short else None,
-                        "kind": appointment_kind(a.classname, a.short or a.title),
-                        "start": a.start,
-                        "end": a.end,
-                    }
+                    portal_appointment(
+                        f"{self.school}-{st.student_id}-termin-{a.appointment_id}",
+                        a.short,
+                        a.title,
+                        a.classname,
+                        a.start,
+                        a.end,
+                    )
                     for a in st.appointments
                 ]
                 if need_download and not self._demo:
@@ -598,6 +599,66 @@ def appointment_kind(classname: str | None, title: str | None = None) -> str:
     if _TEST_RE.match(title):
         return "test"
     return "schule"
+
+
+_APPT_TIME_RE = re.compile(
+    r"^\s*(\d{1,2})[:.](\d{2})(?:\s*(?:-|–|bis)\s*(\d{1,2})[:.](\d{2}))?\s*(?:Uhr)?\s*(?:<br\s*/?>|$)",
+    re.I,
+)
+_BR_RE = re.compile(r"<br\s*/?>", re.I)
+_TAG_RE = re.compile(r"<[^>]*>")
+
+
+def _hhmm(hour: str, minute: str) -> str | None:
+    h, m = int(hour), int(minute)
+    return f"{h:02d}:{m:02d}" if h < 24 and m < 60 else None
+
+
+def clean_appointment_title(raw: str | None) -> tuple[str, str | None, str | None]:
+    """Termintitel aus dem Portal bereinigen (#24).
+
+    Termine mit Uhrzeit kommen als HTML, z. B. ``14:00 - 16:00<br />5: Lernwerkstatt``.
+    Liefert ``(Titel ohne Tags, Beginn "HH:MM" oder None, Ende "HH:MM" oder None)``.
+    """
+    text = raw or ""
+    start = end = None
+    if m := _APPT_TIME_RE.match(text):
+        start = _hhmm(m[1], m[2])
+        end = _hhmm(m[3], m[4]) if m[3] else None
+        if start:
+            text = text[m.end():]
+        else:
+            end = None
+    text = _BR_RE.sub(" ", text)
+    text = html.unescape(_TAG_RE.sub("", text))
+    text = re.sub(r"\s+", " ", text).strip(" -–:")
+    return text, start, end
+
+
+def portal_appointment(
+    uid: str,
+    short: str | None,
+    title: str | None,
+    classname: str | None,
+    start: datetime | None,
+    end: datetime | None,
+) -> dict[str, Any]:
+    """Termin aus ``pyelternportal`` in das Format der Integration bringen."""
+    short_text, t_start, t_end = clean_appointment_title(short)
+    long_text, l_start, l_end = clean_appointment_title(title)
+    if not t_start:
+        t_start, t_end = l_start, l_end
+    shown = short_text or long_text
+    return {
+        "uid": uid,
+        "title": shown,
+        "detail": long_text if long_text and long_text != shown else None,
+        "kind": appointment_kind(classname, shown),
+        "start": start,
+        "end": end,
+        "time": t_start,
+        "time_end": t_end if t_start else None,
+    }
 
 
 def appointment_subject(title: str | None) -> str | None:
@@ -842,6 +903,8 @@ __all__ = [
     "async_validate",
     "appointment_kind",
     "appointment_subject",
+    "clean_appointment_title",
+    "portal_appointment",
     "parse_substitutions",
     "parse_teachers",
     "parse_timetable",

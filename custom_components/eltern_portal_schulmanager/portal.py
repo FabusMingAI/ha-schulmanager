@@ -602,16 +602,22 @@ def appointment_kind(classname: str | None, title: str | None = None) -> str:
 
 
 _APPT_TIME_RE = re.compile(
-    r"^\s*(\d{1,2})[:.](\d{2})(?:\s*(?:-|–|bis)\s*(\d{1,2})[:.](\d{2}))?\s*(?:Uhr)?\s*(?:<br\s*/?>|$)",
+    r"^\s*(\d{1,2})([:.])(\d{2})(?:\s*(?:-|–|bis)\s*(\d{1,2})[:.](\d{2}))?\s*(Uhr)?\s*(?:<br\s*/?>|$)",
     re.I,
 )
 _BR_RE = re.compile(r"<br\s*/?>", re.I)
-_TAG_RE = re.compile(r"<[^>]*>")
+# Nur echte Tags (``<b>``, ``</p>``, ``<!-- -->``), nicht ``<`` als Zeichen („Note < 3“).
+_TAG_RE = re.compile(r"<[a-zA-Z/!][^>]*>")
 
 
 def _hhmm(hour: str, minute: str) -> str | None:
     h, m = int(hour), int(minute)
     return f"{h:02d}:{m:02d}" if h < 24 and m < 60 else None
+
+
+def has_html_tag(text: str | None) -> bool:
+    """Enthält der Text echte HTML-Tags (nicht nur ein ``<`` als Zeichen)?"""
+    return bool(text) and _TAG_RE.search(text) is not None
 
 
 def clean_appointment_title(raw: str | None) -> tuple[str, str | None, str | None]:
@@ -622,15 +628,18 @@ def clean_appointment_title(raw: str | None) -> tuple[str, str | None, str | Non
     """
     text = raw or ""
     start = end = None
-    if m := _APPT_TIME_RE.match(text):
-        start = _hhmm(m[1], m[2])
-        end = _hhmm(m[3], m[4]) if m[3] else None
+    # „12.10“ allein ist eher ein Datum als eine Uhrzeit: mit Punkt nur mit „Uhr“ oder als Spanne
+    if (m := _APPT_TIME_RE.match(text)) and (m[2] == ":" or m[4] or m[6]):
+        start = _hhmm(m[1], m[3])
+        end = _hhmm(m[4], m[5]) if m[4] else None
         if start:
             text = text[m.end():]
         else:
             end = None
-    text = _BR_RE.sub(" ", text)
-    text = html.unescape(_TAG_RE.sub("", text))
+    # Erst Entities auflösen, dann Tags entfernen: so bleibt das Ergebnis stabil,
+    # wenn bereits bereinigte Titel noch einmal durchlaufen (gespeicherte Daten).
+    text = html.unescape(_BR_RE.sub(" ", text))
+    text = _TAG_RE.sub("", _BR_RE.sub(" ", text))
     text = re.sub(r"\s+", " ", text).strip(" -–:")
     return text, start, end
 
@@ -904,6 +913,7 @@ __all__ = [
     "appointment_kind",
     "appointment_subject",
     "clean_appointment_title",
+    "has_html_tag",
     "portal_appointment",
     "parse_substitutions",
     "parse_teachers",

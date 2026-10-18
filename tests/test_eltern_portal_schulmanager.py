@@ -911,6 +911,16 @@ def test_clean_appointment_title() -> None:
     assert clean_appointment_title("8.30 Uhr Gottesdienst") == ("8.30 Uhr Gottesdienst", None, None)
     assert clean_appointment_title("25:00 - 26:00<br />Ungültig") == ("25:00 - 26:00 Ungültig", None, None)
     assert clean_appointment_title(None) == ("", None, None)
+    # Datum mit Punkt ist keine Uhrzeit, mit „Uhr“ oder als Spanne schon
+    assert clean_appointment_title("12.10<br />Wandertag") == ("12.10 Wandertag", None, None)
+    assert clean_appointment_title("8.30 - 9.15<br />Elternsprechtag") == ("Elternsprechtag", "08:30", "09:15")
+    # Maskierte Tags und echtes „<“ als Zeichen
+    assert clean_appointment_title("Info &lt;b&gt;neu&lt;/b&gt;") == ("Info neu", None, None)
+    assert clean_appointment_title("Nachschrift bei Note &lt; 3") == ("Nachschrift bei Note < 3", None, None)
+    # Erneutes Bereinigen ändert nichts (gespeicherte Titel)
+    for raw in ("14:00 - 16:00<br />A &amp; B", "Info &lt;b&gt;neu&lt;/b&gt;", "Note &lt; 3", "12.10<br />Wandertag"):
+        once = clean_appointment_title(raw)[0]
+        assert clean_appointment_title(once)[0] == once
 
 
 async def test_appointment_html_and_time(hass: HomeAssistant, media_dir) -> None:

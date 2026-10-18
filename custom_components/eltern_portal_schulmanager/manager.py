@@ -120,6 +120,7 @@ from .portal import (
     appointment_kind,
     appointment_subject,
     clean_appointment_title,
+    has_html_tag,
     PortalAuthError,
     PortalConnectionError,
     PortalFile,
@@ -133,7 +134,7 @@ MAX_STORED_TEXT = 20000
 
 def _clean_stored_appointment(a: dict[str, Any]) -> dict[str, Any]:
     """Gespeicherte Termine aus Versionen vor dem Fix für #24 nachträglich bereinigen."""
-    if "<" not in (a.get("title") or "") and "<" not in (a.get("detail") or ""):
+    if not has_html_tag(a.get("title")) and not has_html_tag(a.get("detail")):
         return a
     title, t_start, t_end = clean_appointment_title(a.get("title"))
     detail = clean_appointment_title(a.get("detail"))[0] if a.get("detail") else None

@@ -2,7 +2,7 @@
 
 ## Unreleased (planned 0.14.2)
 
-- Fix: **HTML tags in portal appointments.** Eltern-Portal delivers the title of appointments that have a time as HTML (`14:00 - 16:00<br />5: Lernwerkstatt`); `pyelternportal` only cleans it up in some cases, so tags appeared in "Termine & Fristen", the calendar and the morning summary. Titles are now cleaned by the integration itself, and the time is used for start and end, so these appointments show up with their time instead of all day. Entries stored by older versions are cleaned as well. Closes #24. / Behoben: **HTML-Tags in Terminen aus dem Portal.** Termine mit Uhrzeit zeigten Tags wie `<br />`; die Titel werden jetzt bereinigt, und die Uhrzeit wird für Beginn und Ende genutzt.
+- Fix: **HTML tags in portal appointments.** Eltern-Portal delivers the title of appointments that have a time as HTML (`14:00 - 16:00<br />5: Lernwerkstatt`); `pyelternportal` only cleans it up in some cases, so tags appeared in "Termine & Fristen", the calendar and the morning summary. Titles are now cleaned by the integration itself, and the time is used for start and end, so these appointments show up with their time instead of all day. Entries stored by older versions are cleaned as well. A date like "12.10" in front of the title is no longer mistaken for a time, and escaped tags (`&lt;b&gt;`) are removed too. Closes #24. / Behoben: **HTML-Tags in Terminen aus dem Portal.** Termine mit Uhrzeit zeigten Tags wie `<br />`; die Titel werden jetzt bereinigt, und die Uhrzeit wird für Beginn und Ende genutzt. Ein Datum wie „12.10“ vor dem Titel gilt nicht mehr als Uhrzeit.
 
 ## 0.14.1 – 2026-10-12 (bridge release)
 

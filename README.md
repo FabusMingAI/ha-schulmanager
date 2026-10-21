@@ -26,7 +26,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 - **AI analysis** via Home Assistant's [AI Task](https://www.home-assistant.io/integrations/ai_task/) (Anthropic, OpenAI, Google, Ollama …): summary, urgency, tasks, deadlines, amounts, IBAN and payment reference, appointments. Without AI a simple rule-based detection is used.
 - **Tasks with status** *open / in progress / done*, comments, due dates – as a to-do list, calendar and sensors.
 - **Reminders** by push notification (with *Done* and *Remind me tomorrow* buttons), a daily morning summary and optional voice announcements.
-- **Exams and tests in the timetable** – exams (*Schulaufgaben*) and tests (*Tests, Kurzarbeiten, Stegreifaufgaben*) from the portal's appointments are highlighted in the timetable and appear in the calendar; the morning summary mentions tomorrow's exams. Other school appointments (holidays, office hours …) are hidden by default and can be switched on in the settings.
+- **Exams and tests in the timetable** – exams (*Schulaufgaben*) and tests (*Tests, Kurzarbeiten, Stegreifaufgaben*) from the portal's appointments are highlighted in the timetable and appear in the calendar; the morning summary mentions tomorrow's exams. Other school appointments (holidays, office hours …) are hidden by default and can be switched on in the settings. Portal appointments that come with a time (e.g. "14:00 - 16:00") get that time in the calendar, all others are all-day entries.
 - **Timetable & substitutions** – cancelled lessons, substitute teachers and room changes appear in the timetable card, the calendar (with lesson times) and the morning summary; a new change triggers a push notification.
 - **Traffic light per child** – red / yellow / green for dashboards and automations.
 - **Four dashboard cards included**, set up automatically in the "Schule" dashboard – see [The cards](#the-cards).
@@ -110,9 +110,11 @@ Copy `custom_components/eltern_portal_schulmanager` to `/config/custom_component
 
 Existing installations are taken over completely: credentials, settings, tasks, messages with status and comments, the archive, AI summaries, stored files, entity IDs and their history.
 
-**From 0.14.1 this happens automatically.** Just install the update offered in HACS (or under *Settings → Updates*) as usual and restart Home Assistant. Version 0.14.1 arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
+**From 0.14.1 this happens automatically.** Version 0.14.1 is a bridge release: it arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
 
-> **Using [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) as well?** It uses the same folder `custom_components/schulmanager`. If you already took over by hand with 0.14.0 *and* installed Schulmanager Online afterwards, skip the update to 0.14.1 and wait for 0.14.2 – otherwise HACS would install 0.14.1 into Schulmanager Online's folder.
+**Still on 0.13 or older?** Newer releases (0.14.2 and later) no longer contain the bridge, so install 0.14.1 first: HACS → *Eltern Portal Manager Bavaria* → ⋮ → **Redownload** → choose version **v0.14.1** → *Download*, then restart Home Assistant (twice, as above). Afterwards install the latest update as usual. (If Home Assistant still shows version 0.13 in the header of the "Schule" dashboard after updating to 0.14.2 or later, this is the reason.)
+
+> **Using [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) as well?** It uses the same folder `custom_components/schulmanager`. If you already took over by hand with 0.14.0 *and* installed Schulmanager Online afterwards, skip 0.14.1 and update straight to 0.14.2 or later – those install into `custom_components/eltern_portal_schulmanager` again and never touch Schulmanager Online's folder.
 
 If the automatic takeover fails, *Settings → Repairs* shows **"Schulmanager could not be moved to Eltern Portal Manager Bavaria"**. Restart once; if the notice stays, take over by hand:
 
@@ -160,7 +162,7 @@ On the first run the last 120 days are imported; only the last 21 days (and all 
 |---|---|
 | `sensor.schule_<child>_status` | Traffic light `rot` / `gelb` / `gruen`; attributes contain open tasks and recent messages |
 | `todo.schule_<child>_aufgaben` | Task list – complete, reschedule, add your own tasks |
-| `calendar.schule_<child>_kalender` | Deadlines, appointments from letters, exams and tests (school appointments if enabled), substitutions, cancelled lessons and sick notes |
+| `calendar.schule_<child>_kalender` | Deadlines, appointments from letters, exams and tests (school appointments if enabled; with their time if the portal gives one), substitutions, cancelled lessons and sick notes |
 | `sensor.schule_<child>_offene_zahlungen` | Open payments in € |
 | `sensor.schule_<child>_nachste_frist`, `…_uberfallig`, `…_offene_aufgaben`, `…_ungelesene_mitteilungen` | Counters and next deadline |
 | `sensor.schule_<child>_stundenplan` | Timetable: lessons today; day and week plan as attributes |

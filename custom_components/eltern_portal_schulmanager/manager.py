@@ -119,6 +119,8 @@ TAG = "eltern-portal"
 from .portal import (
     appointment_kind,
     appointment_subject,
+    clean_appointment_title,
+    has_html_tag,
     PortalAuthError,
     PortalConnectionError,
     PortalFile,
@@ -128,6 +130,18 @@ from .portal import (
 )
 
 MAX_STORED_TEXT = 20000
+
+
+def _clean_stored_appointment(a: dict[str, Any]) -> dict[str, Any]:
+    """Gespeicherte Termine aus Versionen vor dem Fix für #24 nachträglich bereinigen."""
+    if not has_html_tag(a.get("title")) and not has_html_tag(a.get("detail")):
+        return a
+    title, t_start, t_end = clean_appointment_title(a.get("title"))
+    detail = clean_appointment_title(a.get("detail"))[0] if a.get("detail") else None
+    out = {**a, "title": title or detail or "", "detail": detail if detail != title else None}
+    if not out.get("time") and t_start:
+        out["time"], out["time_end"] = t_start, t_end
+    return out
 
 
 def school_year(day: date) -> str:
@@ -517,6 +531,8 @@ class SchulManager:
                     "kind": a.get("kind"),
                     "start": a["start"].isoformat() if a["start"] else None,
                     "end": a["end"].isoformat() if a["end"] else None,
+                    "time": a.get("time"),
+                    "time_end": a.get("time_end"),
                 }
                 for a in pchild.appointments
             ]
@@ -1258,9 +1274,10 @@ class SchulManager:
         def other_class(text: str | None) -> bool:
             return bool(own_only) and concerns_class(text, classname) is False
 
-        for a in self.data["appointments"].get(child, []):
-            if not a.get("start"):
+        for stored in self.data["appointments"].get(child, []):
+            if not stored.get("start"):
                 continue
+            a = _clean_stored_appointment(stored)
             kind = a.get("kind") or appointment_kind(None, a.get("title"))
             if kind not in kinds:
                 continue
@@ -1272,12 +1289,27 @@ class SchulManager:
             end = datetime.fromisoformat(a["end"]) if a.get("end") else start
             end = end - timedelta(hours=2)  # pyelternportal addiert 2 h
             hover = a.get("detail") or a["title"]
+            if a.get("time"):
+                # Termin mit Uhrzeit (#24): Beginn/Ende aus dem Titel
+                begin = datetime.combine(start.date(), time.fromisoformat(a["time"]), tz)
+                finish = (
+                    datetime.combine(start.date(), time.fromisoformat(a["time_end"]), tz)
+                    if a.get("time_end")
+                    else None
+                )
+                if finish is None or finish <= begin:
+                    finish = begin + timedelta(hours=1)
+                span = {"start": begin, "end": finish}
+            else:
+                span = {
+                    "start": start.date(),
+                    "end": max(end.date(), start.date()) + timedelta(days=1),
+                }
             out.append(
                 {
                     "uid": a["uid"],
                     "summary": f"{icon} {a['title']}",
-                    "start": start.date(),
-                    "end": max(end.date(), start.date()) + timedelta(days=1),
+                    **span,
                     "description": f"{label} (Eltern-Portal)",
                     "category": category,
                     "icon": icon,

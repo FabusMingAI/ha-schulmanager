@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased (planned 0.14.2)
+## 0.14.2 – 2026-10-21
 
+- **Still on 0.13?** This release no longer contains the bridge from 0.14.1. Install 0.14.1 first (HACS → *Eltern Portal Manager Bavaria* → ⋮ → *Redownload* → version **v0.14.1**, restart twice), then update to 0.14.2. Users of Schulmanager Online who skipped 0.14.1 can update straight to 0.14.2 – it installs into `custom_components/eltern_portal_schulmanager` again. / **Noch auf 0.13?** Diese Version enthält die Brücke aus 0.14.1 nicht mehr. Zuerst 0.14.1 installieren (HACS → ⋮ → *Erneut herunterladen* → Version **v0.14.1**, zweimal neu starten), dann auf 0.14.2 aktualisieren. Wer wegen Schulmanager Online 0.14.1 übersprungen hat, aktualisiert direkt auf 0.14.2.
 - Fix: **HTML tags in portal appointments.** Eltern-Portal delivers the title of appointments that have a time as HTML (`14:00 - 16:00<br />5: Lernwerkstatt`); `pyelternportal` only cleans it up in some cases, so tags appeared in "Termine & Fristen", the calendar and the morning summary. Titles are now cleaned by the integration itself, and the time is used for start and end, so these appointments show up with their time instead of all day. Entries stored by older versions are cleaned as well. A date like "12.10" in front of the title is no longer mistaken for a time, and escaped tags (`&lt;b&gt;`) are removed too. Closes #24. / Behoben: **HTML-Tags in Terminen aus dem Portal.** Termine mit Uhrzeit zeigten Tags wie `<br />`; die Titel werden jetzt bereinigt, und die Uhrzeit wird für Beginn und Ende genutzt. Ein Datum wie „12.10“ vor dem Titel gilt nicht mehr als Uhrzeit.
 
 ## 0.14.1 – 2026-10-12 (bridge release)

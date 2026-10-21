@@ -103,9 +103,11 @@ Den Ordner `custom_components/eltern_portal_schulmanager` nach `/config/custom_c
 
 Bestehende Installationen werden vollständig übernommen: Zugangsdaten, Einstellungen, Aufgaben, Mitteilungen mit Status und Kommentaren, das Archiv, KI-Zusammenfassungen, abgelegte Dateien, Entity-IDs und deren Verlauf.
 
-**Ab 0.14.1 passiert das automatisch.** Einfach das Update installieren, das HACS (bzw. *Einstellungen → Updates*) anbietet, und Home Assistant neu starten. Version 0.14.1 kommt noch einmal unter dem alten Namen *Schulmanager*, installiert *Eltern Portal Manager Bavaria* und übernimmt die Einrichtung von selbst. Eine Benachrichtigung bestätigt das – danach **Home Assistant noch einmal neu starten**. Fertig.
+**Ab 0.14.1 passiert das automatisch.** Version 0.14.1 ist ein Brücken-Release: Sie kommt noch einmal unter dem alten Namen *Schulmanager*, installiert *Eltern Portal Manager Bavaria* und übernimmt die Einrichtung von selbst. Eine Benachrichtigung bestätigt das – danach **Home Assistant noch einmal neu starten**. Fertig.
 
-> **Zusätzlich [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) im Einsatz?** Er nutzt denselben Ordner `custom_components/schulmanager`. Wer schon mit 0.14.0 von Hand übernommen *und* danach Schulmanager Online installiert hat, überspringt das Update auf 0.14.1 und wartet auf 0.14.2 – sonst würde HACS 0.14.1 in den Ordner von Schulmanager Online installieren.
+**Noch auf 0.13 oder älter?** Neuere Versionen (ab 0.14.2) enthalten die Brücke nicht mehr, deshalb zuerst 0.14.1 installieren: HACS → *Eltern Portal Manager Bavaria* → ⋮ → **Erneut herunterladen** → Version **v0.14.1** wählen → *Herunterladen*, dann Home Assistant neu starten (wie oben zweimal). Danach das neueste Update wie gewohnt installieren. (Zeigt die Kopfzeile des Dashboards „Schule“ nach dem Update auf 0.14.2 oder neuer noch Version 0.13, liegt es daran.)
+
+> **Zusätzlich [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) im Einsatz?** Er nutzt denselben Ordner `custom_components/schulmanager`. Wer schon mit 0.14.0 von Hand übernommen *und* danach Schulmanager Online installiert hat, überspringt 0.14.1 und aktualisiert direkt auf 0.14.2 oder neuer – diese Versionen installieren wieder nach `custom_components/eltern_portal_schulmanager` und lassen den Ordner von Schulmanager Online in Ruhe.
 
 Klappt die automatische Übernahme nicht, steht unter *Einstellungen → Reparaturen* **„Schulmanager konnte nicht zu Eltern Portal Manager Bavaria umziehen“**. Einmal neu starten; bleibt der Hinweis, von Hand übernehmen:
 

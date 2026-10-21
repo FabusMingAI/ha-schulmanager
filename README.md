@@ -110,9 +110,11 @@ Copy `custom_components/eltern_portal_schulmanager` to `/config/custom_component
 
 Existing installations are taken over completely: credentials, settings, tasks, messages with status and comments, the archive, AI summaries, stored files, entity IDs and their history.
 
-**From 0.14.1 this happens automatically.** Just install the update offered in HACS (or under *Settings → Updates*) as usual and restart Home Assistant. Version 0.14.1 arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
+**From 0.14.1 this happens automatically.** Version 0.14.1 is a bridge release: it arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
 
-> **Using [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) as well?** It uses the same folder `custom_components/schulmanager`. If you already took over by hand with 0.14.0 *and* installed Schulmanager Online afterwards, skip the update to 0.14.1 and wait for 0.14.2 – otherwise HACS would install 0.14.1 into Schulmanager Online's folder.
+**Still on 0.13 or older?** Newer releases (0.14.2 and later) no longer contain the bridge, so install 0.14.1 first: HACS → *Eltern Portal Manager Bavaria* → ⋮ → **Redownload** → choose version **v0.14.1** → *Download*, then restart Home Assistant (twice, as above). Afterwards install the latest update as usual. (If Home Assistant still shows version 0.13 in the header of the "Schule" dashboard after updating to 0.14.2 or later, this is the reason.)
+
+> **Using [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) as well?** It uses the same folder `custom_components/schulmanager`. If you already took over by hand with 0.14.0 *and* installed Schulmanager Online afterwards, skip 0.14.1 and update straight to 0.14.2 or later – those install into `custom_components/eltern_portal_schulmanager` again and never touch Schulmanager Online's folder.
 
 If the automatic takeover fails, *Settings → Repairs* shows **"Schulmanager could not be moved to Eltern Portal Manager Bavaria"**. Restart once; if the notice stays, take over by hand:
 

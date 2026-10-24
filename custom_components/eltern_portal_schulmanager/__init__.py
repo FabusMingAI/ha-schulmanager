@@ -16,7 +16,7 @@ from aiohttp import web
 import voluptuous as vol
 
 from homeassistant.components import frontend
-from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.components.http.auth import async_sign_path
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
@@ -36,8 +36,8 @@ from .const import (
     CARD_FILE,
     CARD_URL,
     DOMAIN,
-    LOCAL_CARD_FILE,
-    LOCAL_CARD_URL,
+    LEGACY_LOCAL_CARD_URL,
+    ICON_URL,
     FILE_URL_BASE,
     ICS_LINK_VALIDITY,
     ICS_URL_BASE,
@@ -141,11 +141,10 @@ class SchulFileView(HomeAssistantView):
             meta = item["files"][int(index)]
         except (HomeAssistantError, KeyError, IndexError, ValueError):
             return web.Response(status=404)
-        path = os.path.realpath(manager.file_abspath(meta["path"]))
-        root = os.path.realpath(manager.media_root[1])
-        if not path.startswith(root + os.sep) or not await hass.async_add_executor_job(
-            os.path.isfile, path
-        ):
+        path = await hass.async_add_executor_job(
+            _attachment_path, manager.file_abspath(meta["path"]), manager.media_root[1]
+        )
+        if path is None:
             return web.Response(status=404)
         name = os.path.basename(path)
         return web.FileResponse(
@@ -155,6 +154,15 @@ class SchulFileView(HomeAssistantView):
                 "Cache-Control": "private, max-age=3600",
             },
         )
+
+
+def _attachment_path(path: str, root: str) -> str | None:
+    """Dateipfad auflösen und vollständig im Executor auf den Medienordner begrenzen."""
+    path = os.path.realpath(path)
+    root = os.path.realpath(root)
+    if not path.startswith(root + os.sep) or not os.path.isfile(path):
+        return None
+    return path
 
 
 def _card_path() -> str:
@@ -168,26 +176,6 @@ def _card_path() -> str:
     raise FileNotFoundError(f"www/{CARD_FILE} fehlt")
 
 
-class SchulCardView(HomeAssistantView):
-    """Liefert die Dashboard-Karte aus (reiner Oberflächen-Code, ohne Daten)."""
-
-    url = CARD_URL
-    name = f"{DOMAIN}:karte"
-    requires_auth = False
-
-    def __init__(self, path: str) -> None:
-        self._path = path
-
-    async def get(self, request: web.Request) -> web.StreamResponse:
-        return web.FileResponse(
-            self._path,
-            headers={
-                "Content-Type": "application/javascript; charset=utf-8",
-                "Cache-Control": "no-cache",
-            },
-        )
-
-
 def _quote(name: str) -> str:
     from urllib.parse import quote
 
@@ -198,14 +186,23 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(SchulFileView())
     hass.http.register_view(SchulIcsView())
     card = await hass.async_add_executor_job(_card_path)
-    hass.http.register_view(SchulCardView(card))
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(CARD_URL, card, cache_headers=False),
+            StaticPathConfig(
+                ICON_URL,
+                os.path.join(os.path.dirname(__file__), "brand", "icon.png"),
+                cache_headers=False,
+            ),
+        ]
+    )
     websocket.async_register(hass)
     _register_services(hass)
     if await migration.async_remove_leftover_bridge(hass):
         LOGGER.info("Übrig gebliebene Brücken-Version „schulmanager“ entfernt")
-    if not await _async_register_resource(hass, card):
+    version = await hass.async_add_executor_job(_card_version, card)
+    if not await _async_register_resource(hass, version):
         # Fallback (z. B. Dashboards im YAML-Modus): Karte als Zusatzmodul laden
-        version = str(int(await hass.async_add_executor_job(os.path.getmtime, card)))
         try:
             frontend.add_extra_js_url(hass, f"{CARD_URL}?v={version}")
         except Exception:  # noqa: BLE001 - z.B. ohne Frontend (Tests)
@@ -213,43 +210,16 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-def _publish_card(hass: HomeAssistant, card: str) -> str | None:
-    """Karte nach /config/www/eltern_portal_schulmanager kopieren und Versions-Hash liefern.
-
-    /local wird von Home Assistant ab der ersten Sekunde ausgeliefert. So ist die
-    Karte auch dann ladbar, wenn ein Client die Seite öffnet, während Home
-    Assistant noch startet und die Integration noch nicht eingerichtet ist.
-    """
-    www = hass.config.path("www")
-    if not os.path.isdir(www):
-        return None  # /local ist ohne www-Ordner beim Start nicht registriert
+def _card_version(card: str) -> str:
+    """Inhalts-Hash der mitgelieferten Karte für die Ressourcen-URL (Executor)."""
     with open(card, "rb") as fh:
         data = fh.read()
-    target_dir = os.path.join(www, DOMAIN)
-    os.makedirs(target_dir, exist_ok=True)
-    target = os.path.join(target_dir, LOCAL_CARD_FILE)
-    try:
-        with open(target, "rb") as fh:
-            same = fh.read() == data
-    except OSError:
-        same = False
-    if not same:
-        with open(target, "wb") as fh:
-            fh.write(data)
-    icon = os.path.join(os.path.dirname(__file__), "brand", "icon.png")
-    icon_target = os.path.join(target_dir, "icon.png")
-    if os.path.isfile(icon) and not os.path.isfile(icon_target):
-        with open(icon, "rb") as src, open(icon_target, "wb") as dst:
-            dst.write(src.read())
     return hashlib.sha1(data).hexdigest()[:10]
 
 
-async def _async_register_resource(hass: HomeAssistant, card: str) -> bool:
+async def _async_register_resource(hass: HomeAssistant, version: str) -> bool:
     """Karte als Lovelace-Ressource eintragen (Speichermodus)."""
     try:
-        version = await hass.async_add_executor_job(_publish_card, hass, card)
-        if not version:
-            return False
         lovelace = hass.data.get("lovelace")
         resources = getattr(lovelace, "resources", None)
         if resources is None or not hasattr(resources, "async_create_item"):
@@ -257,11 +227,11 @@ async def _async_register_resource(hass: HomeAssistant, card: str) -> bool:
         if not getattr(resources, "loaded", True):
             await resources.async_load()
             resources.loaded = True
-        url = f"{LOCAL_CARD_URL}?v={version}"
+        url = f"{CARD_URL}?v={version}"
         mine = [
             item
             for item in resources.async_items()
-            if str(item.get("url", "")).split("?")[0] in (LOCAL_CARD_URL, CARD_URL)
+            if str(item.get("url", "")).split("?")[0] in (LEGACY_LOCAL_CARD_URL, CARD_URL)
         ]
         if mine:
             first, *rest = mine

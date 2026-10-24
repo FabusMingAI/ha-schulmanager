@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.3 – 2026-10-24
+
+- Fix: serve the dashboard card and brand icon directly from the integration through Home Assistant static paths. No files are copied into `/config/www`; existing dashboard resources are updated to the static URL with a content hash, and duplicate resources are removed. / Behoben: Karte und Icon werden direkt aus der Integration ausgeliefert, ohne Kopien nach `/config/www`; vorhandene Dashboard-Ressourcen werden automatisch umgestellt.
+- Fix: use Home Assistant’s cached time zone helper for Google Calendar links and resolve attachment paths (including containment and file checks) in the executor, avoiding blocking disk access in the event loop. / Behoben: Zeitzonen für Google-Kalender-Links aus dem Home-Assistant-Cache; alle Dateipfad-Prüfungen für Anhänge laufen im Executor.
+- Docs: installation instructions in English and German lead with searching in HACS, with custom repository instructions retained until catalog inclusion. Addresses the review in hacs/default#12349. / Doku: Installation über die HACS-Suche zuerst, mit Hinweis zum benutzerdefinierten Repository bis zur Aufnahme.
+
 ## 0.14.2 – 2026-10-21
 
 - **Still on 0.13?** This release no longer contains the bridge from 0.14.1. Install 0.14.1 first (HACS → *Eltern Portal Manager Bavaria* → ⋮ → *Redownload* → version **v0.14.1**, restart twice), then update to 0.14.2. Users of Schulmanager Online who skipped 0.14.1 can update straight to 0.14.2 – it installs into `custom_components/eltern_portal_schulmanager` again. / **Noch auf 0.13?** Diese Version enthält die Brücke aus 0.14.1 nicht mehr. Zuerst 0.14.1 installieren (HACS → ⋮ → *Erneut herunterladen* → Version **v0.14.1**, zweimal neu starten), dann auf 0.14.2 aktualisieren. Wer wegen Schulmanager Online 0.14.1 übersprungen hat, aktualisiert direkt auf 0.14.2.

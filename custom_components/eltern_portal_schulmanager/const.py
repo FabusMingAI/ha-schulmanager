@@ -177,8 +177,9 @@ ICS_URL_BASE: Final = f"/api/{DOMAIN}/ics"
 ICS_LINK_VALIDITY: Final = timedelta(hours=24)
 CARD_FILE: Final = "eltern-portal-schulmanager-card.js"
 CARD_URL: Final = f"/{DOMAIN}_static/{CARD_FILE}"
-LOCAL_CARD_FILE: Final = CARD_FILE
-LOCAL_CARD_URL: Final = f"/local/{DOMAIN}/{LOCAL_CARD_FILE}"
+ICON_URL: Final = f"/{DOMAIN}_static/icon.png"
+# Nur zum Ersetzen bestehender Lovelace-Ressourcen aus Versionen bis 0.14.2.
+LEGACY_LOCAL_CARD_URL: Final = f"/local/{DOMAIN}/{CARD_FILE}"
 
 # Dashboard „Schule“
 DASHBOARD_URL: Final = "dashboard-schule"
@@ -189,7 +190,6 @@ DASHBOARD_SINGLE: Final = "single"
 DASHBOARD_OFF: Final = "off"
 DASHBOARD_MODES: Final = [DASHBOARD_TABS, DASHBOARD_SINGLE, DASHBOARD_OFF]
 DEFAULT_DASHBOARD: Final = DASHBOARD_TABS
-LOCAL_ICON_URL: Final = f"/local/{DOMAIN}/icon.png"
 
 # Kartentypen (bis 0.13: custom:schulmanager-*); die Migration schreibt Dashboards um
 CARD_PREFIX: Final = "eltern-portal-schulmanager"

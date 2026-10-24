@@ -392,9 +392,35 @@ async def test_file_view_signed(hass: HomeAssistant, media_dir, hass_client_no_a
     letter = next(i for i in st.attributes["mitteilungen"] if i["dateien"])
     url = letter["dateien"][0]["url"]
     client = await hass_client_no_auth()
-    resp = await client.get(url)
-    assert resp.status == 200
-    assert (await resp.read()).startswith(b"%PDF")
+    import threading
+    from custom_components.eltern_portal_schulmanager import _attachment_path
+
+    loop_thread = threading.get_ident()
+
+    def checked_path(path, root):
+        assert threading.get_ident() != loop_thread
+        return _attachment_path(path, root)
+
+    with patch("custom_components.eltern_portal_schulmanager._attachment_path", new=checked_path):
+        resp = await client.get(url)
+        assert resp.status == 200
+        assert (await resp.read()).startswith(b"%PDF")
+    # Fehlende Dateien, Verzeichnisse und Ausbrüche (auch per Symlink) bleiben gesperrt.
+    m = entry.runtime_data
+    source = next(i for i in m.items.values() if i["files"])
+    meta = source["files"][0]
+    original = meta["path"]
+    sibling = media_dir.with_name(media_dir.name + "-outside")
+    sibling.mkdir()
+    outside = sibling / "secret.pdf"
+    outside.write_bytes(b"private")
+    link = media_dir / "escape.pdf"
+    link.symlink_to(outside)
+    for candidate in (str(outside), "../" + sibling.name + "/secret.pdf", "escape.pdf", "missing.pdf", "."):
+        meta["path"] = candidate
+        resp = await client.get(url)
+        assert resp.status == 404, candidate
+    meta["path"] = original
     resp = await client.get(url.split("?")[0])
     assert resp.status == 401
     # Regel-Erkennung (ohne KI) hat Betrag + Frist aus dem PDF gelesen
@@ -565,25 +591,39 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
     await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_card_registered_as_lovelace_resource(hass: HomeAssistant) -> None:
-    """Die Karte liegt unter /local und steht in den Dashboard-Ressourcen."""
-    import os
+async def test_card_registered_as_lovelace_resource(hass: HomeAssistant, hass_client_no_auth) -> None:
+    """Karte und Icon funktionieren ohne www; alte Ressourcen werden ersetzt."""
+    from custom_components.eltern_portal_schulmanager import _async_register_resource
+    from custom_components.eltern_portal_schulmanager.const import (
+        CARD_URL, ICON_URL, LEGACY_LOCAL_CARD_URL,
+    )
 
-    from homeassistant.setup import async_setup_component
-
-    os.makedirs(hass.config.path("www"), exist_ok=True)
     assert await async_setup_component(hass, "lovelace", {})
+    res = hass.data["lovelace"].resources
+    await res.async_load()
+    res.loaded = True
+    await res.async_create_item({"res_type": "module", "url": f"{LEGACY_LOCAL_CARD_URL}?v=old"})
+    await res.async_create_item({"res_type": "module", "url": f"{CARD_URL}?v=duplicate"})
+    await res.async_create_item({"res_type": "module", "url": "/unrelated.js"})
     assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
-    res = hass.data["lovelace"].resources
-    urls = [i["url"] for i in res.async_items()]
-    assert len(urls) == 1 and urls[0].startswith("/local/eltern_portal_schulmanager/eltern-portal-schulmanager-card.js?v="), urls
-    assert os.path.isfile(hass.config.path("www", "eltern_portal_schulmanager", "eltern-portal-schulmanager-card.js"))
-    # zweiter Start: kein Duplikat
-    from custom_components.eltern_portal_schulmanager import _async_register_resource, _card_path
-
-    await _async_register_resource(hass, _card_path())
-    assert len(res.async_items()) == 1
+    items = res.async_items()
+    urls = [i["url"] for i in items]
+    url = next(u for u in urls if u.startswith(f"{CARD_URL}?v="))
+    assert len(items) == 2 and "/unrelated.js" in urls
+    assert not any(u.startswith(LEGACY_LOCAL_CARD_URL) for u in urls)
+    assert not pathlib.Path(hass.config.path("www", DOMAIN)).exists()
+    # Wiederholtes Eintragen erzeugt keine Duplikate.
+    assert await _async_register_resource(hass, url.split("?v=")[1])
+    assert res.async_items() == items
+    # Öffentlich sind ausschließlich die mitgelieferten statischen Dateien.
+    client = await hass_client_no_auth()
+    resp = await client.get(url)
+    assert resp.status == 200 and "javascript" in resp.content_type
+    assert "eltern-portal-schulmanager-card" in await resp.text()
+    resp = await client.get(ICON_URL)
+    assert resp.status == 200 and resp.content_type == "image/png"
+    assert (await resp.read()).startswith(b"\x89PNG")
 
 
 async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_dir) -> None:
@@ -627,7 +667,7 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     child_view = json.dumps(cfg["views"][1])
     assert "custom:eltern-portal-schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
     assert '"view": "week"' in child_view
-    assert os.path.isfile(hass.config.path("www", "eltern_portal_schulmanager", "icon.png"))
+    assert cfg["views"][0]["header"]["card"]["icon"] == "/eltern_portal_schulmanager_static/icon.png"
 
     # eigene Änderung bleibt erhalten
     cfg["views"].append({"title": "Eigene Ansicht", "cards": []})

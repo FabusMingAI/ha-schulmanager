@@ -97,8 +97,10 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 ### HACS (recommended)
 
-1. HACS → ⋮ → **Custom repositories** → add `https://github.com/FabusMingAI/ha-schulmanager`, type **Integration**.
-2. Search for **Eltern Portal Manager Bavaria**, install, restart Home Assistant.
+1. Open **HACS** and search for **Eltern Portal Manager Bavaria**.
+2. Install the integration and restart Home Assistant.
+
+Until the integration is included in the default HACS catalog, add it once via HACS → ⋮ → **Custom repositories** → `https://github.com/FabusMingAI/ha-schulmanager`, type **Integration**, then follow the steps above.
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FabusMingAI&repository=ha-schulmanager&category=integration)
 

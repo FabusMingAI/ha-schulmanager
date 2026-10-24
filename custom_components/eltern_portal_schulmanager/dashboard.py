@@ -35,7 +35,7 @@ from .const import (
     DASHBOARD_URL,
     DEFAULT_DASHBOARD,
     DOMAIN,
-    LOCAL_ICON_URL,
+    ICON_URL,
     LOGGER,
 )
 
@@ -70,7 +70,7 @@ def _header(names: list[str]) -> dict[str, Any]:
     card: dict[str, Any] = {
         "type": f"custom:{CARD_PREFIX}-header",
         "settings_path": SETTINGS_PATH,
-        "icon": LOCAL_ICON_URL,
+        "icon": ICON_URL,
     }
     if names:
         card["subtitle"] = " & ".join(names)

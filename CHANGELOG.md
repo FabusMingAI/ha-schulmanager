@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.4 – 2026-11-04
+
+- Fix: remove leftover card and icon copies from `www/eltern_portal_schulmanager` on startup after updates from 0.14.0–0.14.2, only when the folder contains the known files and no subdirectories or symlinks. Foreign contents are preserved. / Behoben: Alte Karten- und Icon-Kopien aus 0.14.0–0.14.2 werden beim Start entfernt, sofern der Ordner nur die bekannten Dateien enthält; fremde Inhalte bleiben erhalten.
+- Fix: migrated dashboards now reference the integration’s static `ICON_URL` instead of the obsolete `/local/` icon. Completes the follow-up from hacs/default#12349. / Behoben: Übernommene Dashboards verwenden den statischen Icon-Pfad der Integration statt des veralteten `/local/`-Pfads.
+
 ## 0.14.3 – 2026-10-24
 
 - Fix: serve the dashboard card and brand icon directly from the integration through Home Assistant static paths. No files are copied into `/config/www`; existing dashboard resources are updated to the static URL with a content hash, and duplicate resources are removed. / Behoben: Karte und Icon werden direkt aus der Integration ausgeliefert, ohne Kopien nach `/config/www`; vorhandene Dashboard-Ressourcen werden automatisch umgestellt.

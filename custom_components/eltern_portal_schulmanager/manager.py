@@ -90,6 +90,7 @@ from .const import (
     FETCH_RETRY_DELAY,
     FETCH_TIMEOUT,
     KIND_LABELS,
+    KIND_BLACKBOARD,
     KIND_LETTER,
     KIND_MANUAL,
     KIND_POLL,
@@ -581,6 +582,16 @@ class SchulManager:
                         new_count += 1
                     self.items[pitem.uid] = stored
                     await self._store_files(stored, pitem.files)
+                elif pitem.kind == KIND_BLACKBOARD and (
+                    (not stored.get("body") and pitem.body)
+                    or (not stored.get("files") and pitem.files)
+                ):
+                    # Nach #30 fehlende Inhalte ergänzen und neu auswerten, ohne
+                    # gelesene Aushänge erneut als neue Mitteilung zu melden.
+                    stored.update(body=pitem.body or stored.get("body", ""), version=pitem.version, meta=pitem.meta)
+                    await self._store_files(stored, pitem.files)
+                    stored["analysis"] = {"status": "pending"}
+                    stored["notify"] = False
                 elif stored.get("version") != pitem.version and (
                     mass_change
                     or _content_key(stored.get("title"), stored.get("body"))

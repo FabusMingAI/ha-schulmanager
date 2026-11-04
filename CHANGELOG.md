@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix: read all text blocks and attachments from blackboard notices instead of relying on fixed HTML positions. Previously empty saved notices receive the recovered content and are analysed again while keeping their read/completion state and without sending a duplicate notification. Refs #30. / Behoben: Texte und Anhänge vom Schwarzen Brett werden unabhängig von ihrer HTML-Position gelesen; bisher leere Einträge werden ergänzt und neu ausgewertet, ohne Gelesen-/Erledigt-Status zurückzusetzen oder erneut zu benachrichtigen.
+
 ## 0.14.4 – 2026-11-04
 
 - Fix: remove leftover card and icon copies from `www/eltern_portal_schulmanager` on startup after updates from 0.14.0–0.14.2, only when the folder contains the known files and no subdirectories or symlinks. Foreign contents are preserved. / Behoben: Alte Karten- und Icon-Kopien aus 0.14.0–0.14.2 werden beim Start entfernt, sofern der Ordner nur die bekannten Dateien enthält; fremde Inhalte bleiben erhalten.

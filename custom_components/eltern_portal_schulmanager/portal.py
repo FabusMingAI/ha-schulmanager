@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import html
 import re
@@ -189,6 +189,7 @@ class SchulPortal(ElternPortalAPI):
         self._timetable: list[dict[str, Any]] = []
         self._subst: dict[str, Any] = {"days": [], "stand": None, "available": False}
         self._extra_messages: list[PortalItem] = []
+        self._blackboard_items: list[PortalItem] = []
         self._keep_session = False
 
     # ------------------------------------------------------------------
@@ -331,6 +332,69 @@ class SchulPortal(ElternPortalAPI):
                 )
         return subject, "\n\n".join(parts), attachments
 
+    async def async_blackboard_parse(self, html: str) -> None:
+        """Aushänge ohne feste Positionen für Text und Anhänge auswerten (#30)."""
+        self._student.blackboards = []
+        self._blackboard_items = []
+        soup = bs4.BeautifulSoup(html, self._beautiful_soup_parser)
+        threshold = date.today() + timedelta(days=self.blackboard_threshold)
+        for card in soup.select("#asam_content .grid .grid-item .well"):
+            heading = card.find(["h4", "h3"])
+            if heading is None:
+                continue
+            title = heading.get_text(" ", strip=True) or "Aushang"
+            stamp = card.find(string=re.compile(r"eingestellt am", re.I))
+            match = re.search(r"eingestellt am (\d{2}\.\d{2}\.\d{4})", str(stamp), re.I)
+            sent = None
+            if match:
+                try:
+                    sent = datetime.strptime(match[1], "%d.%m.%Y").date()
+                except ValueError:
+                    pass
+            if sent is not None and sent < threshold:
+                continue
+            native = _stable_id(sent, title)  # gleiche IDs wie bisher: gespeicherte Zustände behalten
+            heading.decompose()
+            if stamp is not None:
+                stamp.extract()
+            attachments: list[PortalAttachment] = []
+            fingerprints: list[str] = []
+            for link in card.find_all("a", href=True):
+                href = link["href"]
+                url = parse.urlsplit(parse.urljoin(self.base_url, href))
+                if url.netloc != parse.urlsplit(self.base_url).netloc:
+                    continue
+                if not (
+                    "get_file" in url.path or "download" in url.path
+                    or url.path.lower().endswith((".pdf", ".png", ".jpg", ".jpeg"))
+                    or link.has_attr("download")
+                ):
+                    continue
+                if not any(att.href == href for att in attachments):
+                    name = link.get_text(" ", strip=True) or link.get("title")
+                    attachments.append(PortalAttachment(name, href))
+                    # Sitzungsabhängige CSRF-Parameter sind keine Inhaltsänderung.
+                    query = parse.urlencode(sorted(
+                        (k, v) for k, v in parse.parse_qsl(url.query)
+                        if "csrf" not in k.lower()
+                    ))
+                    fingerprints.append(parse.urlunsplit(("", "", url.path, query, "")))
+                link.decompose()
+            for node in card.select("script, style"):
+                node.decompose()
+            for br in card.find_all("br"):
+                br.replace_with("\n")
+            for block in card.find_all(["p", "div", "li"]):
+                block.append("\n")
+            body = re.sub(r"[ \t]+", " ", card.get_text())
+            body = "\n".join(line.strip() for line in body.splitlines() if line.strip() not in ("", "Anhang:", "Anhänge:"))
+            self._blackboard_items.append(PortalItem(
+                uid=self._uid(KIND_BLACKBOARD, native), kind=KIND_BLACKBOARD,
+                title=title, body=body, sent=datetime.combine(sent, datetime.min.time()) if sent else None,
+                url=parse.urljoin(self.base_url, "aktuelles/schwarzes_brett"),
+                version=_stable_id(body, *sorted(fingerprints)), attachments=attachments,
+            ))
+
     # ------------------------------------------------------------------
     # Abruf
     # ------------------------------------------------------------------
@@ -403,6 +467,7 @@ class SchulPortal(ElternPortalAPI):
                 sfx = "demo" if self._demo else "online"
                 failed: set[str] = set()
                 self._timetable = []
+                self._blackboard_items = []
                 self._subst = {"days": [], "stand": None, "available": False}
                 for name in (
                     "appointment",
@@ -497,25 +562,7 @@ class SchulPortal(ElternPortalAPI):
                 )
             )
         items.extend(self._extra_messages)
-        for bb in st.blackboards:
-            native = _stable_id(bb.sent, bb.subject)
-            atts = []
-            if bb.attachment and bb.attachment.href:
-                atts.append(PortalAttachment(bb.attachment.name, bb.attachment.href))
-            items.append(
-                PortalItem(
-                    uid=self._uid(KIND_BLACKBOARD, native),
-                    kind=KIND_BLACKBOARD,
-                    title=bb.subject or "Aushang",
-                    body=bb.body or "",
-                    sent=datetime.combine(bb.sent, datetime.min.time())
-                    if bb.sent
-                    else None,
-                    url=parse.urljoin(self.base_url, "aktuelles/schwarzes_brett"),
-                    version=_stable_id(bb.body),
-                    attachments=atts,
-                )
-            )
+        items.extend(self._blackboard_items)
         for poll in st.polls:
             native = (poll.href or poll.title or "").rsplit("/", 1)[-1]
             atts = []

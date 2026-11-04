@@ -162,6 +162,17 @@
     ],
   };
 
+  // Regression #30: demo.html?card=item&item=blackboard
+  if (q.get("item") === "blackboard") Object.assign(ITEM, {
+    uid: "board1", kind_label: "Schwarzes Brett", sent: "2026-11-04",
+    title: "Nachrichten der Schulleitung", status: "offen", urgency: "niedrig",
+    summary: "Elternabend am 20. November um 19 Uhr. Das Programm steht im Anhang.",
+    summaries: {}, tasks: [],
+    body: "Liebe Eltern,\nbitte beachten Sie:\nDer Elternabend beginnt am 20. November um 19 Uhr.\nWir freuen uns auf Sie!",
+    text: "Programm des Elternabends: Begrüßung, Informationen, Fragen.",
+    files: [{ name: "Programm.pdf", url: "#demo-pdf", content_type: "application/pdf" }],
+  });
+
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
     callWS: async (msg) => msg.type === "eltern_portal_schulmanager/data" ? { children, legend: LEGEND, today: TODAY, errors: [],

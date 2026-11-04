@@ -2298,3 +2298,111 @@ def test_migrated_icon_uses_static_path() -> None:
     migrated = rewrite_config(config)
     assert migrated == {"icon": ICON_URL, "other": config["other"]}
     assert rewrite_config(migrated) == migrated
+
+
+async def test_blackboard_rich_text_and_attachments() -> None:
+    """Text und mehrere Anhänge funktionieren unabhängig von ihrer Position."""
+    import aiohttp
+    from pyelternportal.student import Student
+    from custom_components.eltern_portal_schulmanager.portal import SchulPortal, _stable_id
+
+    today = date.today()
+    stamp = today.strftime('%d.%m.%Y')
+    async with aiohttp.ClientSession() as session:
+        portal = SchulPortal(session, 'demo', '', '')
+        portal._student = Student('1', 'Anna Muster (6c)')
+        markup = f'''<div id="asam_content"><div class="grid"><div class="grid-item"><div class="well">
+          <p>eingestellt am {stamp} 08:00:00</p><h4>Nachrichten der Schulleitung</h4>
+          <div><p>Liebe Eltern,<br>bitte beachten Sie:</p><p>Der Elternabend beginnt um 19 Uhr.</p></div>
+          <div>Anhänge: <a href="aktuelles/get_file/?repo=17&amp;csrf=first">Info.pdf</a>
+          <a href="aktuelles/get_file/?repo=18&amp;csrf=first" title="Programm.pdf herunterladen">📎</a>
+          <a href="aktuelles/get_file/?repo=17&amp;csrf=first">Info.pdf</a></div>
+          <a href="https://example.org/info">Weitere Informationen</a>
+          <script>doNotIncludeThis()</script>
+        </div></div></div></div>'''
+        await portal.async_blackboard_parse(markup)
+        item = portal._collect_items()[0]
+        assert item.uid == portal._uid('schwarzes_brett', _stable_id(today, 'Nachrichten der Schulleitung'))
+        assert 'Liebe Eltern,\nbitte beachten Sie:' in item.body
+        assert 'Der Elternabend beginnt um 19 Uhr.' in item.body
+        assert 'Weitere Informationen' in item.body
+        assert 'doNotIncludeThis' not in item.body and 'eingestellt am' not in item.body
+        assert len(item.attachments) == 2
+        assert item.attachments[0].name == 'Info.pdf'
+        await portal.async_blackboard_parse(markup.replace('csrf=first', 'csrf=second'))
+        assert portal._collect_items()[0].version == item.version
+        await portal.async_blackboard_parse(markup.replace('repo=17', 'repo=19'))
+        assert portal._collect_items()[0].version != item.version
+        # Die erkannten Anhänge gehen durch denselben Sitzungs-Download wie Elternbriefe.
+        from unittest.mock import AsyncMock
+        pdf = _pdf_bytes('Programm des Elternabends')
+        response = AsyncMock()
+        response.status = 200
+        response.headers = {'Content-Type': 'application/pdf'}
+        response.content_length = len(pdf)
+        response.read.return_value = pdf
+        context = AsyncMock()
+        context.__aenter__.return_value = response
+        with patch.object(session, 'get', return_value=context) as request:
+            await portal._download_item(item)
+        assert request.call_count == 2 and len(item.files) == 2
+        assert all(f.content == pdf and f.content_type == 'application/pdf' for f in item.files)
+        await portal.async_blackboard_parse('<div id="asam_content"></div>')
+        assert not portal._collect_items()  # keine Aushänge vom vorigen Kind übernehmen
+
+
+async def test_blackboard_original_layout_and_missing_date() -> None:
+    import aiohttp
+    from pyelternportal.student import Student
+    from pyelternportal.demo import DEMO_HTML_BLACKBOARD
+    from custom_components.eltern_portal_schulmanager.portal import SchulPortal
+
+    async with aiohttp.ClientSession() as session:
+        portal = SchulPortal(session, 'demo', '', '')
+        portal._student = Student('1', 'Anna Muster (6c)')
+        await portal.async_blackboard_parse(DEMO_HTML_BLACKBOARD)
+        item = portal._collect_items()[0]
+        assert item.body == 'Medienpädagogik'
+        assert len(item.attachments) == 1
+        await portal.async_blackboard_parse('''<div id="asam_content"><div class="grid"><div class="grid-item">
+          <div class="well"><h4>Ohne Datum</h4><div>Wichtiger Text</div></div>
+          <div class="well"><p>eingestellt am 01.01.2000 00:00:00</p><h4>Alt</h4><p>Archiv</p></div>
+        </div></div></div>''')
+        assert len(portal._collect_items()) == 1
+        assert portal._collect_items()[0].sent is None
+        assert portal._collect_items()[0].body == 'Wichtiger Text'
+
+
+async def test_blackboard_recovers_content_and_analysis(hass: HomeAssistant, media_dir) -> None:
+    """Ein gespeicherter leerer Aushang bekommt Text/PDF, bleibt gelesen und wird neu ausgewertet."""
+    from custom_components.eltern_portal_schulmanager.manager import SchulManager
+    from custom_components.eltern_portal_schulmanager.const import KIND_BLACKBOARD
+
+    entry = MockConfigEntry(domain=DOMAIN, data={'portals': []}, unique_id=DOMAIN)
+    entry.add_to_hass(hass)
+    manager = SchulManager(hass, entry)
+    await manager.async_load()
+    item = PortalItem(uid='school-1-blackboard-test', kind=KIND_BLACKBOARD,
+        title='Schulleitung', body='', sent=dt_util.now(), url='', version='empty')
+    result = PortalResult(school='school', school_name='Demo', base_url='', children=[
+        PortalChild(student_id='1', fullname='Anna Muster', firstname='Anna', classname='6c', items=[item])])
+    await manager._merge(result)
+    stored = manager.items[item.uid]
+    stored.update(read=True, status='erledigt', analysis={'status': 'ok', 'summary': 'Reine Information'}, notify=False)
+    item.body = 'Bitte lesen Sie den Elternbrief.'
+    item.files = [PortalFile('Info.pdf', _pdf_bytes('Bitte bis 20.11.2026 25 EUR ueberweisen.'), 'application/pdf')]
+    item.version = 'recovered'
+    await manager._merge(result)
+    assert stored['read'] and stored['status'] == 'erledigt' and not stored['notify']
+    assert stored['analysis']['status'] == 'pending'
+    assert stored['body'] == item.body and len(stored['files']) == 1
+    assert pathlib.Path(manager.file_abspath(stored['files'][0]['path'])).read_bytes().startswith(b'%PDF')
+    assert '25 EUR' in stored['text']
+    context = manager._context(stored)
+    assert item.body in context['body'] and '25 EUR' in context['body']
+    await manager._analyze(stored)
+    assert stored['analysis']['status'] == 'fertig'
+    # Ein unveränderter Abruf startet keine erneute Auswertung und speichert keine Duplikate.
+    analysis = stored['analysis'].copy()
+    await manager._merge(result)
+    assert stored['analysis'] == analysis and len(stored['files']) == 1

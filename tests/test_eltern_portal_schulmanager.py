@@ -605,6 +605,11 @@ async def test_card_registered_as_lovelace_resource(hass: HomeAssistant, hass_cl
     await res.async_create_item({"res_type": "module", "url": f"{LEGACY_LOCAL_CARD_URL}?v=old"})
     await res.async_create_item({"res_type": "module", "url": f"{CARD_URL}?v=duplicate"})
     await res.async_create_item({"res_type": "module", "url": "/unrelated.js"})
+    # Update von 0.14.0–0.14.2: Ressourcen und Kopien werden bereinigt.
+    copies = pathlib.Path(hass.config.path("www", DOMAIN))
+    copies.mkdir(parents=True)
+    (copies / "eltern-portal-schulmanager-card.js").write_text("old card")
+    (copies / "icon.png").write_bytes(b"old icon")
     assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
     items = res.async_items()
@@ -2249,3 +2254,47 @@ async def test_legacy_push_buttons_still_work(hass: HomeAssistant, media_dir) ->
     await hass.async_block_till_done()
     assert m.tasks[task2["id"]]["status"] == "erledigt"
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("extra", [None, "notes.txt", "directory", "symlink", "folder_symlink"])
+async def test_cleanup_static_copies(hass: HomeAssistant, tmp_path, extra) -> None:
+    """Altdateien bereinigen; fremde Dateien, Ordner und Links erhalten."""
+    from custom_components.eltern_portal_schulmanager.migration import async_cleanup_static_copies
+
+    hass.config.config_dir = str(tmp_path)
+    folder = tmp_path / "www" / DOMAIN
+    folder.mkdir(parents=True)
+    for name in ("eltern-portal-schulmanager-card.js", "eltern-portal-schulmanager-card.txt", "icon.png"):
+        (folder / name).write_text("old")
+    target = tmp_path / "user-data"
+    target.write_text("keep me")
+    if extra == "notes.txt":
+        (folder / extra).write_text("keep me")
+    elif extra == "directory":
+        (folder / "icon.png").unlink()
+        (folder / "icon.png").mkdir()
+        (folder / "icon.png" / "user.txt").write_text("keep me")
+    elif extra == "symlink":
+        (folder / "icon.png").unlink()
+        (folder / "icon.png").symlink_to(target)
+    elif extra == "folder_symlink":
+        real = tmp_path / "other-folder"
+        folder.rename(real)
+        folder.symlink_to(real, target_is_directory=True)
+    assert await async_cleanup_static_copies(hass) is (extra is None)
+    assert folder.exists() is (extra is not None)
+    assert target.read_text() == "keep me"
+    if extra is not None:
+        assert (folder / "eltern-portal-schulmanager-card.js").read_text() == "old"
+    else:
+        assert not await async_cleanup_static_copies(hass)  # wiederholter Start
+
+
+def test_migrated_icon_uses_static_path() -> None:
+    from custom_components.eltern_portal_schulmanager.const import ICON_URL
+    from custom_components.eltern_portal_schulmanager.migration import rewrite_config
+
+    config = {"icon": "/local/schulmanager/icon.png", "other": "/local/other/icon.png"}
+    migrated = rewrite_config(config)
+    assert migrated == {"icon": ICON_URL, "other": config["other"]}
+    assert rewrite_config(migrated) == migrated

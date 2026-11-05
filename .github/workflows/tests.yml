@@ -17,3 +17,19 @@ jobs:
         run: pip install -r requirements_test.txt
       - name: Run tests
         run: pytest -q
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test dependencies
+        working-directory: tests/browser
+        run: npm ci
+      - name: Test dashboard cards on desktop and mobile
+        working-directory: tests/browser
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
+        run: npm test

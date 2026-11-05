@@ -37,12 +37,9 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 The integration loads four cards automatically and places them in the "Schule" dashboard; no HACS frontend resources are needed. All of them accept an optional `child: <name>`; without it they show all children.
 
-### Header – `custom:eltern-portal-schulmanager-header`
+### Footer – `custom:eltern-portal-schulmanager-header`
 
-<p align="left"><img src="docs/images/header.png" width="640" alt="Header with last fetch, version and settings link"></p>
-
-- Sits at the top of the dashboard overview. Right-aligned: **when Eltern-Portal was last fetched** (↻ fetches now, ⚠️ shows fetch errors), the **installed version** with a link to its GitHub release and "⚙️ Einstellungen".
-- Options: `subtitle`, `icon`, `settings_path`.
+A compact footer at the end of every generated dashboard view shows the live fetch time, refresh button, installed version with release link and settings link. The existing card type remains valid. Option: `settings_path`.
 
 ### Tasks & messages – `custom:eltern-portal-schulmanager-card`
 
@@ -84,6 +81,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
 - Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.
+- Click or tap a lesson in the timetable week view to open its date and focus that lesson. The day view shows available regular and substitute teachers, rooms, status and notes; use **Woche** to return.
 - Tap an exam/test box or a substitution in the day view for **📅 In Kalender eintragen** / **Google Kalender**.
 - **Exams and tests** are marked: 📝 / ✏️ on the weekday buttons, a box above the lessons of that day and a badge on the matching subject (purple = exam, blue = test). Upcoming ones for the next two weeks are listed above the timetable.
 
@@ -154,7 +152,7 @@ Not carried over: PDF and calendar links in push notifications sent before the u
 1. **Settings → Devices & services → Add integration → Eltern Portal Manager Bavaria**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.
 3. **Configure → Settings** – grouped into collapsible sections (*KI & Sprachen*, *Benachrichtigungen & Erinnerungen*, *Termine & Klassen* open; *Sprachansagen*, *Abruf & Ablage*, *Dashboard* collapsed), every field with a short explanation: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, **which portal appointments to show** (default: exams and tests; optionally also school appointments), **only appointments of the child's class** (default on: hides entries such as "Schullandheim 5b+5c" or "Jgst. 10" that name only other classes or grades), **how teachers are shown** in timetable and substitution plan (default *abbreviation and name*, e.g. "Mü (Maria Müller)"; or *name only*, or *abbreviation only*) and the **languages of the AI summary** (checkboxes for German, English, Spanish, Catalan, up to 4; default German and English; the first one is used for push notifications). If an already analysed message lacks a language – also after you add one – the AI translates just the summary in the background; tasks, appointments and status stay untouched. With 5 or more translations you get a Home Assistant notification when they start (with an estimated duration) and when they are done; a failed translation is retried after 6 hours, up to 3 attempts.
-4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, plus a header with the last fetch, the version and a "⚙️ Einstellungen" link) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `eltern_portal_schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
+4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, with a compact footer in every view showing the last fetch, version and a "⚙️ Einstellungen" link) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `eltern_portal_schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
 
 On the first run the last 120 days are imported; only the last 21 days (and all unconfirmed letters) are analysed and marked unread, older items go to the archive as read.
 

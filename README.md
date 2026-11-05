@@ -13,7 +13,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release status:** The latest published release is [v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4). Screenshots show the current `main` development version with fictional data. The compact footer, red archive × and selectable lesson details are included in the next release; see [Unreleased](CHANGELOG.md#unreleased).
+> **Release status:** The latest release is [v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5). Screenshots show its cards with fictional data, including the compact footer, red archive × and selectable lesson details.
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
@@ -117,11 +117,11 @@ Download the source archive of the [latest release](https://github.com/FabusMing
 
 ## Releases and updates
 
-As of **5 November 2026**, the latest published release is **[v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4)**. It removes leftover card/icon copies from 0.14.0–0.14.2 when the old folder contains only the known regular files; foreign files, subdirectories and symlinks are preserved. Migrated dashboards use the integration’s static icon path.
+As of **5 November 2026**, the latest release is **[v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5)**. It adds the compact dashboard footer, red archive ×, selectable lesson details and integration category, recovers notice-board text and attachments, and includes refreshed documentation and screenshots.
 
 Install updates through HACS or Marketplace and restart Home Assistant. The version displayed in the "Schule" status bar is the running integration’s version; the downloaded version only becomes active after a restart.
 
-**Development branch:** `main` already includes the fix for missing notice-board text and attachments ([#33](https://github.com/FabusMingAI/ha-schulmanager/pull/33)). It is **not included in v0.14.4**. With that fix, previously empty notices are supplemented and analysed again on the next regular fetch, keeping their read/completion state and without an additional notification. See [Unreleased in the changelog](CHANGELOG.md#unreleased) for changes awaiting a release.
+**Notice-board recovery:** Version 0.14.5 includes the fix for missing notice-board text and attachments ([#33](https://github.com/FabusMingAI/ha-schulmanager/pull/33)). Previously empty notices are supplemented and analysed again on the next regular fetch, keeping their read/completion state and without an additional notification. See the [changelog](CHANGELOG.md#0145--2026-11-05) for this release.
 
 ## Renamed from Schulmanager
 

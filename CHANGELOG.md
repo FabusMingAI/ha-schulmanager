@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.5 – 2026-11-05
+
+- Documentation: refresh German and English installation and calendar-export guidance; replace all README screenshots with current cards and fictional data. / Dokumentation: Deutsche und englische Installations- und Kalenderexport-Hinweise aktualisieren; alle README-Screenshots mit aktuellen Karten und erfundenen Daten neu aufnehmen.
+
 - Metadata: classify the integration under Calendars & to-dos for discovery in Home Assistant and Marketplace; resolves the HACS missing-category warning. / Metadaten: Integration für Home Assistant und Marketplace unter Kalender und Aufgaben einordnen; behebt den HACS-Hinweis zur fehlenden Kategorie.
 
 - Dashboard: replace the large header with a compact live footer in every view (#36); use a red × to archive appointments and a dedicated archive icon (#35).

@@ -11,7 +11,7 @@
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release-Stand:** Das neueste veröffentlichte Release ist [v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4). Die Screenshots zeigen den aktuellen Entwicklungsstand auf `main` mit erfundenen Daten. Die kompakte Fußzeile, das rote Archiv-× und auswählbare Stundendetails sind für das nächste Release vorgesehen; siehe [Unreleased](CHANGELOG.md#unreleased).
+> **Release-Stand:** Das neueste Release ist [v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5). Die Screenshots zeigen dessen Karten mit erfundenen Daten, einschließlich kompakter Fußzeile, rotem Archiv-× und auswählbaren Stundendetails.
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
@@ -113,11 +113,11 @@ Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-s
 
 ## Releases und Updates
 
-Stand **5. November 2026** ist **[v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4)** das neueste veröffentlichte Release. Es entfernt alte Karten-/Icon-Kopien aus 0.14.0–0.14.2, sofern im alten Ordner nur die bekannten regulären Dateien liegen; fremde Dateien, Unterordner und Symlinks bleiben erhalten. Übernommene Dashboards verwenden den statischen Icon-Pfad der Integration.
+Stand **5. November 2026** ist **[v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5)** das neueste Release. Es ergänzt die kompakte Dashboard-Fußzeile, das rote Archiv-×, auswählbare Stundendetails und die Integrationskategorie, stellt Texte und Anhänge vom Schwarzen Brett wieder her und enthält aktualisierte Anleitungen und Screenshots.
 
 Updates über HACS oder Marketplace installieren und Home Assistant neu starten. Die Versionsanzeige in der Statusleiste von „Schule“ zeigt die tatsächlich laufende Integration; eine heruntergeladene Version wird erst nach dem Neustart aktiv.
 
-**Entwicklungsstand:** Auf `main` liegt bereits die Korrektur für fehlende Texte und Anhänge vom Schwarzen Brett ([#33](https://github.com/FabusMingAI/ha-schulmanager/pull/33)). Sie ist **nicht in v0.14.4 enthalten**. Damit werden bisher leere Einträge beim nächsten regulären Abruf ergänzt und neu ausgewertet, ohne Gelesen-/Erledigt-Status zurückzusetzen oder erneut zu benachrichtigen. Noch nicht veröffentlichte Änderungen stehen unter [Unreleased im Changelog](CHANGELOG.md#unreleased).
+**Schwarzes Brett:** Version 0.14.5 enthält die Korrektur für fehlende Texte und Anhänge ([#33](https://github.com/FabusMingAI/ha-schulmanager/pull/33)). Bisher leere Einträge werden beim nächsten regulären Abruf ergänzt und neu ausgewertet, ohne Gelesen-/Erledigt-Status zurückzusetzen oder erneut zu benachrichtigen. Weitere Änderungen stehen im [Changelog](CHANGELOG.md#0145--2026-11-05).
 
 ## Umbenannt: früher Schulmanager
 

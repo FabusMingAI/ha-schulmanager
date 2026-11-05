@@ -176,7 +176,7 @@
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
     callWS: async (msg) => msg.type === "eltern_portal_schulmanager/data" ? { children: msg.child ? children.filter(c => c.key === msg.child) : children, legend: LEGEND, today: TODAY, errors: [],
-        last_update: `${TODAY}T08:15:00+02:00`, version: "0.14.4", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
+        last_update: `${TODAY}T08:15:00+02:00`, version: "0.14.5", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
       : msg.type === "eltern_portal_schulmanager/task" ? TASK : msg.type === "eltern_portal_schulmanager/item" ? ITEM
       : msg.type === "eltern_portal_schulmanager/event_links" ? { ics: "#ics", google: "#google" } : {},
     callService: async () => {},

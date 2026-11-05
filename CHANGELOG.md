@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Metadata: classify the integration under Calendars & to-dos for discovery in Home Assistant and Marketplace; resolves the HACS missing-category warning. / Metadaten: Integration für Home Assistant und Marketplace unter Kalender und Aufgaben einordnen; behebt den HACS-Hinweis zur fehlenden Kategorie.
+
 - Dashboard: replace the large header with a compact live footer in every view (#36); use a red × to archive appointments and a dedicated archive icon (#35).
 - Timetable: select a lesson by mouse, touch or keyboard to open its actual date in the day view, highlight and focus the lesson, and read teacher, substitute, room and status details. Calendar export remains available (#37).
 

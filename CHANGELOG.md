@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Metadata: classify the integration under Calendars & to-dos for discovery in Home Assistant and Marketplace; resolves the HACS missing-category warning. / Metadaten: Integration für Home Assistant und Marketplace unter Kalender und Aufgaben einordnen; behebt den HACS-Hinweis zur fehlenden Kategorie.
+
+- Dashboard: replace the large header with a compact live footer in every view (#36); use a red × to archive appointments and a dedicated archive icon (#35).
+- Timetable: select a lesson by mouse, touch or keyboard to open its actual date in the day view, highlight and focus the lesson, and read teacher, substitute, room and status details. Calendar export remains available (#37).
+
 - Fix: read all text blocks and attachments from blackboard notices instead of relying on fixed HTML positions. Previously empty saved notices receive the recovered content and are analysed again while keeping their read/completion state and without sending a duplicate notification. Refs #30. / Behoben: Texte und Anhänge vom Schwarzen Brett werden unabhängig von ihrer HTML-Position gelesen; bisher leere Einträge werden ergänzt und neu ausgewertet, ohne Gelesen-/Erledigt-Status zurückzusetzen oder erneut zu benachrichtigen.
 
 ## 0.14.4 – 2026-11-04

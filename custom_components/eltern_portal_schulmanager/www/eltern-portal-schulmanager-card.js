@@ -205,12 +205,15 @@
     .ev .hv { display:none; font-size:.85em; color: var(--secondary-text-color); margin-top:2px; }
     .ev.open .hv { display:block; }
     .acts { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .lesson-pick { width:100%; min-height:44px; border:0; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+    .lesson-selected { outline:2px solid var(--primary-color); outline-offset:-2px; }
+    .lesson-details { font-size:.85em; margin-top:6px; }
     .exam[data-cal], .chg.cal { cursor:pointer; }
     .chg .acts .btn, .exam .acts .btn { color: var(--primary-text-color); }
     .btn.sm { padding:3px 10px; font-size:.85em; border-radius:14px; }
     .ev .acts .btn.sm { font-size:1em; }
     .calw { font-size:.85em; color: var(--secondary-text-color); align-self:center; }
-    .ev .arc { flex:none; width:1.9em; height:1.9em; padding:0; border:1px solid var(--divider-color); background: var(--card-background-color, #fff); border-radius:50%; font-size:.8em; line-height:1; cursor:pointer; visibility:hidden; margin-top:1px; }
+    .ev .arc { flex:none; width:1.9em; height:1.9em; padding:0; border:1px solid var(--divider-color); background: var(--card-background-color, #fff); border-radius:50%; font-size:.8em; line-height:1; cursor:pointer; visibility:visible; color:var(--error-color,#db4437); margin-top:1px; }
     .ev.archived .arc { visibility:visible; }
     .ev:hover .arc, .ev.open .arc, .ev .arc:focus { visibility:visible; }
     .ev .arc:hover { border-color: var(--primary-color); color: var(--primary-color); }
@@ -1062,10 +1065,10 @@
       let html = `<div class="bar">
           <button class="pill ${range === "2w" ? "on" : ""}" data-range="2w">Nächste 2 Wochen</button>
           <button class="pill ${range === "all" ? "on" : ""}" data-range="all">Alle${range === "2w" && hidden ? ` (+${hidden})` : ""}</button>
-          <button class="pill ${archiveView ? "on" : ""}" data-range="archive" title="Archivierte Termine und Fristen anzeigen">📦 Archiv${archived.length ? ` (${archived.length})` : ""}</button>
+          <button class="pill ${archiveView ? "on" : ""}" data-range="archive" title="Archivierte Termine und Fristen anzeigen">🗃️ Archiv${archived.length ? ` (${archived.length})` : ""}</button>
         </div>`;
       if (!groups.length) html += archiveView
-        ? `<div class="empty">Das Archiv ist leer. Einträge lassen sich mit 📦 hierher schieben.</div>`
+        ? `<div class="empty">Das Archiv ist leer. Einträge lassen sich mit dem roten × hierher schieben.</div>`
         : `<div class="empty">Keine Termine ${range === "2w" ? "in den nächsten zwei Wochen" : "geplant"} 🎉</div>`;
       for (const [key, label, list] of groups) {
         html += `<div class="day ${key === today ? "today" : key === "over" ? "over" : ""}">${esc(label)}</div>`;
@@ -1085,7 +1088,7 @@
               <div class="main"><div class="t">${esc(e.title)}</div>
                 <div class="hv">${e.hover ? `<div>${esc(clip(e.hover))}</div>` : ""}${acts}</div></div>
               ${multi ? `<span class="who" style="background:${colors[e.child]}">${esc(e.child_name)}</span>` : ""}
-              <button class="arc" data-arc="${evKey}" title="${e.archived ? "Reaktivieren: zurück in die Termine & Fristen" : "Archivieren: ins Archiv schieben"}" aria-label="${e.archived ? "Reaktivieren" : "Archivieren"}">${e.archived ? "↩️" : "📦"}</button>
+              <button class="arc" data-arc="${evKey}" title="${e.archived ? "Reaktivieren: zurück in die Termine & Fristen" : "Ins Archiv verschieben"}" aria-label="${e.archived ? "Reaktivieren" : "Ins Archiv verschieben"}">${e.archived ? "↩️" : "×"}</button>
             </div>`;
         }
       }
@@ -1255,6 +1258,15 @@
           this._render();
         })
       );
+      root.querySelectorAll("[data-lesson]").forEach((el) => el.addEventListener("click", () => {
+        this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.date };
+        this._week = { ...(this._week || {}), [el.dataset.child]: false };
+        this._selectedLesson = { child: el.dataset.child, lesson: el.dataset.lesson };
+        this._render();
+        const chosen = this.shadowRoot.querySelector(".lesson-selected");
+        chosen?.scrollIntoView({ block: "nearest" });
+        chosen?.focus({ preventScroll: true });
+      }));
       this._bindLegends(root);
     }
 
@@ -1371,10 +1383,13 @@
         const ex = examFor(l.subject);
         const exCls = ex ? (ex.category === "test" ? "has-test" : "has-exam") : "";
         const exBadge = ex ? `<span class="badge ${EXAM_LABEL[ex.category][2]}">${EXAM_LABEL[ex.category][0]} ${EXAM_LABEL[ex.category][1]}</span>` : "";
-        html += `<div class="les ${kind} ${exCls} ${isNow ? "now" : ""}">
+        html += `<div tabindex="0" class="les ${kind} ${exCls} ${isNow ? "now" : ""} ${this._selectedLesson?.child === c.key && String(this._selectedLesson.lesson) === String(l.lesson) ? "lesson-selected" : ""}">
             <span class="nr">${esc(l.lesson)}.</span>
             <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
             <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}${exBadge}</div>
+              <div class="lesson-details">Reguläre Lehrkraft: ${esc(l.teacher_label || l.teacher || "nicht angegeben")}<br>
+              ${ch.map((e) => `Status: ${esc(KIND_LABEL[e.kind] || e.kind || "Änderung")}${e.teacher_label || e.teacher ? `<br>Ursprüngliche Lehrkraft: ${esc(e.teacher_label || e.teacher)}` : ""}${e.substitute_label || e.substitute ? `<br>Vertretungslehrkraft: ${esc(e.substitute_label || e.substitute)}` : ""}${e.room ? `<br>Raumänderung: ${esc(room(l.room))} → ${esc(room(e.room))}` : ""}${e.info ? `<br>Hinweis: ${esc(e.info)}` : ""}`).join("<br>") || "Status: regulärer Unterricht"}
+              ${l.info ? `<br>Hinweis: ${esc(l.info)}` : ""}</div>
               ${ch.map((e) => this._chgHtml(c, e)).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
           </div>`;
@@ -1414,7 +1429,7 @@
           const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
           const ex = l && ((this._exams || {})[iso] || []).find((e) => e.subject && sameSubject(e.subject, l.subject));
           const exCls = ex ? " " + EXAM_LABEL[ex.category][2] : "";
-          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? `<span class="lg">${esc(fullName(l.subject))}</span><span class="sh">${esc(shortName(l.subject))}</span>` + `<div class="r">${esc(room(l.room))}</div>` : ""}${kind ? `<div class="r"><span class="lg">${KIND_LABEL[kind]}</span><span class="sh">${KIND_SHORT[kind] || KIND_LABEL[kind]}</span></div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} <span class="lg">${EXAM_LABEL[ex.category][1]}</span><span class="sh">${EXAM_SHORT[ex.category]}</span></div>` : ""}</td>`;
+          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? `<button class="lesson-pick" data-child="${k}" data-lesson="${esc(nr)}" data-date="${iso}" aria-label="${esc(dayLabel(iso, today) + ", Stunde " + nr + ": " + fullName(l.subject))}"><span class="lg">${esc(fullName(l.subject))}</span><span class="sh">${esc(shortName(l.subject))}</span>` + `<div class="r">${esc(room(l.room))}</div></button>` : ""}${kind ? `<div class="r"><span class="lg">${KIND_LABEL[kind]}</span><span class="sh">${KIND_SHORT[kind] || KIND_LABEL[kind]}</span></div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} <span class="lg">${EXAM_LABEL[ex.category][1]}</span><span class="sh">${EXAM_SHORT[ex.category]}</span></div>` : ""}</td>`;
         });
         html += `</tr>`;
       }
@@ -1439,7 +1454,7 @@
     .top .meta a { color: var(--primary-color); text-decoration:none; cursor:pointer; }
     .top .meta a:hover { text-decoration:underline; }
     .top .meta .err { color: var(--error-color,#db4437); }
-    .rf { border:none; background:none; cursor:pointer; color: var(--primary-color); font: inherit; padding:0 2px; }
+    .rf { border:none; background:none; cursor:pointer; color: var(--primary-color); font: inherit; padding:8px; min-width:44px; min-height:44px; }
     @media (max-width: 600px) {
       .top .meta { margin-left:0; justify-content:flex-start; text-align:left; width:100%; }
     }
@@ -1475,7 +1490,7 @@
         const errs = d.errors || [];
         meta.push(
           `<span title="Letzter Abruf aus dem Eltern-Portal">Stand: ${esc(this._stamp(d.last_update))}` +
-            `<button class="rf" data-refresh title="Portale jetzt abrufen">${this._refreshing ? "…" : "↻"}</button></span>`
+            `<button class="rf" data-refresh aria-label="Portale jetzt abrufen" title="Portale jetzt abrufen">${this._refreshing ? "…" : "↻"}</button></span>`
         );
         if (errs.length) meta.push(`<span class="err" title="${esc(errs.join("\n"))}">⚠️ ${errs.length} Fehler beim Abruf</span>`);
         if (d.version) {
@@ -1483,15 +1498,12 @@
           meta.push(`<a href="${esc(url)}" target="_blank" rel="noopener" title="${NAME} auf GitHub">v${esc(d.version)} ↗</a>`);
         }
       }
-      if (isAdmin && cfg.settings_path !== false) meta.push(`<a data-nav="${esc(cfg.settings_path || `/config/integrations/integration/${DOMAIN}`)}">⚙️ Einstellungen</a>`);
+      if (isAdmin && cfg.settings_path !== false) meta.push(`<a href="${esc(cfg.settings_path || `/config/integrations/integration/${DOMAIN}`)}" data-nav="${esc(cfg.settings_path || `/config/integrations/integration/${DOMAIN}`)}">⚙️ Einstellungen</a>`);
       const html = `<style>${HEADER_STYLE}</style><ha-card class="hd"><div class="top">
-          ${cfg.icon ? `<img src="${esc(cfg.icon)}" alt="">` : ""}
-          <div class="tt"><div class="ttl">${esc(cfg.title || NAME)}</div>
-            <div class="sub">${esc(cfg.subtitle || "")}${cfg.subtitle ? " · " : ""}Eltern-Portal, Aufgaben und Fristen</div></div>
           <div class="meta">${meta.join("")}</div>
         </div></ha-card>`;
       const root = this._setContent(html);
-      root.querySelectorAll("[data-nav]").forEach((el) => el.addEventListener("click", () => navigate(el.dataset.nav)));
+      root.querySelectorAll("[data-nav]").forEach((el) => el.addEventListener("click", (event) => { event.preventDefault(); navigate(el.dataset.nav); }));
       root.querySelectorAll("[data-refresh]").forEach((el) =>
         el.addEventListener("click", async () => {
           if (this._refreshing) return;

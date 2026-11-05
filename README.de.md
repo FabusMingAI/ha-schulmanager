@@ -30,12 +30,9 @@
 
 Die Integration lädt vier Karten automatisch und baut sie ins Dashboard „Schule“ ein. HACS-Frontend-Ressourcen braucht es nicht. Alle Karten nehmen optional `child: <kind>`, ohne Angabe zeigen sie alle Kinder.
 
-### Kopfzeile – `custom:eltern-portal-schulmanager-header`
+### Fußzeile – `custom:eltern-portal-schulmanager-header`
 
-<p align="left"><img src="docs/images/header.png" width="640" alt="Kopfzeile mit letztem Abruf, Version und Einstellungen"></p>
-
-- Steht oben auf der Übersicht des Dashboards. Rechtsbündig: **wann zuletzt aus dem Eltern-Portal abgerufen wurde** (↻ ruft sofort ab, ⚠️ zeigt Fehler beim Abruf), die **installierte Version** mit Link zum Release auf GitHub und „⚙️ Einstellungen“.
-- Optionen: `subtitle`, `icon`, `settings_path`.
+Am Ende jeder erzeugten Dashboard-Ansicht stehen der aktuelle Datenstand, die Aktualisierungsfunktion, die installierte Version mit Release-Link und „⚙️ Einstellungen“. Der bisherige Kartentyp bleibt gültig. Option: `settings_path`.
 
 ### Aufgaben & Mitteilungen – `custom:eltern-portal-schulmanager-card`
 
@@ -77,6 +74,7 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 - Die Wochenansicht passt auch in schmale Karten (halbe Spalte, Handy), ohne dass man seitlich scrollen muss: Fächer werden dort abgekürzt („Mathe“, „Engl.“, „Reli/Eth“, „SA“ für Schulaufgabe).
 - Fächer stehen **ausgeschrieben** da („Biologie“ statt „B“, „Mathematik (Intensivierung)“ statt „MInt“, „Sport“ statt „Sm/Sw“). Das Original-Kürzel erscheint, wenn man mit der Maus darauf zeigt.
 - Änderungen aus dem Vertretungsplan sind farbig markiert: rot = entfällt, orange = Vertretung oder Raumänderung. Die Zahl an den Wochentagen zeigt, wie viele Änderungen anstehen.
+- Klick oder Tipp auf eine Stunde in der Wochenansicht öffnet ihr Datum und markiert die gewählte Stunde. Die Tagesansicht zeigt verfügbare reguläre Lehrkräfte, Vertretungslehrkräfte, Räume, Status und Hinweise; **Woche** führt zurück.
 - In der Tagesansicht zeigt Antippen eines Schulaufgaben-/Test-Kastens oder einer Vertretung **📅 In Kalender eintragen** / **Google Kalender**.
 - **Schulaufgaben und Tests** aus den Portal-Terminen sind hervorgehoben: 📝 / ✏️ an den Wochentagen, ein Kasten über den Stunden des Tages und eine Markierung am passenden Fach (lila = Schulaufgabe, blau = Test). Was in den nächsten zwei Wochen ansteht, steht über dem Stundenplan.
 
@@ -154,7 +152,7 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
    - **Nur Termine der eigenen Klasse** (Standard: an): blendet Einträge aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen, z. B. „Schullandheim 5b+5c“ oder „Grundwissenstest Jgst. 10“. Termine ohne Klassenangabe bleiben sichtbar.
    - **Lehrkräfte im Stunden- und Vertretungsplan**: Standard *Kürzel und Name*, z. B. „Mü (Maria Müller)“; alternativ *Nur Name* oder *Nur Kürzel*.
    - **Sprachen der KI-Zusammenfassung**: Häkchen bei Deutsch, Englisch, Spanisch und/oder Katalanisch (bis zu 4, Standard Deutsch und Englisch). Jede Sprache wird ein eigener Reiter in der Zusammenfassung; die erste gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache (auch nach dem Hinzufügen einer Sprache), übersetzt die KI im Hintergrund nur die Zusammenfassung – Aufgaben, Termine und Status bleiben unverändert. Ab 5 Übersetzungen kommt eine Benachrichtigung in Home Assistant beim Start (mit geschätzter Dauer) und am Ende; eine fehlgeschlagene Übersetzung wird nach 6 Stunden erneut versucht, höchstens dreimal.
-4. **Dashboard**: Die Integration legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, oben eine Kopfzeile mit letztem Abruf, Version und Link „⚙️ Einstellungen“) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `eltern_portal_schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
+4. **Dashboard**: Die Integration legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, mit kompakter Fußzeile in jeder Ansicht für letzten Abruf, Version und Link „⚙️ Einstellungen“) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `eltern_portal_schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
 
 Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur die der letzten 21 Tage (und alle noch unbestätigten Briefe) werden ausgewertet und als ungelesen markiert, der Rest landet als gelesen im Archiv. Es gibt einmalig eine kurze Einrichtungs-Push statt einer Flut.
 

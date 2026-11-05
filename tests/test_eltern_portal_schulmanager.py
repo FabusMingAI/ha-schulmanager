@@ -672,7 +672,8 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     child_view = json.dumps(cfg["views"][1])
     assert "custom:eltern-portal-schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
     assert '"view": "week"' in child_view
-    assert cfg["views"][0]["header"]["card"]["icon"] == "/eltern_portal_schulmanager_static/icon.png"
+    assert all("header" not in view for view in cfg["views"])
+    assert all(view["sections"][-1]["cards"][0]["type"] == "custom:eltern-portal-schulmanager-header" for view in cfg["views"])
 
     # eigene Änderung bleibt erhalten
     cfg["views"].append({"title": "Eigene Ansicht", "cards": []})
@@ -1239,7 +1240,7 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
 
         # Einstellungen von der Startseite erreichbar
         cfg = dash_mod.build_config(hass, m, "tabs")
-        head = cfg["views"][0]["header"]["card"]
+        head = cfg["views"][0]["sections"][-1]["cards"][0]
         assert head["type"] == "custom:eltern-portal-schulmanager-header"
         assert head["settings_path"] == "/config/integrations/integration/eltern_portal_schulmanager"
     await hass.config_entries.async_unload(entry.entry_id)
@@ -1677,9 +1678,11 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, mon
     ev = next(x for x in m.child_events("anna") if x["uid"].startswith("vertretung-") and "Ph" in x["title"])
     # unbekanntes Kürzel bleibt stehen
     assert "Lehrkräfte laut Plan: Kurz (Karla Kurzweil), Unbek" in ev["hover"]
+    m.data["timetable"]["anna"] = {"lessons": [{"weekday": 1, "lesson": "1", "subject": "M", "teacher": "Kurz"}]}
     ws = await hass_ws_client(hass)
     await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
+    assert res["children"][0]["timetable"][0]["teacher_label"] == "Kurz (Karla Kurzweil)"
     ent = next(x for d in res["children"][0]["substitutions"]["days"] for x in d["entries"] if x["substitute"] == "Lang")
     assert ent["substitute_label"] == "Lang (Lena Lang-Weilig)"
 

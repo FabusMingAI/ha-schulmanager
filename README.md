@@ -1,6 +1,6 @@
 # Eltern Portal Manager Bavaria for Home Assistant
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/default/pull/12349)
 [![Validate](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/validate.yml/badge.svg)](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/validate.yml)
 [![Tests](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/tests.yml/badge.svg)](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -13,31 +13,37 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
+> **Release status:** The latest published release is [v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4). Screenshots show the current `main` development version with fictional data. The compact footer, red archive × and selectable lesson details are included in the next release; see [Unreleased](CHANGELOG.md#unreleased).
+
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
 
 > [!IMPORTANT]
-> **Formerly "Schulmanager".** Up to version 0.13 this integration was called *Schulmanager* and used the domain `schulmanager`. The same domain is used by **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – a different integration for schools that use *schulmanager-online.de* – so the two could not be installed side by side. Since 0.14 this integration is **Eltern Portal Manager Bavaria** (domain `eltern_portal_schulmanager`) and both work together, e.g. one child at an Eltern-Portal school and the other at a Schulmanager Online school. Updating from 0.13 or older? See [Renamed from Schulmanager](#renamed-from-schulmanager) – from 0.14.1 your existing setup is taken over automatically.
+> **Formerly "Schulmanager".** Up to version 0.13 this integration was called *Schulmanager* and used the domain `schulmanager`. The same domain is used by **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – a different integration for schools that use *schulmanager-online.de* – so the two could not be installed side by side. Since 0.14 this integration is **Eltern Portal Manager Bavaria** (domain `eltern_portal_schulmanager`) and both work together, e.g. one child at an Eltern-Portal school and the other at a Schulmanager Online school. Updating from 0.13 or older? See [Renamed from Schulmanager](#renamed-from-schulmanager) – the bridge release 0.14.1 can take over your existing setup automatically.
 
 ## Features
 
 - **Reads the portal directly** – parent letters (*Elternbriefe*), messages from teachers, notice board, surveys, **exams and tests** (*Schulaufgaben, Stegreifaufgaben* …), **timetable**, **substitution plan** (*Vertretungsplan*) and **sick notes** (*Krankmeldungen*). Several schools and children with one installation.
 - **Files per child** – PDFs and attachments go to `Media › eltern_portal_schulmanager › <child> › <school year>`.
 - **AI analysis** via Home Assistant's [AI Task](https://www.home-assistant.io/integrations/ai_task/) (Anthropic, OpenAI, Google, Ollama …): summary, urgency, tasks, deadlines, amounts, IBAN and payment reference, appointments. Without AI a simple rule-based detection is used.
+- **Portal tasks** – open surveys become "Umfrage beantworten" and unconfirmed letters become "Empfang im Portal bestätigen"; those tasks complete when the portal reports them as done.
 - **Tasks with status** *open / in progress / done*, comments, due dates – as a to-do list, calendar and sensors.
 - **Reminders** by push notification (with *Done* and *Remind me tomorrow* buttons), a daily morning summary and optional voice announcements.
 - **Exams and tests in the timetable** – exams (*Schulaufgaben*) and tests (*Tests, Kurzarbeiten, Stegreifaufgaben*) from the portal's appointments are highlighted in the timetable and appear in the calendar; the morning summary mentions tomorrow's exams. Other school appointments (holidays, office hours …) are hidden by default and can be switched on in the settings. Portal appointments that come with a time (e.g. "14:00 - 16:00") get that time in the calendar, all others are all-day entries.
 - **Timetable & substitutions** – cancelled lessons, substitute teachers and room changes appear in the timetable card, the calendar (with lesson times) and the morning summary; a new change triggers a push notification.
+- **Configurable defaults:** fetch every 30 minutes; task reminders at 18:30, 3 days before, the day before and on the due date (overdue tasks daily); morning summary at 06:45 when something is due or pending.
 - **Traffic light per child** – red / yellow / green for dashboards and automations.
 - **Four dashboard cards included**, set up automatically in the "Schule" dashboard – see [The cards](#the-cards).
 
-> The user interface texts of the cards, notifications and the AI output are in German, because Eltern-Portal is a German service. Configuration dialogs are available in English and German.
+> Cards and notification controls use German text. AI summaries can be shown in German, English, Spanish and Catalan; configuration dialogs are available in English and German.
 
 ## The cards
 
-The integration loads four cards automatically and places them in the "Schule" dashboard; no HACS frontend resources are needed. All of them accept an optional `child: <name>`; without it they show all children.
+The integration loads four cards automatically and places them in the "Schule" dashboard; no separate frontend installation is needed. Since 0.14.3, the card and icon are served from the integration’s own static paths, and the dashboard resource is registered automatically. The three content cards accept an optional `child: <name>`; without it they show all children. The footer displays the integration-wide fetch status.
 
 ### Footer – `custom:eltern-portal-schulmanager-header`
+
+<p align="left"><img src="docs/images/footer.png" width="640" alt="Compact footer with last fetch, refresh, version and settings"></p>
 
 A compact footer at the end of every generated dashboard view shows the live fetch time, refresh button, installed version with release link and settings link. The existing card type remains valid. Option: `settings_path`.
 
@@ -63,11 +69,11 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="left"><img src="docs/images/termine.png" width="320" alt="Appointments with AI summary on hover"></p>
 
-- All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks**, **all** and **📦 Archiv**.
-- **Archive entries you no longer need:** hover an entry (on phones the button is always shown) and click **📦**. It disappears from the list and moves to **📦 Archiv** (right of **Alle**, with the number of archived entries). There, **↩️** brings it back. Works on the overview and on every child's tab; the archive is stored in Home Assistant, so it is the same on all devices. Archiving only hides the entry in the card – deadlines stay open tasks and keep their reminders, the calendar is unchanged. Entries that no longer exist are removed from the archive automatically.
+- All appointments, deadlines and substitution plan changes, grouped by day, overdue items on top. Switch between **next 2 weeks**, **all** and **🗃️ Archiv**.
+- **Archive entries you no longer need:** hover an entry (on phones the button is always shown) and click the **red ×** ("Ins Archiv verschieben"). It disappears from the list and moves to **🗃️ Archiv** (right of **Alle**, with the number of archived entries). There, **↩️** brings it back. Works on the overview and on every child's tab; the archive is stored in Home Assistant, so it is the same on all devices. Archiving only hides the entry in the card – deadlines stay open tasks and keep their reminders, the calendar is unchanged. Entries that no longer exist are removed from the archive automatically.
 - **Tap or click an entry** to expand it and again to collapse it – the same for every kind of entry. Expanded, it shows the AI's short summary, location and source, **Aufgabe öffnen › / Mitteilung öffnen ›** for deadlines and appointments from a letter, and **📅 In Kalender eintragen**. With a mouse, hovering shows the short summary as a tooltip.
-- **📅 In Kalender eintragen** puts exactly this one entry into your own calendar – you decide which ones. It opens an `.ics` file: iPhone/iPad (Safari) offers "Add to Calendar", Outlook and most calendar apps open it as an event to save. **Google Kalender** opens the event in Google Calendar (handy on Android, where `.ics` files are not always imported). Adding the same entry again updates it instead of creating a duplicate (stable `UID`). Deadlines get a reminder at 6 pm the day before, timed entries one hour before. The links are signed and valid for 24 hours. In the Home Assistant Companion app the link opens in the browser.
-- A **legend** at the bottom explains the icons: 📝 exam (*Schulaufgabe*), ✏️ test / short test / pop quiz, 🏫 school appointment, 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, 🤒 sick note, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
+- **📅 In Kalender eintragen** puts exactly this one entry into your own calendar – you decide which ones. It opens an `.ics` file: iPhone/iPad (Safari) offers "Add to Calendar", Outlook and most calendar apps open it as an event to save. **Google Kalender** opens the event in Google Calendar (handy on Android, where `.ics` files are not always imported). The `.ics` file uses a stable `UID`; whether importing it again updates an existing event depends on your calendar app. The Google link opens a prefilled event form; saving it repeatedly can create duplicates. The `.ics` file includes a reminder at 6 pm the day before for all-day entries, or one hour before for timed entries. Only the `.ics` links are signed and valid for 24 hours. In the Home Assistant Companion app the link opens in the browser.
+- A **collapsible legend** at the bottom explains the icons: 📝 exam (*Schulaufgabe*), ✏️ test / short test / pop quiz, 🏫 school appointment, 📅 appointment from a message, ❌ lesson cancelled, 🔁 substitution, 🚪 room change, 🤒 sick note, and deadlines by type (💶 payment, ✍️ signature, ↩️ reply, 🎒 bring along, 📖 read, ✅ task). With several children each one gets its own colour.
 
 ### Timetable & substitutions – `custom:eltern-portal-schulmanager-stundenplan`
 
@@ -75,9 +81,10 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="left"><img src="docs/images/stundenplan-woche.png" width="560" alt="Week view with substitutions and exams"></p>
 
-<p align="left"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, regenerate with `python docs/screenshots/make_screenshots.py`).</sub></p>
+<p align="left"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, [regeneration instructions](docs/screenshots/README.md)).</sub></p>
 
 - Day view with times and rooms, switchable to the whole **week**. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
+- **Week navigation:** use ‹ / › to go back or forward one week and **Heute** to return to the starting week. The heading shows the calendar week and Monday–Friday dates; at weekends the starting week is the following week. The week-view legend can be expanded or collapsed.
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
 - Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.
@@ -93,26 +100,36 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 ## Installation
 
-### HACS (recommended)
+### HACS / Marketplace (recommended)
 
-1. Open **HACS** and search for **Eltern Portal Manager Bavaria**.
+1. On **Home Assistant 2026.11 or newer**, open **Settings → Marketplace**. On **2026.10 or older**, open **HACS**. Search for **Eltern Portal Manager Bavaria**.
 2. Install the integration and restart Home Assistant.
 
-Until the integration is included in the default HACS catalog, add it once via HACS → ⋮ → **Custom repositories** → `https://github.com/FabusMingAI/ha-schulmanager`, type **Integration**, then follow the steps above.
+The integration is included in the default catalog; adding a custom repository is no longer necessary. In HACS, check the country filter if the integration does not appear: this repository is listed for **Germany (DE)**.
+
+Starting with Home Assistant 2026.11, Marketplace replaces HACS and takes over existing installations automatically. Do not install HACS separately on those versions. See the [official Marketplace announcement](https://www.home-assistant.io/blog/2026/11/04/release-202611/#welcome-to-the-marketplace).
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FabusMingAI&repository=ha-schulmanager&category=integration)
 
 ### Manual
 
-Copy `custom_components/eltern_portal_schulmanager` to `/config/custom_components/eltern_portal_schulmanager` and restart Home Assistant.
+Download the source archive of the [latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), extract it, copy `custom_components/eltern_portal_schulmanager` to `/config/custom_components/eltern_portal_schulmanager` and restart Home Assistant.
+
+## Releases and updates
+
+As of **5 November 2026**, the latest published release is **[v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4)**. It removes leftover card/icon copies from 0.14.0–0.14.2 when the old folder contains only the known regular files; foreign files, subdirectories and symlinks are preserved. Migrated dashboards use the integration’s static icon path.
+
+Install updates through HACS or Marketplace and restart Home Assistant. The version displayed in the "Schule" status bar is the running integration’s version; the downloaded version only becomes active after a restart.
+
+**Development branch:** `main` already includes the fix for missing notice-board text and attachments ([#33](https://github.com/FabusMingAI/ha-schulmanager/pull/33)). It is **not included in v0.14.4**. With that fix, previously empty notices are supplemented and analysed again on the next regular fetch, keeping their read/completion state and without an additional notification. See [Unreleased in the changelog](CHANGELOG.md#unreleased) for changes awaiting a release.
 
 ## Renamed from Schulmanager
 
 Existing installations are taken over completely: credentials, settings, tasks, messages with status and comments, the archive, AI summaries, stored files, entity IDs and their history.
 
-**From 0.14.1 this happens automatically.** Version 0.14.1 is a bridge release: it arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
+**The bridge release 0.14.1 handles this automatically.** It is a one-off release: it arrives once more under the old name *Schulmanager*, installs *Eltern Portal Manager Bavaria* and takes over your setup by itself. A notification confirms it – then **restart Home Assistant once more**. That's all.
 
-**Still on 0.13 or older?** Newer releases (0.14.2 and later) no longer contain the bridge, so install 0.14.1 first: HACS → *Eltern Portal Manager Bavaria* → ⋮ → **Redownload** → choose version **v0.14.1** → *Download*, then restart Home Assistant (twice, as above). Afterwards install the latest update as usual. (If Home Assistant still shows version 0.13 in the header of the "Schule" dashboard after updating to 0.14.2 or later, this is the reason.)
+**Still on 0.13 or older?** Newer releases (0.14.2 and later) no longer contain the bridge, so install 0.14.1 first: in HACS, use *Eltern Portal Manager Bavaria* → ⋮ → **Redownload** → version **v0.14.1** → *Download*. In Marketplace (Home Assistant 2026.11+), open the repository page → ⋮ → **Install another version** and select **v0.14.1**. Then restart Home Assistant (twice, as above). Afterwards install the latest update as usual. (If Home Assistant still shows version 0.13 in the header of the "Schule" dashboard after updating to 0.14.2 or later, this is the reason.)
 
 > **Using [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) as well?** It uses the same folder `custom_components/schulmanager`. If you already took over by hand with 0.14.0 *and* installed Schulmanager Online afterwards, skip 0.14.1 and update straight to 0.14.2 or later – those install into `custom_components/eltern_portal_schulmanager` again and never touch Schulmanager Online's folder.
 
@@ -129,7 +146,7 @@ What changes:
 |---|---|
 | Integration *Schulmanager*, domain `schulmanager` | *Eltern Portal Manager Bavaria*, domain `eltern_portal_schulmanager` |
 | Actions `schulmanager.refresh`, `schulmanager.mark_read`, … | `eltern_portal_schulmanager.refresh`, `eltern_portal_schulmanager.mark_read`, … |
-| Events `schulmanager_new_item`, `schulmanager_task_reminder`, `schulmanager_substitution` | `eltern_portal_schulmanager_new_item`, `eltern_portal_schulmanager_task_reminder`, `eltern_portal_schulmanager_substitution` |
+| Events `schulmanager_new_item`, `schulmanager_task_reminder`, `schulmanager_substitution` | `eltern_portal_schulmanager_new_item` (with `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder`, `eltern_portal_schulmanager_substitution` |
 | Cards `custom:schulmanager-card`, `-termine`, `-stundenplan`, `-header` | `custom:eltern-portal-schulmanager-card`, `-termine`, `-stundenplan`, `-header` |
 | Files in `Media › schulmanager › …` | `Media › eltern_portal_schulmanager › …` |
 
@@ -151,10 +168,10 @@ Not carried over: PDF and calendar links in push notifications sent before the u
 
 1. **Settings → Devices & services → Add integration → Eltern Portal Manager Bavaria**
 2. Enter the school code (the part before `.eltern-portal.org`) – or simply paste the link from a portal notification e-mail – plus e-mail and password. Add more schools in the same dialog.
-3. **Configure → Settings** – grouped into collapsible sections (*KI & Sprachen*, *Benachrichtigungen & Erinnerungen*, *Termine & Klassen* open; *Sprachansagen*, *Abruf & Ablage*, *Dashboard* collapsed), every field with a short explanation: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, **which portal appointments to show** (default: exams and tests; optionally also school appointments), **only appointments of the child's class** (default on: hides entries such as "Schullandheim 5b+5c" or "Jgst. 10" that name only other classes or grades), **how teachers are shown** in timetable and substitution plan (default *abbreviation and name*, e.g. "Mü (Maria Müller)"; or *name only*, or *abbreviation only*) and the **languages of the AI summary** (checkboxes for German, English, Spanish, Catalan, up to 4; default German and English; the first one is used for push notifications). If an already analysed message lacks a language – also after you add one – the AI translates just the summary in the background; tasks, appointments and status stay untouched. With 5 or more translations you get a Home Assistant notification when they start (with an estimated duration) and when they are done; a failed translation is retried after 6 hours, up to 3 attempts.
-4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, with a compact footer in every view showing the last fetch, version and a "⚙️ Einstellungen" link) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `eltern_portal_schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/schulmanager_dashboard.yaml) is only an example for your own dashboards.
+3. **Configure → Settings** – grouped into collapsible sections (*KI & Sprachen*, *Benachrichtigungen & Erinnerungen*, *Termine & Klassen* open; *Sprachansagen*, *Abruf & Ablage*, *Dashboard* collapsed), every field with a short explanation: choose the AI Task entity, the phones for push notifications (`notify.mobile_app_…`), reminder days and times, optionally speakers or Assist satellites for announcements, **which portal appointments to show** (default: exams and tests; optionally also school appointments), **only appointments of the child's class** (default on: hides entries such as "Schullandheim 5b+5c" or "Jgst. 10" that name only other classes or grades), **how teachers are shown** in timetable and substitution plan (default *abbreviation and name*, e.g. "Mü (Maria Müller)"; or *name only*, or *abbreviation only*) and the **languages of the AI summary** (checkboxes for German, English, Spanish, Catalan, up to 4; default German and English; the first selected language in the fixed order German → English → Spanish → Catalan is used for push summaries). If an already analysed message lacks a language – also after you add one – the AI translates just the summary in the background; tasks, appointments and status stay untouched. With 5 or more translations you get a Home Assistant notification when they start (with an estimated duration) and when they are done; a failed translation is retried after 6 hours, up to 3 attempts.
+4. **Dashboard**: the integration creates the **"Schule"** dashboard in the sidebar by itself – tabs **Overview** (appointments & deadlines of all children on the left, each child's timetable with substitutions on the right, with a compact footer in every view for the last fetch, version and a "⚙️ Einstellungen" link) plus **one tab per child** (tasks & messages, timetable with substitutions, appointments), ideal on phones. Under **Configure → Settings → "Schule" dashboard** you can switch to *Single page* or *Do not manage*. Dashboards you change by hand are left alone (regenerate with the action `eltern_portal_schulmanager.rebuild_dashboard`). The YAML in [`dashboard/`](dashboard/eltern_portal_schulmanager_dashboard.yaml) is only an example for your own dashboards.
 
-On the first run the last 120 days are imported; only the last 21 days (and all unconfirmed letters) are analysed and marked unread, older items go to the archive as read.
+On the first run the last 120 days are imported; recent messages from the last 21 days, unconfirmed letters and surveys whose closing date has not passed are analysed and marked unread, older items are stored as read without automatic analysis. A single setup notification replaces individual notifications for the initial import.
 
 ## Entities (per child)
 
@@ -177,26 +194,27 @@ Entity IDs follow your Home Assistant language (shown here for German).
 | Action | Purpose |
 |---|---|
 | `eltern_portal_schulmanager.refresh` | Fetch all portals now |
-| `eltern_portal_schulmanager.mark_read` | Mark a message, a child or everything as read |
-| `eltern_portal_schulmanager.complete_task` / `eltern_portal_schulmanager.update_task` | Change status, comment, due date or title |
+| `eltern_portal_schulmanager.mark_read` | `item_id` or `child`, without either: all messages; optional `read: false` marks them unread |
+| `eltern_portal_schulmanager.complete_task` | `task_id`, optional `done` (default `true`); complete or reopen a task |
+| `eltern_portal_schulmanager.update_task` | `task_id` and `status`, `comment`, `due`, `title` or `details` |
 | `eltern_portal_schulmanager.update_item` | `status` (`offen`, `in_arbeit`, `erledigt`) of a message (`item_id`); without `item_id` for all messages of `child` (or of all children), returns `changed` |
-| `eltern_portal_schulmanager.add_task` | Add your own task |
-| `eltern_portal_schulmanager.reanalyze` | Let the AI analyse a message again |
+| `eltern_portal_schulmanager.add_task` | `child`, `title`; optional `due`, `amount`, `details`, `type` |
+| `eltern_portal_schulmanager.reanalyze` | `item_id`; analyse a message again using the configured AI service or rules |
 | `eltern_portal_schulmanager.archive_event` / `eltern_portal_schulmanager.unarchive_event` | `child` and `event_id` (uid of an entry in "Termine & Fristen"): move it to the archive or bring it back |
 | `eltern_portal_schulmanager.send_digest` / `eltern_portal_schulmanager.send_reminders` | Send summary or reminders now |
 | `eltern_portal_schulmanager.rebuild_dashboard` | Regenerate the "Schule" dashboard |
 | `eltern_portal_schulmanager.get_overview` | Returns everything as a response – e.g. for an Assist script "What's up at school?" |
 
-Events for your own automations: `eltern_portal_schulmanager_new_item`, `eltern_portal_schulmanager_task_reminder` and `eltern_portal_schulmanager_substitution` (new substitution plan entries, with `child` and `entries`).
+Events for your own automations: `eltern_portal_schulmanager_new_item` (with `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` and `eltern_portal_schulmanager_substitution` (new substitution plan entries, with `child` and `entries`).
 
 ## Good to know
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, the integration therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.
-- **Privacy:** everything stays in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days; calendar (`.ics`) links after 24 hours. An `.ics` file contains the entry as shown in the card (teacher names as set in *Termine & Klassen*) and leaves Home Assistant once you open it.
+- **Privacy:** school data and downloaded files are stored locally in Home Assistant. If you select an AI service, the text and PDF content of a message is sent to that provider for analysis. File links in the dashboard are signed and expire after 30 days; calendar (`.ics`) links after 24 hours. An `.ics` file contains the entry as shown in the card (teacher names as set in *Termine & Klassen*) and is passed to your browser/calendar app when opened. Opening **Google Kalender** sends the event’s title, times, description and location to Google.
 - **Substitution plan layouts:** depending on the school, Eltern-Portal shows the substitution plan with 6 columns (with *Fach*, a replaced subject struck through) or with 5 columns without a subject. Both are read; without a subject column the subject is taken from the timetable when it is unambiguous.
 - **Timetable, substitution plan and sick notes** are only available if the school has enabled them in Eltern-Portal. If such a page is missing or the portal drops the connection there, only that section is skipped (noted in `sensor.eltern_portal_manager_bavaria_letzter_abruf`); everything else is still fetched. If the portal briefly returns an empty page, the last known data is kept.
 - **Unofficial:** Eltern-Portal has no public API. Access uses the library [pyelternportal](https://github.com/michull/pyelternportal), which reads the web pages. If the portal layout changes, single sections may stop working until an update; the error shows up in `sensor.eltern_portal_manager_bavaria_letzter_abruf`.
-- **Teacher names:** Eltern-Portal lists the timetable abbreviations of all teachers under *Service → Schulinformationen* ("Stundenplankürzel der Lehrkräfte"). The integration reads this list per school once a day and shows the names next to the abbreviations in the timetable, substitution plan, calendar, hover texts and push notifications – as set in *Termine & Klassen*. Each school has its own list; unknown abbreviations stay as they are. The names stay in Home Assistant and are never sent to the AI service.
+- **Teacher names:** Eltern-Portal lists the timetable abbreviations of all teachers under *Service → Schulinformationen* ("Stundenplankürzel der Lehrkräfte"). The integration reads this list per school once a day and shows the names next to the abbreviations in the timetable, substitution plan, calendar, hover texts and push notifications – as set in *Termine & Klassen*. Each school has its own list; unknown abbreviations stay as they are. The separately fetched abbreviation-to-name list is not sent to the AI service. Sender names and names within message text can still be included in the analysis.
 - **Changed messages:** if a teacher edits a message in the portal, it is analysed again and shown as unread. Pure formatting differences (spaces, line breaks) are ignored, and if most known messages look different at once (e.g. after a portal or integration update), they are updated quietly instead of all becoming unread again.
 - **Connection:** every fetch uses its own fresh connection per school. If the portal drops it ("Server disconnected"), the integration tries once more after a few seconds before keeping the last known data.
 - **Sick notes** are only read, never submitted – report sickness in the portal as usual.
@@ -206,10 +224,16 @@ Events for your own automations: `eltern_portal_schulmanager_new_item`, `eltern_
 
 ## Development
 
+The test workflow uses **Python 3.13**. From the repository root:
+
 ```bash
-pip install -r requirements_test.txt
-pytest
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements_test.txt
+python -m pytest
 ```
+
+Before publishing a release, keep the version in the integration manifest, the card and the bridge manifest aligned, update [CHANGELOG.md](CHANGELOG.md), and ensure Tests, HACS and hassfest pass. The manual **Release** workflow publishes from `main` and runs the tests again.
 
 Issues and pull requests are welcome.
 

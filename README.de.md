@@ -1,16 +1,23 @@
 # Eltern Portal Manager Bavaria für Home Assistant
 
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/default/pull/12349)
+[![Validate](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/validate.yml/badge.svg)](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/validate.yml)
+[![Tests](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/tests.yml/badge.svg)](https://github.com/FabusMingAI/ha-schulmanager/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **English:** [README.md](README.md)
 
 **Eltern Portal Manager Bavaria** (früher *Schulmanager*) holt alle Mitteilungen aus dem **[Eltern-Portal](https://www.eltern-portal.org)** selbst ab, legt Elternbriefe und Anhänge pro Kind ab, lässt eine KI daraus Aufgaben, Fristen, Zahlungen und Termine herauslesen und erinnert euch rechtzeitig: per Push aufs Handy, morgens als Tagesübersicht, per Sprachansage und als Ampel im Dashboard. Mehrere Kinder und Schulen laufen in einer Installation.
 
 ![Dashboard](docs/images/dashboard.png)
 
+> **Release-Stand:** Das neueste veröffentlichte Release ist [v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4). Die Screenshots zeigen den aktuellen Entwicklungsstand auf `main` mit erfundenen Daten. Die kompakte Fußzeile, das rote Archiv-× und auswählbare Stundendetails sind für das nächste Release vorgesehen; siehe [Unreleased](CHANGELOG.md#unreleased).
+
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
 
 > [!IMPORTANT]
-> **Früher „Schulmanager“.** Bis Version 0.13 hieß diese Integration *Schulmanager* und nutzte die Domain `schulmanager`. Dieselbe Domain nutzt **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – eine andere Integration für Schulen mit *schulmanager-online.de* –, deshalb ließen sich beide nicht gleichzeitig installieren. Seit 0.14 heißt diese Integration **Eltern Portal Manager Bavaria** (Domain `eltern_portal_schulmanager`), und beide laufen nebeneinander, z. B. ein Kind an einer Schule mit Eltern-Portal und eines an einer Schule mit Schulmanager Online. Update von 0.13 oder älter? Siehe [Umbenannt: früher Schulmanager](#umbenannt-früher-schulmanager) – ab 0.14.1 wird die bestehende Einrichtung automatisch übernommen.
+> **Früher „Schulmanager“.** Bis Version 0.13 hieß diese Integration *Schulmanager* und nutzte die Domain `schulmanager`. Dieselbe Domain nutzt **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – eine andere Integration für Schulen mit *schulmanager-online.de* –, deshalb ließen sich beide nicht gleichzeitig installieren. Seit 0.14 heißt diese Integration **Eltern Portal Manager Bavaria** (Domain `eltern_portal_schulmanager`), und beide laufen nebeneinander, z. B. ein Kind an einer Schule mit Eltern-Portal und eines an einer Schule mit Schulmanager Online. Update von 0.13 oder älter? Siehe [Umbenannt: früher Schulmanager](#umbenannt-früher-schulmanager) – das Brücken-Release 0.14.1 kann die bestehende Einrichtung automatisch übernehmen.
 
 ## Was passiert automatisch
 
@@ -20,7 +27,7 @@
 | Ablage | PDFs und Anhänge unter `Medien › eltern_portal_schulmanager › <Kind> › <Schuljahr>` speichern, z. B. `Anna/2026-27/2026-09-30 Elternbrief - Wandertag.pdf` |
 | Auswertung | Text und PDF-Inhalt an den KI-Dienst von Home Assistant ([AI Task](https://www.home-assistant.io/integrations/ai_task/)) geben: Zusammenfassung, Dringlichkeit, Aufgaben (zahlen, unterschreiben, zurückgeben, mitbringen …), Fälligkeiten, Beträge, IBAN und Verwendungszweck, Termine. Ohne KI gibt es eine einfache Erkennung von Datum und Betrag. |
 | Portal-Aufgaben | Offene Umfragen werden zu „Umfrage beantworten“, Briefe ohne Datei zu „Empfang im Portal bestätigen“. Beide haken sich von selbst ab, sobald das im Portal erledigt ist. |
-| Push | Pro neuer Mitteilung eine Nachricht an die gewählten Handys, mit den Buttons **Gelesen**, **Erledigt** und **Im Portal öffnen** |
+| Push | Pro neuer Mitteilung eine Nachricht an die gewählten Handys, mit **Gelesen** und **Im Portal öffnen**; **Erledigt** wird angeboten, wenn genau eine offene Aufgabe dazugehört |
 | Vertretungen | Neue Vertretungen, Ausfälle und Raumänderungen ab heute kommen als Push, z. B. „🔁 Vertretungsplan Anna – Morgen: 6. Std. E entfällt“. Beim allerersten Abruf gibt es keine Push. |
 | Erinnerung (18:30) | Standardmäßig 3 Tage vorher, am Vortag und am Tag selbst, Überfälliges täglich. Buttons **Erledigt** und **Morgen erinnern**. |
 | Tagesübersicht (06:45) | Nur wenn etwas ansteht: Ampel pro Kind, Fristen, Ungelesenes, heutige Termine, heutige Vertretungen und Schulaufgaben/Tests von morgen |
@@ -28,9 +35,11 @@
 
 ## Die Karten
 
-Die Integration lädt vier Karten automatisch und baut sie ins Dashboard „Schule“ ein. HACS-Frontend-Ressourcen braucht es nicht. Alle Karten nehmen optional `child: <kind>`, ohne Angabe zeigen sie alle Kinder.
+Die Integration lädt vier Karten automatisch und baut sie ins Dashboard „Schule“ ein. Eine separate Frontend-Installation ist nicht nötig. Seit 0.14.3 werden Karte und Icon über eigene statische Pfade der Integration ausgeliefert; die Dashboard-Ressource wird automatisch eingetragen. Die drei Inhaltskarten nehmen optional `child: <kind>` entgegen; ohne Angabe zeigen sie alle Kinder. Die Fußzeile zeigt den Abrufstatus der gesamten Integration.
 
 ### Fußzeile – `custom:eltern-portal-schulmanager-header`
+
+<p align="left"><img src="docs/images/footer.png" width="640" alt="Kompakte Fußzeile mit letztem Abruf, Aktualisierung, Version und Einstellungen"></p>
 
 Am Ende jeder erzeugten Dashboard-Ansicht stehen der aktuelle Datenstand, die Aktualisierungsfunktion, die installierte Version mit Release-Link und „⚙️ Einstellungen“. Der bisherige Kartentyp bleibt gültig. Option: `settings_path`.
 
@@ -56,11 +65,11 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 <p align="left"><img src="docs/images/termine.png" width="320" alt="Termine mit Kurzbeschreibung"></p>
 
-- Alle Termine, Fristen und Änderungen aus dem Vertretungsplan nach Tagen sortiert, Überfälliges oben. Umschalten zwischen **Nächste 2 Wochen**, **Alle** und **📦 Archiv**.
-- **Erledigtes archivieren:** Maus auf einen Eintrag (am Handy ist der Knopf immer sichtbar) und auf **📦** klicken. Der Eintrag verschwindet aus der Liste und landet im **📦 Archiv** (rechts neben **Alle**, mit Anzahl). Dort holt **↩️** ihn zurück. Funktioniert auf der Übersicht und in jedem Kinder-Reiter; das Archiv liegt in Home Assistant und ist auf allen Geräten gleich. Archivieren blendet nur in der Karte aus – Fristen bleiben offene Aufgaben mit Erinnerung, der Kalender bleibt unverändert. Einträge, die es nicht mehr gibt, verschwinden automatisch aus dem Archiv.
+- Alle Termine, Fristen und Änderungen aus dem Vertretungsplan nach Tagen sortiert, Überfälliges oben. Umschalten zwischen **Nächste 2 Wochen**, **Alle** und **🗃️ Archiv**.
+- **Erledigtes archivieren:** Maus auf einen Eintrag (am Handy ist der Knopf immer sichtbar) und auf das **rote ×** („Ins Archiv verschieben“) klicken. Der Eintrag verschwindet aus der Liste und landet im **🗃️ Archiv** (rechts neben **Alle**, mit Anzahl). Dort holt **↩️** ihn zurück. Funktioniert auf der Übersicht und in jedem Kinder-Reiter; das Archiv liegt in Home Assistant und ist auf allen Geräten gleich. Archivieren blendet nur in der Karte aus – Fristen bleiben offene Aufgaben mit Erinnerung, der Kalender bleibt unverändert. Einträge, die es nicht mehr gibt, verschwinden automatisch aus dem Archiv.
 - **Eintrag antippen bzw. anklicken** klappt ihn auf, erneutes Antippen klappt ihn zu – bei allen Arten gleich. Aufgeklappt stehen dort Kurzbeschreibung der KI, Ort und Quelle, bei Fristen und Terminen aus einem Brief **Aufgabe öffnen › / Mitteilung öffnen ›** und **📅 In Kalender eintragen**. Mit der Maus zeigt schon das Darüberfahren die Kurzbeschreibung.
-- **📅 In Kalender eintragen** übernimmt genau diesen einen Eintrag in den eigenen Kalender – ihr entscheidet selbst, welche. Es öffnet eine `.ics`-Datei: iPhone/iPad (Safari) bietet „Zum Kalender hinzufügen“ an, Outlook und die meisten Kalender-Apps öffnen sie als Termin zum Speichern. **Google Kalender** legt den Termin im Google Kalender an (praktisch auf Android, wo `.ics` nicht immer direkt importiert wird). Nochmaliges Eintragen aktualisiert den Termin statt ihn doppelt anzulegen (gleiche `UID`). Fristen erinnern am Vortag um 18 Uhr, Termine mit Uhrzeit eine Stunde vorher. Die Links sind signiert und 24 Stunden gültig. In der Home-Assistant-App öffnet sich der Link im Browser.
-- Unten erklärt eine **Legende** die Icons: 📝 Schulaufgabe, ✏️ Test / Kurzarbeit / Stegreifaufgabe, 🏫 Termin der Schule, 📅 Termin aus einer Mitteilung, ❌ Stunde entfällt, 🔁 Vertretung, 🚪 Raumänderung, 🤒 Krankmeldung und die Fristen nach Art (💶 Zahlung, ✍️ Unterschrift, ↩️ Rückmeldung, 🎒 Mitbringen, 📖 Lesen, ✅ Aufgabe). Bei mehreren Kindern hat jedes eine eigene Farbe.
+- **📅 In Kalender eintragen** übernimmt genau diesen einen Eintrag in den eigenen Kalender – ihr entscheidet selbst, welche. Es öffnet eine `.ics`-Datei: iPhone/iPad (Safari) bietet „Zum Kalender hinzufügen“ an, Outlook und die meisten Kalender-Apps öffnen sie als Termin zum Speichern. **Google Kalender** öffnet ein vorausgefülltes Terminformular (praktisch auf Android, wo `.ics` nicht immer direkt importiert wird). Die `.ics`-Datei hat eine stabile `UID`; ob ein erneuter Import einen bestehenden Termin aktualisiert, hängt von der Kalender-App ab. Wiederholtes Speichern über den Google-Link kann Duplikate erzeugen. Die `.ics`-Datei enthält eine Erinnerung für ganztägige Einträge am Vortag um 18 Uhr, bei Terminen mit Uhrzeit eine Stunde vorher. Nur die `.ics`-Links sind signiert und 24 Stunden gültig. In der Home-Assistant-App öffnet sich der Link im Browser.
+- Unten erklärt eine **einklappbare Legende** die Icons: 📝 Schulaufgabe, ✏️ Test / Kurzarbeit / Stegreifaufgabe, 🏫 Termin der Schule, 📅 Termin aus einer Mitteilung, ❌ Stunde entfällt, 🔁 Vertretung, 🚪 Raumänderung, 🤒 Krankmeldung und die Fristen nach Art (💶 Zahlung, ✍️ Unterschrift, ↩️ Rückmeldung, 🎒 Mitbringen, 📖 Lesen, ✅ Aufgabe). Bei mehreren Kindern hat jedes eine eigene Farbe.
 
 ### Stundenplan & Vertretungen – `custom:eltern-portal-schulmanager-stundenplan`
 
@@ -68,9 +77,10 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 <p align="left"><img src="docs/images/stundenplan-woche.png" width="560" alt="Wochenansicht mit Vertretungen und Leistungsnachweisen"></p>
 
-<p align="left"><sub>Die Screenshots zeigen erfundene Demo-Daten (`docs/screenshots/demo.html`, neu erzeugen mit `python docs/screenshots/make_screenshots.py`).</sub></p>
+<p align="left"><sub>Die Screenshots zeigen erfundene Demo-Daten (`docs/screenshots/demo.html`, [Anleitung zum Neuerzeugen](docs/screenshots/README.md)).</sub></p>
 
 - Tagesansicht mit Uhrzeit und Raum, umschaltbar auf die **Woche**. Vormittags zeigt sie den heutigen Tag, nach Schulschluss und am Wochenende den nächsten Schultag. Mit `view: week` startet die Karte in der Wochenansicht; das Dashboard „Schule“ nutzt das für alle Stundenpläne.
+- **Wochen blättern:** Mit ‹ / › eine Woche zurück oder vor und mit **Heute** zur Ausgangswoche. Die Kopfzeile zeigt Kalenderwoche und Datum von Montag bis Freitag; am Wochenende ist die folgende Woche die Ausgangswoche. Die Legende der Wochenansicht lässt sich auf- und zuklappen.
 - Die Wochenansicht passt auch in schmale Karten (halbe Spalte, Handy), ohne dass man seitlich scrollen muss: Fächer werden dort abgekürzt („Mathe“, „Engl.“, „Reli/Eth“, „SA“ für Schulaufgabe).
 - Fächer stehen **ausgeschrieben** da („Biologie“ statt „B“, „Mathematik (Intensivierung)“ statt „MInt“, „Sport“ statt „Sm/Sw“). Das Original-Kürzel erscheint, wenn man mit der Maus darauf zeigt.
 - Änderungen aus dem Vertretungsplan sind farbig markiert: rot = entfällt, orange = Vertretung oder Raumänderung. Die Zahl an den Wochentagen zeigt, wie viele Änderungen anstehen.
@@ -86,26 +96,36 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 ## Installation
 
-### Über HACS (empfohlen)
+### Über HACS / Marketplace (empfohlen)
 
-1. **HACS** öffnen und nach **Eltern Portal Manager Bavaria** suchen.
+1. Ab **Home Assistant 2026.11** **Einstellungen → Marketplace** öffnen; unter **2026.10 oder älter** **HACS** öffnen. Nach **Eltern Portal Manager Bavaria** suchen.
 2. Die Integration installieren und Home Assistant neu starten.
 
-Bis zur Aufnahme in den HACS-Standardkatalog einmalig über HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/FabusMingAI/ha-schulmanager` mit Typ **Integration** hinzufügen und dann die Schritte oben ausführen.
+Die Integration ist im Standardkatalog enthalten; ein benutzerdefiniertes Repository ist nicht mehr nötig. Falls sie in HACS nicht erscheint, den Länderfilter prüfen: Dieses Repository ist für **Deutschland (DE)** gelistet.
+
+Ab Home Assistant 2026.11 ersetzt Marketplace HACS und übernimmt vorhandene Installationen automatisch. HACS auf diesen Versionen nicht zusätzlich installieren. Siehe die [offizielle Marketplace-Ankündigung](https://www.home-assistant.io/blog/2026/11/04/release-202611/#welcome-to-the-marketplace).
 
 [![In HACS öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FabusMingAI&repository=ha-schulmanager&category=integration)
 
 ### Von Hand
 
-Den Ordner `custom_components/eltern_portal_schulmanager` nach `/config/custom_components/eltern_portal_schulmanager` kopieren (Samba, Add-on „File editor“ oder Studio Code Server) und Home Assistant neu starten.
+Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-schulmanager/releases/latest) herunterladen und entpacken, dann den Ordner `custom_components/eltern_portal_schulmanager` nach `/config/custom_components/eltern_portal_schulmanager` kopieren (Samba, Add-on „File editor“ oder Studio Code Server) und Home Assistant neu starten.
+
+## Releases und Updates
+
+Stand **5. November 2026** ist **[v0.14.4](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.4)** das neueste veröffentlichte Release. Es entfernt alte Karten-/Icon-Kopien aus 0.14.0–0.14.2, sofern im alten Ordner nur die bekannten regulären Dateien liegen; fremde Dateien, Unterordner und Symlinks bleiben erhalten. Übernommene Dashboards verwenden den statischen Icon-Pfad der Integration.
+
+Updates über HACS oder Marketplace installieren und Home Assistant neu starten. Die Versionsanzeige in der Statusleiste von „Schule“ zeigt die tatsächlich laufende Integration; eine heruntergeladene Version wird erst nach dem Neustart aktiv.
+
+**Entwicklungsstand:** Auf `main` liegt bereits die Korrektur für fehlende Texte und Anhänge vom Schwarzen Brett ([#33](https://github.com/FabusMingAI/ha-schulmanager/pull/33)). Sie ist **nicht in v0.14.4 enthalten**. Damit werden bisher leere Einträge beim nächsten regulären Abruf ergänzt und neu ausgewertet, ohne Gelesen-/Erledigt-Status zurückzusetzen oder erneut zu benachrichtigen. Noch nicht veröffentlichte Änderungen stehen unter [Unreleased im Changelog](CHANGELOG.md#unreleased).
 
 ## Umbenannt: früher Schulmanager
 
 Bestehende Installationen werden vollständig übernommen: Zugangsdaten, Einstellungen, Aufgaben, Mitteilungen mit Status und Kommentaren, das Archiv, KI-Zusammenfassungen, abgelegte Dateien, Entity-IDs und deren Verlauf.
 
-**Ab 0.14.1 passiert das automatisch.** Version 0.14.1 ist ein Brücken-Release: Sie kommt noch einmal unter dem alten Namen *Schulmanager*, installiert *Eltern Portal Manager Bavaria* und übernimmt die Einrichtung von selbst. Eine Benachrichtigung bestätigt das – danach **Home Assistant noch einmal neu starten**. Fertig.
+**Das Brücken-Release 0.14.1 erledigt das automatisch.** Es ist eine einmalige Brücken-Version: Sie kommt noch einmal unter dem alten Namen *Schulmanager*, installiert *Eltern Portal Manager Bavaria* und übernimmt die Einrichtung von selbst. Eine Benachrichtigung bestätigt das – danach **Home Assistant noch einmal neu starten**. Fertig.
 
-**Noch auf 0.13 oder älter?** Neuere Versionen (ab 0.14.2) enthalten die Brücke nicht mehr, deshalb zuerst 0.14.1 installieren: HACS → *Eltern Portal Manager Bavaria* → ⋮ → **Erneut herunterladen** → Version **v0.14.1** wählen → *Herunterladen*, dann Home Assistant neu starten (wie oben zweimal). Danach das neueste Update wie gewohnt installieren. (Zeigt die Kopfzeile des Dashboards „Schule“ nach dem Update auf 0.14.2 oder neuer noch Version 0.13, liegt es daran.)
+**Noch auf 0.13 oder älter?** Neuere Versionen (ab 0.14.2) enthalten die Brücke nicht mehr, deshalb zuerst 0.14.1 installieren: in HACS über *Eltern Portal Manager Bavaria* → ⋮ → **Erneut herunterladen** → Version **v0.14.1** → *Herunterladen*. Im Marketplace (Home Assistant ab 2026.11) die Repository-Seite öffnen → ⋮ → **Install another version** (andere Version installieren) → **v0.14.1**. Danach Home Assistant neu starten (wie oben zweimal). Danach das neueste Update wie gewohnt installieren. (Zeigt die Kopfzeile des Dashboards „Schule“ nach dem Update auf 0.14.2 oder neuer noch Version 0.13, liegt es daran.)
 
 > **Zusätzlich [Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant) im Einsatz?** Er nutzt denselben Ordner `custom_components/schulmanager`. Wer schon mit 0.14.0 von Hand übernommen *und* danach Schulmanager Online installiert hat, überspringt 0.14.1 und aktualisiert direkt auf 0.14.2 oder neuer – diese Versionen installieren wieder nach `custom_components/eltern_portal_schulmanager` und lassen den Ordner von Schulmanager Online in Ruhe.
 
@@ -151,10 +171,10 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
    - **Termine aus dem Portal anzeigen**: Standard sind nur Schulaufgaben und Tests (Test / Kurzarbeit / kl. Leistungsnachweis / Stegreifaufgabe). „Termine der Schule“ (Ferien, Sekretariat, Veranstaltungen …) lassen sich dazuschalten. Gibt das Portal eine Uhrzeit an (z. B. „14:00 - 16:00“), steht der Termin mit dieser Uhrzeit im Kalender, sonst ganztägig.
    - **Nur Termine der eigenen Klasse** (Standard: an): blendet Einträge aus, die ausdrücklich nur andere Klassen oder Jahrgangsstufen nennen, z. B. „Schullandheim 5b+5c“ oder „Grundwissenstest Jgst. 10“. Termine ohne Klassenangabe bleiben sichtbar.
    - **Lehrkräfte im Stunden- und Vertretungsplan**: Standard *Kürzel und Name*, z. B. „Mü (Maria Müller)“; alternativ *Nur Name* oder *Nur Kürzel*.
-   - **Sprachen der KI-Zusammenfassung**: Häkchen bei Deutsch, Englisch, Spanisch und/oder Katalanisch (bis zu 4, Standard Deutsch und Englisch). Jede Sprache wird ein eigener Reiter in der Zusammenfassung; die erste gilt für Push-Nachrichten. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache (auch nach dem Hinzufügen einer Sprache), übersetzt die KI im Hintergrund nur die Zusammenfassung – Aufgaben, Termine und Status bleiben unverändert. Ab 5 Übersetzungen kommt eine Benachrichtigung in Home Assistant beim Start (mit geschätzter Dauer) und am Ende; eine fehlgeschlagene Übersetzung wird nach 6 Stunden erneut versucht, höchstens dreimal.
-4. **Dashboard**: Die Integration legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, mit kompakter Fußzeile in jeder Ansicht für letzten Abruf, Version und Link „⚙️ Einstellungen“) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `eltern_portal_schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
+   - **Sprachen der KI-Zusammenfassung**: Häkchen bei Deutsch, Englisch, Spanisch und/oder Katalanisch (bis zu 4, Standard Deutsch und Englisch). Jede Sprache wird ein eigener Reiter in der Zusammenfassung; die erste gewählte Sprache in der festen Reihenfolge Deutsch → Englisch → Spanisch → Katalanisch gilt für die Push-Zusammenfassung. Fehlt bei schon ausgewerteten Mitteilungen eine Sprache (auch nach dem Hinzufügen einer Sprache), übersetzt die KI im Hintergrund nur die Zusammenfassung – Aufgaben, Termine und Status bleiben unverändert. Ab 5 Übersetzungen kommt eine Benachrichtigung in Home Assistant beim Start (mit geschätzter Dauer) und am Ende; eine fehlgeschlagene Übersetzung wird nach 6 Stunden erneut versucht, höchstens dreimal.
+4. **Dashboard**: Die Integration legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, mit einer kompakten Fußzeile in jeder Ansicht für letzten Abruf, Version und Link „⚙️ Einstellungen“) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `eltern_portal_schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/eltern_portal_schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
 
-Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur die der letzten 21 Tage (und alle noch unbestätigten Briefe) werden ausgewertet und als ungelesen markiert, der Rest landet als gelesen im Archiv. Es gibt einmalig eine kurze Einrichtungs-Push statt einer Flut.
+Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Mitteilungen der letzten 21 Tage, noch unbestätigte Briefe und Umfragen mit noch nicht abgelaufenem Enddatum werden ausgewertet und als ungelesen markiert, ältere Mitteilungen werden als gelesen ohne automatische Auswertung gespeichert. Es gibt einmalig einen kurzen Einrichtungs-Push statt einer Flut.
 
 ## Was in Home Assistant entsteht (pro Kind)
 
@@ -170,34 +190,36 @@ Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Nur 
 - `sensor.schule_<kind>_krankmeldungen`: Krankheitstage (Schultage) im laufenden Schuljahr; Liste der Krankmeldungen (von, bis, Tage, Kommentar) und die letzte als Attribute
 - `sensor.eltern_portal_manager_bavaria_letzter_abruf` (bei Übernahme aus 0.13: `sensor.schulmanager_letzter_abruf`): Diagnose, mit Fehlern und Anzahl noch ausstehender Auswertungen (`auswertung_ausstehend`) und Übersetzungen (`uebersetzung_ausstehend`)
 
+Entity-IDs richten sich nach der Sprache von Home Assistant; die Beispiele zeigen deutsche IDs.
+
 ## Aktionen (für Automationen, Skripte, Assist)
 
 | Aktion | Zweck |
 |---|---|
 | `eltern_portal_schulmanager.refresh` | Portale sofort abrufen |
-| `eltern_portal_schulmanager.mark_read` | `child: anna` oder `item_id: …`, ohne Angabe: alles |
-| `eltern_portal_schulmanager.complete_task` | `task_id: …` |
-| `eltern_portal_schulmanager.update_task` | `task_id` und `status`, `comment`, `due` oder `title` |
+| `eltern_portal_schulmanager.mark_read` | `child: anna` oder `item_id: …`, ohne Angabe: alle Mitteilungen; optional `read: false` setzt sie auf ungelesen |
+| `eltern_portal_schulmanager.complete_task` | `task_id`, optional `done` (Standard `true`); Aufgabe erledigen oder wieder öffnen |
+| `eltern_portal_schulmanager.update_task` | `task_id` und `status`, `comment`, `due`, `title` oder `details` |
 | `eltern_portal_schulmanager.update_item` | `status` (`offen`, `in_arbeit`, `erledigt`) einer Mitteilung (`item_id`); ohne `item_id` für alle Mitteilungen von `child` (bzw. aller Kinder), liefert `changed` |
 | `eltern_portal_schulmanager.add_task` | `child`, `title`, optional `due`, `amount`, `details`, `type` |
-| `eltern_portal_schulmanager.reanalyze` | eine Mitteilung neu von der KI auswerten lassen |
+| `eltern_portal_schulmanager.reanalyze` | `item_id`; Mitteilung mit dem eingestellten KI-Dienst oder Regeln neu auswerten |
 | `eltern_portal_schulmanager.archive_event` / `eltern_portal_schulmanager.unarchive_event` | `child` und `event_id` (uid eines Eintrags in „Termine & Fristen“): ins Archiv schieben bzw. zurückholen |
-| `eltern_portal_schulmanager.send_digest` / `send_reminders` | Übersicht oder Erinnerungen sofort schicken |
+| `eltern_portal_schulmanager.send_digest` / `eltern_portal_schulmanager.send_reminders` | Übersicht oder Erinnerungen sofort schicken |
 | `eltern_portal_schulmanager.rebuild_dashboard` | Dashboard „Schule“ neu erzeugen |
 | `eltern_portal_schulmanager.get_overview` | liefert alles als Antwort, z. B. für ein Assist-Skript „Was ist für die Schule zu tun?“ |
 
-Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `child`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` und `eltern_portal_schulmanager_substitution` (neue Vertretungen, mit `child` und `entries`). Damit lässt sich z. B. bei einer dringenden Mitteilung das Flurlicht kurz orange blinken lassen.
+Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` und `eltern_portal_schulmanager_substitution` (neue Vertretungen, mit `child` und `entries`). Damit lässt sich z. B. bei einer dringenden Mitteilung das Flurlicht kurz orange blinken lassen.
 
 ## Gut zu wissen
 
-- **Empfangsbestätigung:** Das Eltern-Portal zählt das Herunterladen eines Elternbriefs als „Empfang bestätigt“. Mit aktivierter automatischer Ablage bestätigt die Integration deshalb neue Briefe, sobald er die PDF holt. Wer das nicht will, schaltet „Anhänge/PDFs automatisch ablegen“ aus. Dann entsteht je Brief die Aufgabe „Empfang im Portal bestätigen“.
-- **Datenschutz:** Alles bleibt in Home Assistant. Ausnahme: Ist ein KI-Dienst gewählt, gehen Text und PDF-Inhalt der Mitteilung zur Auswertung an dessen Anbieter. PDF-Links im Dashboard sind signiert (30 Tage gültig) und ohne Anmeldung bzw. Signatur nicht abrufbar. Kalender-Links (`.ics`) sind 24 Stunden gültig. Eine `.ics`-Datei enthält den Eintrag so, wie ihn die Karte zeigt (Namen der Lehrkräfte wie unter *Termine & Klassen* eingestellt), und verlässt Home Assistant, sobald ihr sie öffnet.
+- **Empfangsbestätigung:** Das Eltern-Portal zählt das Herunterladen eines Elternbriefs als „Empfang bestätigt“. Mit aktivierter automatischer Ablage bestätigt die Integration deshalb neue Briefe, sobald sie die PDF holt. Wer das nicht will, schaltet „Anhänge/PDFs automatisch ablegen“ aus. Dann entsteht je Brief die Aufgabe „Empfang im Portal bestätigen“.
+- **Datenschutz:** Schuldaten und heruntergeladene Dateien werden lokal in Home Assistant gespeichert. Ist ein KI-Dienst gewählt, gehen Text und PDF-Inhalt der Mitteilung zur Auswertung an dessen Anbieter. PDF-Links im Dashboard sind signiert (30 Tage gültig) und ohne Anmeldung bzw. Signatur nicht abrufbar. Kalender-Links (`.ics`) sind 24 Stunden gültig. Eine `.ics`-Datei enthält den Eintrag so, wie ihn die Karte zeigt (Namen der Lehrkräfte wie unter *Termine & Klassen* eingestellt), und wird beim Öffnen an euren Browser bzw. eure Kalender-App übergeben. Beim Öffnen von **Google Kalender** gehen Titel, Zeiten, Beschreibung und Ort des Termins an Google.
 - **Inoffiziell:** Das Portal hat keine offizielle Schnittstelle. Der Zugriff läuft über die Bibliothek [pyelternportal](https://github.com/michull/pyelternportal), die das HTML ausliest. Ändert der Anbieter das Layout, kann ein Bereich vorübergehend ausfallen. Der Fehler steht dann in `sensor.eltern_portal_manager_bavaria_letzter_abruf`, die übrigen Bereiche laufen weiter.
 - **Aufbau des Vertretungsplans:** Je nach Schule zeigt das Eltern-Portal den Vertretungsplan mit 6 Spalten (mit *Fach*, ein ersetztes Fach durchgestrichen) oder mit 5 Spalten ohne Fach. Beides wird gelesen; ohne Fach-Spalte kommt das Fach aus dem Stundenplan, wenn es eindeutig ist.
 - **Stundenplan, Vertretungsplan und Krankmeldungen** gibt es nur, wenn die Schule sie im Eltern-Portal freigeschaltet hat. Fehlt eine dieser Seiten oder trennt das Portal dort die Verbindung, wird nur dieser Bereich übersprungen (Hinweis in `sensor.eltern_portal_manager_bavaria_letzter_abruf`), alles andere wird weiter abgerufen. Liefert das Portal kurzzeitig eine leere Seite, bleiben die zuletzt gelesenen Daten stehen.
-- **Namen der Lehrkräfte:** Das Eltern-Portal führt unter *Service → Schulinformationen* die „Stundenplankürzel der Lehrkräfte“. Die Integration liest diese Liste je Schule einmal am Tag und zeigt die Namen neben den Kürzeln in Stundenplan, Vertretungsplan, Kalender, Hover-Texten und Push-Nachrichten – wie unter *Termine & Klassen* eingestellt. Jede Schule hat ihre eigene Liste; unbekannte Kürzel bleiben stehen. Die Namen bleiben in Home Assistant und gehen nie an den KI-Dienst.
+- **Namen der Lehrkräfte:** Das Eltern-Portal führt unter *Service → Schulinformationen* die „Stundenplankürzel der Lehrkräfte“. Die Integration liest diese Liste je Schule einmal am Tag und zeigt die Namen neben den Kürzeln in Stundenplan, Vertretungsplan, Kalender, Hover-Texten und Push-Nachrichten – wie unter *Termine & Klassen* eingestellt. Jede Schule hat ihre eigene Liste; unbekannte Kürzel bleiben stehen. Die separat abgerufene Liste aus Kürzeln und Namen wird nicht an den KI-Dienst geschickt. Absendernamen und Namen im Mitteilungstext können weiterhin in die Auswertung eingehen.
 - **Geänderte Mitteilungen:** Ändert eine Lehrkraft eine Mitteilung im Portal, wird sie neu ausgewertet und als ungelesen angezeigt. Reine Unterschiede in Leerzeichen oder Zeilenumbrüchen zählen nicht, und sehen die meisten bekannten Mitteilungen auf einmal anders aus (z. B. nach einem Update von Portal oder Integration), werden sie still aktualisiert, statt alle wieder ungelesen zu werden.
-- **Verbindung:** Jeder Abruf nutzt je Schule eine eigene, frische Verbindung. Trennt das Portal sie („Server disconnected“), versucht die Integration es nach ein paar Sekunden noch einmal, bevor er die zuletzt gelesenen Daten behält.
+- **Verbindung:** Jeder Abruf nutzt je Schule eine eigene, frische Verbindung. Trennt das Portal sie („Server disconnected“), versucht die Integration es nach ein paar Sekunden noch einmal, bevor sie die zuletzt gelesenen Daten behält.
 - **Krankmeldungen** werden nur gelesen, nie abgeschickt – krankmelden wie gewohnt im Portal.
 - **Noch nicht enthalten:** „Kommunikation Eltern/Klassenleitung“ (nur Fachlehrkräfte) und das Klassenbuch.
 - Wer zusätzlich die HACS-Integration `elternportal` nutzt, sollte auf dieselbe `pyelternportal`-Version achten (hier 0.0.27).
@@ -205,10 +227,16 @@ Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `chi
 
 ## Entwicklung
 
+Der Test-Workflow verwendet **Python 3.13**. Im Hauptverzeichnis des Repositorys:
+
 ```bash
-pip install -r requirements_test.txt
-pytest
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements_test.txt
+python -m pytest
 ```
+
+Vor einer Veröffentlichung die Version in Integrations-Manifest, Karte und Brücken-Manifest abgleichen, [CHANGELOG.md](CHANGELOG.md) ergänzen und Tests, HACS sowie hassfest erfolgreich ausführen. Der manuell gestartete Workflow **Release** veröffentlicht von `main` und führt die Tests erneut aus.
 
 Issues und Pull-Requests sind willkommen.
 

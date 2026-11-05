@@ -55,7 +55,7 @@
   const TODAY = "2026-10-05"; // Montag
   const T = [["08:00","08:45"],["08:50","09:35"],["09:55","10:40"],["10:45","11:30"],["11:45","12:30"],["12:35","13:20"],["14:00","14:45"],["14:50","15:35"]];
   const plan = (rows) => rows.flatMap(([wd, subjects]) => subjects.map((s, i) => s && ({
-    weekday: wd, lesson: String(i + 1), start: T[i][0], end: T[i][1], subject: s[0], room: s[1],
+    weekday: wd, lesson: String(i + 1), start: T[i][0], end: T[i][1], subject: s[0], room: s[1], teacher: "AB", teacher_label: "AB (Anna Beispiel)",
   })).filter(Boolean));
 
   const anna = {
@@ -75,7 +75,7 @@
           { lesson: "4", kind: "raum", subject: "B", room: "C104", info: "" },
         ]},
         { date: "2026-10-07", entries: [
-          { lesson: "3", kind: "vertretung", subject: "Ph", substitute: "Hr. Beispiel", room: "PhS", info: "Aufgaben im Buch S. 42" },
+          { lesson: "3", kind: "vertretung", subject: "Ph", substitute: "Hr. Beispiel", room: "Ph2", teacher: "AB", teacher_label: "AB (Anna Beispiel)", info: "Aufgaben im Buch S. 42" },
           { lesson: "4", kind: "entfall", subject: "B", info: "" },
           { lesson: "5", kind: "raum", subject: "G", room: "214", info: "" },
         ]},
@@ -88,7 +88,7 @@
       { uid: "e2", date: "2026-10-09", category: "test", icon: "✏️", subject: "Mathematik", title: "Stegreifaufgabe Mathematik (angekündigt)",
         hover: "Bruchrechnen: Kürzen, Erweitern, Addieren." },
       { uid: "e3", date: "2026-10-07", time: "09:55", time_end: "10:40", category: "vertretung", icon: "🔁", title: "3. Std. Physik: Vertretung",
-        hover: "Vertretung bei Hr. Beispiel, Raum PhS – Aufgaben im Buch S. 42" },
+        hover: "Vertretung bei Hr. Beispiel, Raum Ph2 – Aufgaben im Buch S. 42" },
       { uid: "e4", date: "2026-10-07", time: "10:45", time_end: "11:30", category: "entfall", icon: "❌", title: "4. Std. Biologie entfällt", hover: "" },
       { uid: "e5", date: "2026-10-08", until: "2026-10-12", category: "frist_zahlung", icon: "💶", title: "Wandertag: 12,50 € überweisen", task_id: "t1",
         hover: "Busfahrt und Eintritt Tierpark. Überweisung an das Schulkonto, Verwendungszweck: Wandertag 7B Anna." },
@@ -122,7 +122,7 @@
   const theme = q.get("theme") || "light";
   document.documentElement.dataset.theme = theme;
   if (q.get("w")) document.documentElement.style.setProperty("--w", q.get("w") + "px");
-  const children = card === "termine" ? [anna, max] : [anna];
+  const children = card === "termine" || card === "dashboard" || card === "tasks" ? [anna, max] : [anna];
 
   // Aufgabe für den Detail-Dialog (card=task)
   const TASK = {
@@ -175,8 +175,8 @@
 
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
-    callWS: async (msg) => msg.type === "eltern_portal_schulmanager/data" ? { children, legend: LEGEND, today: TODAY, errors: [],
-        last_update: `${TODAY}T08:15:00+02:00`, version: "0.14.0", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
+    callWS: async (msg) => msg.type === "eltern_portal_schulmanager/data" ? { children: msg.child ? children.filter(c => c.key === msg.child) : children, legend: LEGEND, today: TODAY, errors: [],
+        last_update: `${TODAY}T08:15:00+02:00`, version: "0.14.4", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
       : msg.type === "eltern_portal_schulmanager/task" ? TASK : msg.type === "eltern_portal_schulmanager/item" ? ITEM
       : msg.type === "eltern_portal_schulmanager/event_links" ? { ics: "#ics", google: "#google" } : {},
     callService: async () => {},
@@ -184,16 +184,33 @@
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },
   };
 
+  // Fictional list data for the overview of tasks and messages.
+  anna.tasks = TASK.item.tasks.map(t => ({...t, child: "anna", type: t.id === "t9" ? "zahlung" : "unterschrift", source_title: ITEM.title}));
+  anna.items = [{...ITEM, read: false}];
+  anna.unread = 1;
+  max.tasks = [{id:"max1",child:"max",title:"Anmeldung Nachmittagsbetreuung zurückgeben",icon:"📝",type:"rueckmeldung",status:"offen",due:"2026-10-09",days:4,published:"2026-10-01"}];
+
   const s = document.createElement("script");
   s.src = "../../custom_components/eltern_portal_schulmanager/www/eltern-portal-schulmanager-card.js";
   s.onload = () => {
-    const el = document.createElement(card === "task" || card === "item" ? "eltern-portal-schulmanager-card" : "eltern-portal-schulmanager-" + card);
-    el.setConfig(card === "header"
-      ? { subtitle: "Anna & Max", icon: "../../custom_components/eltern_portal_schulmanager/brand/icon.png" }
-      : q.get("view") ? { view: q.get("view") } : {});
-    document.getElementById("wrap").appendChild(el);
-    el.hass = window.hass;
-    window.cardEl = el;
+    const wrap = document.getElementById("wrap");
+    const make = (type, config, parent = wrap) => {
+      const el = document.createElement("eltern-portal-schulmanager-" + type);
+      el.setConfig(config);
+      parent.appendChild(el);
+      el.hass = window.hass;
+      return el;
+    };
+    if (card === "dashboard") {
+      wrap.style.cssText = "display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start";
+      make("termine", {title:"Termine & Fristen"});
+      make("stundenplan", {child:"anna",title:"Stundenplan Anna",view:"week"});
+      const footer = make("header", {});
+      footer.style.gridColumn = "1 / -1";
+    } else {
+      const type = ["task", "item", "tasks"].includes(card) ? "card" : card;
+      window.cardEl = make(type, q.get("view") ? {view:q.get("view")} : {});
+    }
   };
   document.head.appendChild(s);
 </script>

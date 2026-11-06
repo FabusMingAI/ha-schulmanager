@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.14.6";
+  const VERSION = "0.14.7";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -1354,6 +1354,19 @@
       return html;
     }
 
+    _participation(l) {
+      if (!l.optional) return "";
+      return {registered: "Optional · angemeldet", not_registered: "Optional · nicht angemeldet"}[l.participation] || "Optional · Teilnahme ungeklärt";
+    }
+
+    _teacherSource(l) {
+      const source = l.teacher_source;
+      if (!source) return "";
+      const title = esc(source.title || "Mitteilung");
+      const label = /^https?:\/\//.test(source.url || "") ? `<a href="${esc(source.url)}" target="_blank" rel="noopener">${title}</a>` : title;
+      return `<br>Lehrkraft laut: ${label}${source.sent ? ` (${esc(fmtDate(source.sent.slice(0, 10)))})` : ""}`;
+    }
+
     _dayHtml(c, iso, today, entries, known) {
       const wd = parseDay(iso).getDay();
       const lessons = c.timetable.filter((l) => l.weekday === wd);
@@ -1387,8 +1400,8 @@
             <span class="nr">${esc(l.lesson)}.</span>
             <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
             <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}${exBadge}</div>
-              <div class="lesson-details">Reguläre Lehrkraft: ${esc(l.teacher_label || l.teacher || "nicht angegeben")}<br>
-              ${ch.map((e) => `Status: ${esc(KIND_LABEL[e.kind] || e.kind || "Änderung")}${e.teacher_label || e.teacher ? `<br>Ursprüngliche Lehrkraft: ${esc(e.teacher_label || e.teacher)}` : ""}${e.substitute_label || e.substitute ? `<br>Vertretungslehrkraft: ${esc(e.substitute_label || e.substitute)}` : ""}${e.room ? `<br>Raumänderung: ${esc(room(l.room))} → ${esc(room(e.room))}` : ""}${e.info ? `<br>Hinweis: ${esc(e.info)}` : ""}`).join("<br>") || "Status: regulärer Unterricht"}
+              <div class="lesson-details">Reguläre Lehrkraft: ${esc(l.teacher_label || l.teacher || "nicht angegeben")}${this._teacherSource(l)}${l.optional ? `<br>${esc(this._participation(l))}` : ""}<br>
+              ${ch.map((e) => `Status: ${esc(KIND_LABEL[e.kind] || e.kind || "Änderung")}${e.teacher_label || e.teacher ? `<br>Ursprüngliche Lehrkraft: ${esc(e.teacher_label || e.teacher)}` : ""}${e.substitute_label || e.substitute ? `<br>Vertretungslehrkraft: ${esc(e.substitute_label || e.substitute)}` : ""}${e.room ? `<br>Raumänderung: ${esc(room(l.room))} → ${esc(room(e.room))}` : ""}${e.info ? `<br>Hinweis: ${esc(e.info)}` : ""}`).join("<br>") || (l.optional && l.participation !== "registered" ? "Status: optionales Klassenangebot" : "Status: regulärer Unterricht")}
               ${l.info ? `<br>Hinweis: ${esc(l.info)}` : ""}</div>
               ${ch.map((e) => this._chgHtml(c, e)).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
@@ -1429,7 +1442,7 @@
           const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
           const ex = l && ((this._exams || {})[iso] || []).find((e) => e.subject && sameSubject(e.subject, l.subject));
           const exCls = ex ? " " + EXAM_LABEL[ex.category][2] : "";
-          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? `<button class="lesson-pick" data-child="${k}" data-lesson="${esc(nr)}" data-date="${iso}" aria-label="${esc(dayLabel(iso, today) + ", Stunde " + nr + ": " + fullName(l.subject))}"><span class="lg">${esc(fullName(l.subject))}</span><span class="sh">${esc(shortName(l.subject))}</span>` + `<div class="r">${esc(room(l.room))}</div></button>` : ""}${kind ? `<div class="r"><span class="lg">${KIND_LABEL[kind]}</span><span class="sh">${KIND_SHORT[kind] || KIND_LABEL[kind]}</span></div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} <span class="lg">${EXAM_LABEL[ex.category][1]}</span><span class="sh">${EXAM_SHORT[ex.category]}</span></div>` : ""}</td>`;
+          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? `<button class="lesson-pick" data-child="${k}" data-lesson="${esc(nr)}" data-date="${iso}" aria-label="${esc(dayLabel(iso, today) + ", Stunde " + nr + ": " + fullName(l.subject))}"><span class="lg">${esc(fullName(l.subject))}</span><span class="sh">${esc(shortName(l.subject))}</span>` + `<div class="r">${esc(room(l.room))}</div>${l.optional ? `<div class="r">${esc(this._participation(l))}</div>` : ""}</button>` : ""}${kind ? `<div class="r"><span class="lg">${KIND_LABEL[kind]}</span><span class="sh">${KIND_SHORT[kind] || KIND_LABEL[kind]}</span></div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} <span class="lg">${EXAM_LABEL[ex.category][1]}</span><span class="sh">${EXAM_SHORT[ex.category]}</span></div>` : ""}</td>`;
         });
         html += `</tr>`;
       }

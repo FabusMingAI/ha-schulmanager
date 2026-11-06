@@ -31,6 +31,8 @@ from pyelternportal.exception import (
     StudentListException,
 )
 
+from .timetable import parse_course_registrations
+
 from .const import (
     KIND_BLACKBOARD,
     KIND_LETTER,
@@ -101,6 +103,7 @@ class PortalChild:
     appointments: list[dict[str, Any]] = field(default_factory=list)
     # Stundenplan: None = nicht gelesen (Fehler), sonst Liste der Stunden
     timetable: list[dict[str, Any]] | None = None
+    course_registrations: list[str] | None = None
     # Vertretungsplan: None = nicht gelesen (Fehler), sonst Tage mit Einträgen
     substitutions: dict[str, Any] | None = None
     # Krankmeldungen: None = nicht gelesen (Fehler), sonst Liste {start, end, comment}
@@ -429,6 +432,13 @@ class SchulPortal(ElternPortalAPI):
             html = await resp.text()
         return parse_teachers(html, self._beautiful_soup_parser) or {}
 
+    async def async_course_registrations_online(self) -> list[str] | None:
+        """Read the existing registrations without submitting the booking form."""
+        url = parse.urljoin(self.base_url, "/buchungen/intensivierungskurse")
+        async with self._session.get(url) as resp:
+            resp.raise_for_status()
+            return parse_course_registrations(await resp.text(), self._beautiful_soup_parser)
+
     async def async_fetch(
         self,
         need_download: Callable[[PortalItem], bool] | None = None,
@@ -490,6 +500,11 @@ class SchulPortal(ElternPortalAPI):
                     firstname=st.firstname,
                     classname=st.classname,
                 )
+                if not self._demo:
+                    try:
+                        child.course_registrations = await self.async_course_registrations_online()
+                    except Exception:  # optional page is absent at some schools
+                        LOGGER.debug("%s: Kursanmeldungen nicht lesbar", self.school)
                 child.items = self._collect_items()
                 if "lesson" not in failed:
                     child.timetable = list(self._timetable)
@@ -745,6 +760,7 @@ def _timetable_teachers(soup: bs4.BeautifulSoup) -> tuple[dict[str, list[str]], 
     """Read only the teacher table; group memberships belong to this child."""
     subjects: dict[str, list[str]] = {}
     groups: dict[str, list[str]] = {}
+    by_code: dict[str, list[str]] = {}
     for table in soup.select("#asam_content table"):
         heading = table.find("b")
         if not heading or not heading.get_text(" ", strip=True).startswith("Lehrkräfte von "):
@@ -768,7 +784,9 @@ def _timetable_teachers(soup: bs4.BeautifulSoup) -> tuple[dict[str, list[str]], 
                         tokens = course.strip().split("_")
                         if len(tokens) < 3:
                             continue
-                        names = target.setdefault(tokens[1], [])
+                        by_code.setdefault(tokens[-1], []).append(teacher)
+                        token = {"NuTBio": "NuT", "NuTInf": "Inf"}.get(tokens[1], tokens[1])
+                        names = target.setdefault(token, [])
                         if teacher not in names:
                             names.append(teacher)
                         subject = name.strip()
@@ -779,6 +797,15 @@ def _timetable_teachers(soup: bs4.BeautifulSoup) -> tuple[dict[str, list[str]], 
                 names = target.setdefault(subject, [])
                 if teacher not in names:
                     names.append(teacher)
+    # A shared course-code suffix establishes identity; an initial alone does not.
+    aliases = {}
+    for names in by_code.values():
+        full = [n for n in names if not re.search(r"(?:^|\s)[A-ZÄÖÜ]\.", n)]
+        if len(set(full)) == 1:
+            aliases.update({n: full[0] for n in names})
+    for mapping in (subjects, groups):
+        for key, names in mapping.items():
+            mapping[key] = list(dict.fromkeys(aliases.get(n, n) for n in names))
     return subjects, groups
 
 

@@ -2454,3 +2454,82 @@ async def test_timetable_regular_teachers_from_child_table() -> None:
     assert plan[1, "1"]["teacher"] == "Maria Muster"
     # Without the child table, retain the original timetable fields unchanged.
     assert all("teacher" not in x for x in parse_timetable(html.split("</table></div>")[0] + "</table></div></div>"))
+
+
+async def test_timetable_course_codes_resolve_teacher_initials() -> None:
+    from custom_components.eltern_portal_schulmanager.portal import parse_timetable
+
+    html = """<div id="asam_content"><div class="table-responsive"><table>
+    <tr><td>1.<br>08.00 - 08.45</td><td>Inf<br>A1</td><td>NuT<br>A2</td><td></td><td></td><td></td></tr>
+    </table></div><table>
+    <tr><td colspan="2"><b>Lehrkräfte von Beispiel</b></td></tr>
+    <tr><td colspan="2">Ganze Klasse</td></tr>
+    <tr><td>Natur und Technik</td><td>Karla Kurz</td></tr>
+    <tr><td>Natur und Technik</td><td>K. Kurz</td></tr>
+    <tr><td colspan="2">Geteilte Klassen</td></tr>
+    <tr><td>6_NuTBio_6A_KUR, Natur und Technik</td><td>Karla Kurz</td></tr>
+    <tr><td>6_NuTInf_6A_KUR, Natur und Technik</td><td>K. Kurz</td></tr>
+    </table></div>"""
+    assert [l["teacher"] for l in parse_timetable(html)] == ["Karla Kurz", "Karla Kurz"]
+    html = html.replace("6_NuTInf_6A_KUR", "6_NuTInf_6A_AND")
+    assert [l["teacher"] for l in parse_timetable(html)] == ["K. Kurz", "Karla Kurz"]
+
+
+async def test_personal_course_evidence_persists_and_reaches_card_and_sensor(hass, media_dir, hass_ws_client) -> None:
+    from custom_components.eltern_portal_schulmanager.manager import school_year
+    from custom_components.eltern_portal_schulmanager.sensor import TimetableSensor
+
+    today = dt_util.now().date()
+    year = today.year if today.month >= 8 else today.year - 1
+    await async_setup_component(hass, "http", {})
+    state = {"registrations": ["Int_M_6a"]}
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        result = _fake_result(today)
+        child = result.children[0]
+        child.classname = "6A"
+        child.timetable = [
+            {"subject":"M", "weekday":1, "lesson":"6", "end":"13:10"},
+            {"subject":"MInt", "weekday":1, "lesson":"7", "end":"14:00"},
+        ]
+        child.course_registrations = state["registrations"]
+        result.teachers = {"KUR":"Karla Kurz"}
+        return result
+
+    entry = MockConfigEntry(domain=DOMAIN,
+        data={"portals":[{"school":"bspgym","school_name":"M","username":"x","password":"p"}]},
+        unique_id=DOMAIN)
+    entry.add_to_hass(hass)
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        manager = entry.runtime_data
+        # Read the already-stored PDF text; a different child's letter cannot contribute.
+        item = {**next(iter(manager.items.values())), "uid":"evidence", "child":"anna", "title":f"Förderangebote {year}/{year+1}",
+                "sent":today.isoformat(), "text":"Freiwillige Intensivierungen Int_M_6a Mathe Mo 7. Std. in X101 KUR 1"}
+        manager.items["evidence"] = item
+        assert manager.child_timetable("anna")[1]["teacher"] == "Karla Kurz"
+        assert manager.child_timetable("anna")[1]["participation"] == "registered"
+        item["child"] = "other"
+        assert "teacher" not in manager.child_timetable("anna")[1]
+        item["child"] = "anna"
+        # A failed optional-page read preserves the last confirmed registration.
+        state["registrations"] = None
+        await manager.async_refresh()
+        assert manager.child_timetable("anna")[1]["participation"] == "registered"
+        # A successful explicit empty list clears the previous registration.
+        state["registrations"] = []
+        await manager.async_refresh()
+        assert manager.child_timetable("anna")[1]["participation"] == "not_registered"
+        sensor = TimetableSensor(manager, "anna")
+        assert [l["lesson"] for l in sensor._lessons()] == ["6"]
+        client = await hass_ws_client(hass)
+        await client.send_json({"id":1,"type":f"{DOMAIN}/data"})
+        message = await client.receive_json()
+        anna = next(c for c in message["result"]["children"] if c["key"] == "anna")
+        assert anna["timetable"][1]["teacher_label"] == "Karla Kurz"
+        assert anna["timetable"][1]["teacher_source"]["item_uid"] == "evidence"
+        # Stale registrations must not determine next year's participation.
+        manager.data["timetable"]["anna"]["registrations_year"] = f"{year-1}-{year%100:02d}"
+        assert manager.child_timetable("anna")[1]["participation"] == "unknown"
+        assert school_year(today) != manager.data["timetable"]["anna"]["registrations_year"]

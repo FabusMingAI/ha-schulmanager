@@ -728,10 +728,88 @@ def _lines(tag: Any) -> list[str]:
     return [t.strip() for t in tag.find_all(string=True) if t.strip()]
 
 
+# Names in the additional, child-specific table below the weekly grid.
+_TIMETABLE_SUBJECTS = {
+    "D": "Deutsch", "M": "Mathematik", "E": "Englisch", "F": "Französisch",
+    "L": "Latein", "Sp": "Spanisch", "Spa": "Spanisch", "It": "Italienisch",
+    "Gr": "Griechisch", "Ku": "Kunst", "Mu": "Musik", "Geo": "Geographie",
+    "G": "Geschichte", "B": "Biologie", "C": "Chemie",
+    "Ph": "Physik", "Inf": "Informatik", "NuT": "Natur und Technik",
+    "WR": "Wirtschaft und Recht", "Sk": "Sozialkunde", "PuG": "Politik und Gesellschaft",
+    "Ev": "Evang. Religionslehre", "K": "Kath. Religionslehre", "Eth": "Ethik",
+    "Sm": "Sport", "Sw": "Sport", "S": "Sport", "Smw": "Sport", "Spo": "Sport",
+}
+
+
+def _timetable_teachers(soup: bs4.BeautifulSoup) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Read only the teacher table; group memberships belong to this child."""
+    subjects: dict[str, list[str]] = {}
+    groups: dict[str, list[str]] = {}
+    for table in soup.select("#asam_content table"):
+        heading = table.find("b")
+        if not heading or not heading.get_text(" ", strip=True).startswith("Lehrkräfte von "):
+            continue
+        section = ""
+        for row in table.find_all("tr"):
+            cells = row.find_all("td", recursive=False)
+            if len(cells) == 1:
+                section = cells[0].get_text(" ", strip=True)
+            elif len(cells) == 2 and section in ("Ganze Klasse", "Geteilte Klassen"):
+                subject, teacher = (c.get_text(" ", strip=True) for c in cells)
+                if not subject or not teacher:
+                    continue
+                target = subjects
+                if section == "Geteilte Klassen":
+                    target = groups
+                    # E.g. 8_PhÜ_8AB_KUR, Physik: keep the course token, including
+                    # exercise/intensive suffixes. Never infer those from base subjects.
+                    course, sep, name = subject.partition(",")
+                    if sep:
+                        tokens = course.strip().split("_")
+                        if len(tokens) < 3:
+                            continue
+                        names = target.setdefault(tokens[1], [])
+                        if teacher not in names:
+                            names.append(teacher)
+                        subject = name.strip()
+                        # An intensive/exercise course must not override the
+                        # teacher of the ordinary base subject.
+                        if _TIMETABLE_SUBJECTS.get(tokens[1]) != subject:
+                            continue
+                names = target.setdefault(subject, [])
+                if teacher not in names:
+                    names.append(teacher)
+    return subjects, groups
+
+
+def _lesson_teachers(
+    subject: str, subjects: dict[str, list[str]], groups: dict[str, list[str]]
+) -> str:
+    teachers = []
+    tokens = [token.strip() for token in subject.split("/")]
+    personal = any(groups.get(t) or groups.get(_TIMETABLE_SUBJECTS.get(t, t)) for t in tokens)
+    for token in tokens:
+        name = _TIMETABLE_SUBJECTS.get(token, token)
+        # Specific personal groups take precedence over whole-class lists.
+        specific = groups.get(token) or groups.get(name)
+        if len(tokens) > 1 and personal and not specific:
+            continue
+        names = specific or subjects.get(name, [])
+        # Several whole-class teachers for one subject cannot be assigned to
+        # a particular lesson safely (e.g. boys' and girls' sports).
+        if not specific and len(names) != 1:
+            continue
+        for teacher in names:
+            if teacher not in teachers:
+                teachers.append(teacher)
+    return ", ".join(teachers)
+
+
 def parse_timetable(html: str, parser: str = "html.parser") -> list[dict[str, Any]]:
     """Stundenplan der Klasse: eine Zeile je Stunde und Wochentag (1 = Montag)."""
     soup = bs4.BeautifulSoup(html, parser)
     out: list[dict[str, Any]] = []
+    subjects, groups = _timetable_teachers(soup)
     for row in soup.select("#asam_content div.table-responsive table tr"):
         cells = row.find_all("td", recursive=False)
         if len(cells) < 6:
@@ -763,6 +841,9 @@ def parse_timetable(html: str, parser: str = "html.parser") -> list[dict[str, An
                     "room": room.strip(" /") and room,
                 }
             )
+    for lesson in out:
+        if teacher := _lesson_teachers(lesson["subject"], subjects, groups):
+            lesson["teacher"] = teacher
     out.sort(key=lambda x: (x["weekday"], _lesson_sort(x["lesson"])))
     return out
 

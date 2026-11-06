@@ -2409,3 +2409,48 @@ async def test_blackboard_recovers_content_and_analysis(hass: HomeAssistant, med
     analysis = stored['analysis'].copy()
     await manager._merge(result)
     assert stored['analysis'] == analysis and len(stored['files']) == 1
+
+
+async def test_timetable_regular_teachers_from_child_table() -> None:
+    """Use personal course memberships, without guessing intensive teachers."""
+    from custom_components.eltern_portal_schulmanager.portal import parse_timetable
+
+    html = """<div id="asam_content"><div class="table-responsive"><table>
+      <tr><td>1.<br>08.00 - 08.45</td>
+        <td><span><span>M<br>N115</span></span></td>
+        <td>L/F<br>226/227</td><td>PhÜ/ChÜ<br>037/207</td>
+        <td>MInt<br>N115</td><td>Unbekannt<br>123</td></tr>
+      <tr><td>2.<br>08.45 - 09.30</td><td>Sm/Sw<br>TH/TH</td>
+        <td>NuT<br>N115</td><td></td><td></td><td></td></tr>
+    </table></div><table>
+      <tr><td colspan="2"><b>Lehrkräfte von Anna Beispiel</b></td></tr>
+      <tr><td colspan="2"><b>Ganze Klasse</b></td></tr>
+      <tr><td>Mathematik</td><td>Maria Muster</td></tr>
+      <tr><td>Latein</td><td>Lena Lang</td></tr>
+      <tr><td>Französisch</td><td>Fritz Frei</td></tr>
+      <tr><td>Sport</td><td>Sara Sommer</td></tr>
+      <tr><td>Sport</td><td>Stefan Sport</td></tr>
+      <tr><td>Natur und Technik</td><td>Nora Natur</td></tr>
+      <tr><td>Natur und Technik</td><td>Ingo Info</td></tr>
+      <tr><td colspan="2"><b>Geteilte Klassen</b></td></tr>
+      <tr><td>8_L_8AB_LAN, Latein</td><td>Lena Lang</td></tr>
+      <tr><td>8_PhÜ_8AB_KUR, Physik</td><td>Paul Probe</td></tr>
+      <tr><td>8_ChÜ_8AB_CHE, Chemie</td><td>Clara Chemie</td></tr>
+      <tr><td colspan="2"><b>Schülergruppen</b></td></tr>
+      <tr><td>MInt</td><td>Falsche Zuordnung</td></tr>
+    </table></div>"""
+    plan = {(x["weekday"], x["lesson"]): x for x in parse_timetable(html)}
+    assert plan[1, "1"]["teacher"] == "Maria Muster"
+    assert plan[2, "1"]["teacher"] == "Lena Lang"
+    assert plan[3, "1"]["teacher"] == "Paul Probe, Clara Chemie"
+    assert "teacher" not in plan[4, "1"]  # no base-subject inference for MInt
+    assert "teacher" not in plan[5, "1"]
+    assert "teacher" not in plan[1, "2"]  # ambiguous whole-class sports list
+    assert "teacher" not in plan[2, "2"]  # two teachers for the same subject
+    # Exact course codes do support intensive lessons when supplied by the portal.
+    html = html.replace("8_L_8AB_LAN, Latein", "8_MInt_8AB_LAN, Mathematik")
+    plan = {(x["weekday"], x["lesson"]): x for x in parse_timetable(html)}
+    assert plan[4, "1"]["teacher"] == "Lena Lang"
+    assert plan[1, "1"]["teacher"] == "Maria Muster"
+    # Without the child table, retain the original timetable fields unchanged.
+    assert all("teacher" not in x for x in parse_timetable(html.split("</table></div>")[0] + "</table></div></div>"))

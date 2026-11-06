@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.14.7 – 2026-11-06
+
 - Timetable: resolve teacher initials through shared course codes and use explicit current-school-year course tables in stored notices/PDF text to fill missing intensive-course teachers. Show the source and personal registration status for optional class offers; unregistered offers do not extend the timetable sensor's personal end-of-school time. Unavailable registration pages preserve the last confirmed state for the current school year. No extra message downloads or booking submissions are triggered.
 - Stundenplan: Lehrkraftinitialen über gemeinsame Kurskennungen auflösen und fehlende Intensivierungs-Lehrkräfte aus ausdrücklich zugeordneten Kurszeilen aktueller Mitteilungen/PDF-Texte ergänzen. Quelle und persönlicher Anmeldestatus werden bei optionalen Klassenangeboten angezeigt; nicht angemeldete Angebote verlängern den persönlichen Unterrichtsschluss im Sensor nicht. Bei nicht erreichbarer Anmeldeseite bleibt der letzte bestätigte Stand des laufenden Schuljahrs erhalten. Keine zusätzlichen Nachrichtendownloads oder Kursbuchungen.
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.14.6 – 2026-11-06
+
 - Fix: read regular teachers from the child-specific teacher table below the portal timetable, including explicit course assignments for split classes. Ambiguous assignments remain empty. / Behoben: Reguläre Lehrkräfte aus der kindbezogenen Lehrkräftetabelle unter dem Portal-Stundenplan übernehmen, einschließlich expliziter Kurszuordnungen für geteilte Klassen. Mehrdeutige Zuordnungen bleiben leer.
 
 ## 0.14.5 – 2026-11-05

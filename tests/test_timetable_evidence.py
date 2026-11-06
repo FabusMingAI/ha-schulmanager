@@ -50,7 +50,7 @@ def test_enrichment_keeps_raw_plan_and_handles_conflicts_and_participation():
 
 
 def test_registrations_distinguish_unavailable_from_empty():
-    head = '<h2>Voranmeldung Intensivierungskurse</h2>'
+    head = '<header><h2>Example school</h2></header><h2>Voranmeldung Intensivierungskurse</h2>'
     assert parse_course_registrations('<h2>Login</h2>') is None
     assert parse_course_registrations(head + '<form>Bitte anmelden</form>') is None
     assert parse_course_registrations(head + '<p>Keine Anmeldungen vorhanden</p>') == []

@@ -17,8 +17,8 @@ _DAYS = {"mo": 1, "di": 2, "mi": 3, "do": 4, "fr": 5}
 def parse_course_registrations(html: str, parser: str = "html.parser") -> list[str] | None:
     """None means unavailable/unrecognized, [] means explicitly no registrations."""
     soup = bs4.BeautifulSoup(html, parser)
-    heading = soup.find("h2")
-    if not heading or "Voranmeldung Intensivierungskurse" not in heading.get_text(" ", strip=True):
+    if not any("Voranmeldung Intensivierungskurse" in h.get_text(" ", strip=True)
+               for h in soup.find_all("h2")):
         return None
     text = soup.get_text(" ", strip=True)
     courses = [h.get_text(" ", strip=True) for h in soup.select("h4.link_buchungen")]

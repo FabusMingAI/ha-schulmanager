@@ -6,7 +6,7 @@ const path = require('node:path');
   const browser = await chromium.launch({executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox']});
   try {
     for (const width of [1280, 390]) {
-      const page = await browser.newPage({viewport: {width, height: 900}});
+      const page = await browser.newPage({timezoneId:"UTC", viewport: {width, height: 900}});
       const errors = [];
       page.on('pageerror', e => errors.push(e.message));
       await page.setContent('<!doctype html><html lang="de"><body></body></html>');
@@ -52,6 +52,22 @@ const path = require('node:path');
         const details = await plan.locator('ha-card').innerText();
         assert.match(details, kind === 'entfall' ? /Status: entfällt/ : kind === 'raum' ? /101 → 303/ : /Status: regulärer Unterricht/);
       }
+      await plan.evaluate(card => {
+        const lesson = card._data.children[0].timetable[0];
+        lesson.optional = true;
+        lesson.participation = 'not_registered';
+        lesson.teacher_source = {title:'Förderangebote 2026/2027',sent:'2026-09-15',url:'https://example.org/course-source'};
+        card._render();
+      });
+      assert.match(await plan.locator('ha-card').innerText(), /Optional · nicht angemeldet/);
+      assert.match(await plan.locator('ha-card').innerText(), /Status: optionales Klassenangebot/);
+      assert.equal(await plan.getByRole('link', {name:'Förderangebote 2026/2027'}).getAttribute('href'), 'https://example.org/course-source');
+      for (const [state, label] of [['registered','angemeldet'],['unknown','Teilnahme ungeklärt']]) {
+        await plan.evaluate((card,state) => {card._data.children[0].timetable[0].participation=state;card._render();}, state);
+        assert.match(await plan.locator('ha-card').innerText(), new RegExp('Optional · '+label));
+      }
+      await plan.getByRole('button',{name:'Woche',exact:true}).click();
+      assert.match(await plan.locator('[data-lesson]').innerText(), /Teilnahme ungeklärt/);
       const footer = page.locator('eltern-portal-schulmanager-header');
       assert.equal(await footer.locator('.ttl, img, .sub').count(),0);
       assert.match(await footer.locator("ha-card").innerText(),/Stand:.*12:34/);

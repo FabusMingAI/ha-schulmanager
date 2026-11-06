@@ -37,6 +37,7 @@ from .analyzer import (
     fmt_eur,
     summary_languages,
 )
+from .timetable import enrich_timetable
 from .classes import concerns_class
 from .const import (
     ACTION_DONE,
@@ -542,9 +543,14 @@ class SchulManager:
             ):
                 # leere Antwort (z. B. Seite gerade nicht erreichbar) überschreibt nichts
                 self.data["timetable"][key] = {
+                    **self.data["timetable"].get(key, {}),
                     "lessons": pchild.timetable,
                     "updated": dt_util.now().isoformat(),
                 }
+            if pchild.course_registrations is not None:
+                plan = self.data["timetable"].setdefault(key, {})
+                plan["course_registrations"] = pchild.course_registrations
+                plan["registrations_year"] = school_year(today)
             if pchild.sicknotes is not None and (
                 pchild.sicknotes or not self.data["sicknotes"].get(key)
             ):
@@ -1559,6 +1565,17 @@ class SchulManager:
         current = [e["uid"] for d in days for e in d["entries"]]
         self.data["subs_seen"][key] = (current + [u for u in seen if u not in current])[:300]
         return fresh if known else []
+
+    def child_timetable(self, child: str) -> list[dict[str, Any]]:
+        """Enrich the raw class grid with current, child-scoped evidence."""
+        plan = self.data["timetable"].get(child, {})
+        today = dt_util.now().date()
+        registrations = plan.get("course_registrations") if plan.get("registrations_year") == school_year(today) else None
+        return enrich_timetable(
+            plan.get("lessons", []), self.child_items(child),
+            self.children.get(child, {}).get("classname") or "",
+            self.teacher_names(child), today, registrations,
+        )
 
     def lesson_times(self, child: str, day: date, lesson: str) -> tuple[str | None, str | None]:
         """Beginn und Ende einer Stunde (z. B. '3' oder '3-4') laut Stundenplan."""

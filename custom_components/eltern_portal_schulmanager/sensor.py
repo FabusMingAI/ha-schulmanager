@@ -222,7 +222,9 @@ class UnreadSensor(SchulEntity, SensorEntity):
 def _lesson_line(x: dict[str, Any]) -> str:
     time_ = f" {x['start']}" if x.get("start") else ""
     room = f" ({x['room']})" if x.get("room") else ""
-    return f"{x['lesson']}.{time_} {x['subject']}{room}"
+    teacher = f" – {x['teacher']}" if x.get("teacher") else ""
+    optional = " · optional, Teilnahme ungeklärt" if x.get("participation") == "unknown" else ""
+    return f"{x['lesson']}.{time_} {x['subject']}{room}{teacher}{optional}"
 
 
 class SubstitutionSensor(SchulEntity, SensorEntity):
@@ -280,13 +282,13 @@ class TimetableSensor(SchulEntity, SensorEntity):
 
     _attr_icon = "mdi:timetable"
     _attr_native_unit_of_measurement = "Stunden"
-    _unrecorded_attributes = frozenset({"woche", "heute", "naechster_schultag_plan"})
+    _unrecorded_attributes = frozenset({"woche", "heute", "naechster_schultag_plan", "eintraege"})
 
     def __init__(self, manager: SchulManager, child: str) -> None:
         super().__init__(manager, child, "stundenplan")
 
     def _lessons(self) -> list[dict[str, Any]]:
-        return self.manager.data["timetable"].get(self.child, {}).get("lessons", [])
+        return [l for l in self.manager.child_timetable(self.child) if l.get("participation") != "not_registered"]
 
     @property
     def available(self) -> bool:
@@ -311,6 +313,7 @@ class TimetableSensor(SchulEntity, SensorEntity):
         return {
             "heute": [_lesson_line(x) for x in todays],
             "schluss_heute": todays[-1].get("end") if todays else None,
+            "eintraege": self.manager.child_timetable(self.child),
             "naechster_schultag": nxt.isoformat(),
             "naechster_schultag_plan": [
                 _lesson_line(x) for x in lessons if x["weekday"] == nxt.isoweekday()

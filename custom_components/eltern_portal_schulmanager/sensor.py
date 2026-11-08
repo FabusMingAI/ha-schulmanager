@@ -25,9 +25,12 @@ from .const import (
     SIGNAL_UPDATED,
     TASK_TYPE_ICONS,
 )
-from .entity import SchulEntity
+from .entity import SchulEntity, SchulPortalEntity
 from .manager import SchulManager
 
+
+# All updates use the manager lock; entities do not perform their own I/O.
+PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -227,7 +230,7 @@ def _lesson_line(x: dict[str, Any]) -> str:
     return f"{x['lesson']}.{time_} {x['subject']}{room}{teacher}{optional}"
 
 
-class SubstitutionSensor(SchulEntity, SensorEntity):
+class SubstitutionSensor(SchulPortalEntity, SensorEntity):
     """Anzahl der Vertretungen/Ausfälle ab heute, Einträge als Attribut."""
 
     _attr_icon = "mdi:account-switch"
@@ -277,7 +280,7 @@ class SubstitutionSensor(SchulEntity, SensorEntity):
         }
 
 
-class TimetableSensor(SchulEntity, SensorEntity):
+class TimetableSensor(SchulPortalEntity, SensorEntity):
     """Stundenplan: Zahl der Stunden heute, Tages- und Wochenplan als Attribut."""
 
     _attr_icon = "mdi:timetable"
@@ -292,7 +295,7 @@ class TimetableSensor(SchulEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return bool(self._lessons())
+        return super().available and bool(self._lessons())
 
     @property
     def native_value(self) -> int:
@@ -326,7 +329,7 @@ class TimetableSensor(SchulEntity, SensorEntity):
         }
 
 
-class SicknoteSensor(SchulEntity, SensorEntity):
+class SicknoteSensor(SchulPortalEntity, SensorEntity):
     """Krankmeldungen: Schultage im laufenden Schuljahr, Liste als Attribut."""
 
     _attr_icon = "mdi:emoticon-sick-outline"

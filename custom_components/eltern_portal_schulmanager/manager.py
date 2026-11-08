@@ -20,6 +20,7 @@ from homeassistant.exceptions import (
     HomeAssistantError,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.event import (
     async_track_time_change,
     async_track_time_interval,
@@ -219,6 +220,8 @@ class SchulManager:
         self.data: dict[str, Any] = {}
         self.last_update: datetime | None = None
         self.last_errors: list[str] = []
+        # Runtime-only health, never inferred from cached data after restart.
+        self.portal_status: dict[str, str] = {}
         self._lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._worker: asyncio.Task | None = None
@@ -352,14 +355,18 @@ class SchulManager:
                     msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
                     if initial:
                         raise ConfigEntryAuthFailed(msg) from err
+                    self._set_portal_status(school, "auth_failed")
+                    self.entry.async_start_reauth(self.hass)
                     errors.append(msg)
                     continue
                 except PortalConnectionError as err:
                     msg = f"{school}: Portal nicht erreichbar ({err})"
                     if initial and not self.children:
                         raise ConfigEntryNotReady(msg) from err
+                    self._set_portal_status(school, "connection_failed")
                     errors.append(msg)
                     continue
+                self._set_portal_status(school, "partial" if result.errors else "ok")
                 errors.extend(f"{school}: {e}" for e in result.errors)
                 self._store_teachers(result)
                 await self._merge(result)
@@ -370,6 +377,22 @@ class SchulManager:
             self._changed()
             if self._pending() or self._missing_translations():
                 self._queue_event.set()
+
+    @callback
+    def _set_portal_status(self, school: str, status: str) -> None:
+        """Log outages and recovery once per transition, without server text."""
+        previous = self.portal_status.get(school)
+        self.portal_status[school] = status
+        if status == previous:
+            return
+        if status != "ok":
+            LOGGER.warning("%s: Eltern-Portal unavailable or incomplete (%s)", school, status)
+        elif previous is not None:
+            LOGGER.info("%s: Eltern-Portal available again", school)
+
+    def portal_available(self, child: str) -> bool:
+        school = self.children.get(child, {}).get("school")
+        return self.portal_status.get(school) in ("ok", "partial")
 
     async def _async_fetch_portal(self, portal: dict[str, Any]) -> PortalResult:
         """Ein Portal abrufen, mit eigener Verbindung und einem Wiederholversuch.
@@ -386,7 +409,8 @@ class SchulManager:
             connector = aiohttp.TCPConnector(
                 ssl=get_default_context(), limit_per_host=2
             )
-            async with aiohttp.ClientSession(
+            async with async_create_clientsession(
+                self.hass,
                 connector=connector,
                 # kein Gesamtlimit: der erste Abruf lädt viele PDFs
                 timeout=aiohttp.ClientTimeout(

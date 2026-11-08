@@ -41,7 +41,19 @@ class SchulEntity(Entity):
             )
         )
 
+    @property
+    def available(self) -> bool:
+        """Local tasks and messages remain usable while a portal is offline."""
+        return self.child in self.manager.children
+
     @callback
     def _handle_update(self) -> None:
-        if self.child in self.manager.children:
-            self.async_write_ha_state()
+        self.async_write_ha_state()
+
+
+class SchulPortalEntity(SchulEntity):
+    """A portal snapshot must not appear current after a failed fetch."""
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.manager.portal_available(self.child)

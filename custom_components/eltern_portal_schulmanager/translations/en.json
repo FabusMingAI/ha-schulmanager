@@ -30,6 +30,15 @@
       "migrate": {
         "title": "Take over Schulmanager",
         "description": "“Schulmanager” is now called **Eltern Portal Manager Bavaria**. An existing setup was found (“{title}”, schools: {schools}).\n\nTaking it over keeps credentials, settings, tasks, messages, archive, stored files, entity IDs and history. The old entry is removed afterwards and dashboards are switched to the new cards.\n\nAutomations and scripts using `schulmanager.…` actions or `schulmanager_…` events have to be changed by hand – they are listed under Settings → Repairs."
+      },
+      "reconfigure": {
+        "title": "Change credentials",
+        "description": "Choose an existing school and enter its new credentials. Tasks, messages and settings are kept.",
+        "data": {
+          "school": "School",
+          "username": "E-mail address (optional)",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -42,7 +51,8 @@
     "abort": {
       "already_configured": "Eltern Portal Manager Bavaria is already set up. Add more schools via “Configure”.",
       "reauth_successful": "Credentials updated.",
-      "no_legacy_entry": "No existing Schulmanager setup was found to take over."
+      "no_legacy_entry": "No existing Schulmanager setup was found to take over.",
+      "reconfigure_successful": "Credentials updated."
     }
   },
   "options": {

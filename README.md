@@ -21,6 +21,9 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 > [!IMPORTANT]
 > **Formerly "Schulmanager".** Up to version 0.13 this integration was called *Schulmanager* and used the domain `schulmanager`. The same domain is used by **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – a different integration for schools that use *schulmanager-online.de* – so the two could not be installed side by side. Since 0.14 this integration is **Eltern Portal Manager Bavaria** (domain `eltern_portal_schulmanager`) and both work together, e.g. one child at an Eltern-Portal school and the other at a Schulmanager Online school. Updating from 0.13 or older? See [Renamed from Schulmanager](#renamed-from-schulmanager) – the bridge release 0.14.1 can take over your existing setup automatically.
 
+
+[Quality work (Bronze → Gold), diagnostics, troubleshooting and removal](docs/QUALITY_SCALE.md)
+
 ## Features
 
 - **Reads the portal directly** – parent letters (*Elternbriefe*), messages from teachers, notice board, surveys, **exams and tests** (*Schulaufgaben, Stegreifaufgaben* …), **timetable**, **substitution plan** (*Vertretungsplan*) and **sick notes** (*Krankmeldungen*). Several schools and children with one installation.

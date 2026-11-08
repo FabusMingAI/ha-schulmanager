@@ -25,6 +25,9 @@ _RE_DECOR = re.compile(
 )
 
 
+# All updates use the manager lock; entities do not perform their own I/O.
+PARALLEL_UPDATES = 0
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SchulConfigEntry,

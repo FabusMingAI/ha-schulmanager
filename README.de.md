@@ -19,6 +19,9 @@
 > [!IMPORTANT]
 > **Früher „Schulmanager“.** Bis Version 0.13 hieß diese Integration *Schulmanager* und nutzte die Domain `schulmanager`. Dieselbe Domain nutzt **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – eine andere Integration für Schulen mit *schulmanager-online.de* –, deshalb ließen sich beide nicht gleichzeitig installieren. Seit 0.14 heißt diese Integration **Eltern Portal Manager Bavaria** (Domain `eltern_portal_schulmanager`), und beide laufen nebeneinander, z. B. ein Kind an einer Schule mit Eltern-Portal und eines an einer Schule mit Schulmanager Online. Update von 0.13 oder älter? Siehe [Umbenannt: früher Schulmanager](#umbenannt-früher-schulmanager) – das Brücken-Release 0.14.1 kann die bestehende Einrichtung automatisch übernehmen.
 
+
+[Qualitätsarbeit (Bronze → Gold), Diagnose, Fehlerbehebung und Entfernen](docs/QUALITY_SCALE.md)
+
 ## Was passiert automatisch
 
 | Schritt | Was die Integration tut |

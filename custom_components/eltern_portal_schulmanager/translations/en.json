@@ -452,6 +452,39 @@
   "exceptions": {
     "not_loaded": {
       "message": "Eltern Portal Manager Bavaria is not loaded. Check the integration under Settings → Devices & services."
+    },
+    "unknown_child": {
+      "message": "Unknown child. Check the identifier in the sensor attributes."
+    },
+    "unknown_item": {
+      "message": "The message does not exist."
+    },
+    "unknown_task": {
+      "message": "The task does not exist."
+    },
+    "invalid_status": {
+      "message": "Invalid task or message status."
+    },
+    "refresh_failed": {
+      "message": "One or more portal sections could not be refreshed. Check the diagnostics sensor."
+    },
+    "dashboard_failed": {
+      "message": "The dashboard could not be created. Check the Lovelace configuration."
+    },
+    "portal_auth_failed": {
+      "message": "Authentication failed for {school}."
+    },
+    "portal_connection_failed": {
+      "message": "The portal {school} is unreachable."
+    },
+    "notification_failed": {
+      "message": "The notification could not be sent. Check the configured notification services."
+    },
+    "notification_not_configured": {
+      "message": "No notification service is configured. Select one in the integration settings."
+    },
+    "unknown_event": {
+      "message": "The appointment or deadline does not exist."
     }
   }
 }

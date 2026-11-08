@@ -54,6 +54,8 @@ class SchulEntity(Entity):
 class SchulPortalEntity(SchulEntity):
     """A portal snapshot must not appear current after a failed fetch."""
 
+    _portal_section: str | None = None
+
     @property
     def available(self) -> bool:
-        return super().available and self.manager.portal_available(self.child)
+        return super().available and self.manager.portal_available(self.child, self._portal_section)

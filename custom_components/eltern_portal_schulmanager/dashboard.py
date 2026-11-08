@@ -19,6 +19,7 @@ import inspect
 import json
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -300,7 +301,7 @@ async def async_apply(hass: HomeAssistant, manager: SchulManager, force: bool = 
             current = None
         state = manager.data.setdefault("dashboard", {})
         new = build_config(hass, manager, effective)
-        if _hash(new) == _hash(current):
+        if _hash(new) == _hash(current) and not force:
             state.update(hash=_hash(new), mode=mode)
             return False
         allowed = (
@@ -323,7 +324,9 @@ async def async_apply(hass: HomeAssistant, manager: SchulManager, force: bool = 
         manager.store.async_delay_save(lambda: manager.data, 2)
         LOGGER.debug("Dashboard „%s“ aktualisiert (%s)", DASHBOARD_URL, effective)
         return True
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        if force:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="dashboard_failed") from err
         LOGGER.warning("Dashboard „%s“ konnte nicht aktualisiert werden", DASHBOARD_URL, exc_info=True)
         return False
 

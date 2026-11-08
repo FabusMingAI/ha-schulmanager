@@ -413,10 +413,10 @@ class SchulPortal(ElternPortalAPI):
             # Zusatzbereiche (Stundenplan, Vertretungen, Krankmeldungen) sind nicht
             # bei jeder Schule freigeschaltet; manche Portale trennen dann die
             # Verbindung. Das darf den Abruf der übrigen Bereiche nicht abbrechen.
-            LOGGER.info("%s: Bereich '%s' nicht verfügbar: %s", self.school, name, err)
+            LOGGER.debug("%s: Bereich '%s' nicht verfügbar: %s", self.school, name, err)
             return f"{name}: nicht verfügbar ({err or type(err).__name__})"
         except Exception as err:  # noqa: BLE001 - Portal-HTML ändert sich gern
-            LOGGER.warning(
+            LOGGER.debug(
                 "%s: Bereich '%s' konnte nicht gelesen werden: %s",
                 self.school,
                 name,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 import hashlib
@@ -18,6 +19,7 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
     HomeAssistantError,
+    ServiceValidationError,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
@@ -221,6 +223,7 @@ class SchulManager:
         self.last_errors: list[str] = []
         # Runtime-only health, never inferred from cached data after restart.
         self.portal_status: dict[str, str] = {}
+        self.section_status: dict[str, dict[str, bool]] = {}
         self._lock = asyncio.Lock()
         self._queue_event = asyncio.Event()
         self._worker: asyncio.Task | None = None
@@ -331,6 +334,9 @@ class SchulManager:
         self._unsubs.clear()
         if self._worker:
             self._worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._worker
+            self._worker = None
         await self.store.async_save(self.data)
 
     # ------------------------------------------------------------------
@@ -353,15 +359,15 @@ class SchulManager:
                 except PortalAuthError as err:
                     msg = f"{school}: Anmeldung fehlgeschlagen ({err})"
                     if initial:
-                        raise ConfigEntryAuthFailed(msg) from err
+                        raise ConfigEntryAuthFailed(translation_domain=DOMAIN, translation_key="portal_auth_failed", translation_placeholders={"school": school}) from err
                     self._set_portal_status(school, "auth_failed")
                     self.entry.async_start_reauth(self.hass)
                     errors.append(msg)
                     continue
                 except PortalConnectionError as err:
                     msg = f"{school}: Portal nicht erreichbar ({err})"
-                    if initial and not self.children:
-                        raise ConfigEntryNotReady(msg) from err
+                    if initial:
+                        raise ConfigEntryNotReady(translation_domain=DOMAIN, translation_key="portal_connection_failed", translation_placeholders={"school": school}) from err
                     self._set_portal_status(school, "connection_failed")
                     errors.append(msg)
                     continue
@@ -389,9 +395,12 @@ class SchulManager:
         elif previous is not None:
             LOGGER.info("%s: Eltern-Portal available again", school)
 
-    def portal_available(self, child: str) -> bool:
+    def portal_available(self, child: str, section: str | None = None) -> bool:
         school = self.children.get(child, {}).get("school")
-        return self.portal_status.get(school) in ("ok", "partial")
+        return (
+            self.portal_status.get(school) in ("ok", "partial")
+            and (section is None or self.section_status.get(child, {}).get(section, False))
+        )
 
     async def _async_fetch_portal(self, portal: dict[str, Any]) -> PortalResult:
         """Ein Portal abrufen, mit eigener Verbindung und einem Wiederholversuch.
@@ -506,6 +515,21 @@ class SchulManager:
             return True
         return stored.get("version") != item.version
 
+    def _child_key(self, school: str, student_id: str, firstname: str) -> str:
+        """Keep existing entity identities, including when names change."""
+        for key, known in self.children.items():
+            if known.get("school") == school and str(known.get("student_id")) == str(student_id):
+                return key
+        base = slugify(firstname) or slugify(str(student_id))
+        if base not in self.children:
+            return base
+        candidate = slugify(f"{base}_{school}_{student_id}")
+        key, number = candidate, 2
+        while key in self.children:
+            key = f"{candidate}_{number}"
+            number += 1
+        return key
+
     async def _merge(self, result: PortalResult) -> None:
         first_import = result.school not in self.data["initialized"]
         today = dt_util.now().date()
@@ -537,7 +561,19 @@ class SchulManager:
                 len(known),
             )
         for pchild in result.children:
-            key = slugify(pchild.firstname) or pchild.student_id
+            key = self._child_key(result.school, pchild.student_id, pchild.firstname)
+            previous = self.section_status.get(key, {})
+            current = {
+                "lesson": bool(pchild.timetable),
+                "substitution": pchild.substitutions is not None and bool(pchild.substitutions.get("available")),
+                "sicknote": pchild.sicknotes is not None and (bool(pchild.sicknotes) or not self.data["sicknotes"].get(key)),
+            }
+            for section, available in current.items():
+                if previous.get(section) is False and available:
+                    LOGGER.info("%s: %s available again", result.school, section)
+                elif previous.get(section) is True and not available:
+                    LOGGER.warning("%s: %s unavailable", result.school, section)
+            self.section_status[key] = current
             self.children[key] = {
                 "name": pchild.firstname,
                 "fullname": pchild.fullname,
@@ -827,6 +863,8 @@ class SchulManager:
             task["completed"] = None
 
     def _set_status(self, tid: str, status: str) -> None:
+        if status not in (STATUS_OPEN, STATUS_PROGRESS, STATUS_DONE):
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_status")
         if status == STATUS_DONE:
             self._set_done(tid, True)
             return
@@ -1090,12 +1128,19 @@ class SchulManager:
     # ------------------------------------------------------------------
     async def async_reanalyze(self, uid: str) -> None:
         if uid not in self.items:
-            raise HomeAssistantError(f"Unbekannte Mitteilung: {uid}")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_item")
         self.items[uid]["analysis"] = {"status": "pending"}
         self._changed()
         self._queue_event.set()
 
+    def validate_child(self, child: str | None) -> None:
+        if child is not None and child not in self.children:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_child")
+
     def mark_read(self, uid: str | None = None, child: str | None = None, read: bool = True) -> int:
+        self.validate_child(child)
+        if uid is not None and uid not in self.items:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_item")
         count = 0
         for item in self.items.values():
             if uid and item["uid"] != uid:
@@ -1120,12 +1165,13 @@ class SchulManager:
         Ohne ``uid`` gilt der Status für alle Mitteilungen (eines Kindes), die ihn
         noch nicht haben. Gibt die Zahl der geänderten Mitteilungen zurück.
         """
+        self.validate_child(child)
         if status not in (STATUS_OPEN, STATUS_PROGRESS, STATUS_DONE):
-            raise HomeAssistantError(f"Unbekannter Status: {status}")
-        if uid:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_status")
+        if uid is not None:
             item = self.items.get(uid)
             if item is None:
-                raise HomeAssistantError(f"Unbekannte Mitteilung: {uid}")
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_item")
             targets = [item]
         else:
             targets = [
@@ -1147,7 +1193,7 @@ class SchulManager:
 
     def complete_task(self, tid: str, done: bool = True) -> None:
         if tid not in self.tasks:
-            raise HomeAssistantError(f"Unbekannte Aufgabe: {tid}")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_task")
         self._set_done(tid, done)
         self._changed()
 
@@ -1161,7 +1207,7 @@ class SchulManager:
         type_: str = "aufgabe",
     ) -> dict[str, Any]:
         if child not in self.children:
-            raise HomeAssistantError(f"Unbekanntes Kind: {child}")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_child")
         tid = f"manuell-{dt_util.now().strftime('%Y%m%d%H%M%S%f')}"
         task = self._ensure_task(
             tid,
@@ -1180,7 +1226,7 @@ class SchulManager:
     def update_task(self, tid: str, **changes: Any) -> None:
         task = self.tasks.get(tid)
         if task is None:
-            raise HomeAssistantError(f"Unbekannte Aufgabe: {tid}")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_task")
         if "status" in changes:
             status = changes.pop("status")
             # „offen“ aus der To-do-Liste soll „in Arbeit“ nicht zurücksetzen
@@ -1196,8 +1242,10 @@ class SchulManager:
         self._changed()
 
     def delete_tasks(self, tids: list[str]) -> None:
-        for tid in tids:
-            self.tasks.pop(tid, None)
+        if any(tid not in self.tasks for tid in tids):
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_task")
+        for tid in dict.fromkeys(tids):
+            self.tasks.pop(tid)
         self._changed()
 
     # ------------------------------------------------------------------
@@ -1213,7 +1261,9 @@ class SchulManager:
     def set_event_archived(self, child: str, uid: str, archived: bool = True) -> None:
         """Einen Termin bzw. eine Frist ins Archiv schieben oder zurückholen."""
         if child not in self.children:
-            raise ValueError(f"Unbekanntes Kind: {child}")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_child")
+        if self.find_event(child, uid) is None and uid not in self.archived_events(child):
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_event")
         store = self.data["archived"].setdefault(child, {})
         if archived:
             store[uid] = dt_util.now().isoformat()
@@ -1708,8 +1758,11 @@ class SchulManager:
     # ------------------------------------------------------------------
     # Benachrichtigungen
     # ------------------------------------------------------------------
-    async def _notify(self, title: str, message: str, data: dict[str, Any] | None = None) -> None:
-        for svc in self.opt(CONF_NOTIFY, []) or []:
+    async def _notify(self, title: str, message: str, data: dict[str, Any] | None = None, *, strict: bool = False) -> None:
+        services = self.opt(CONF_NOTIFY, []) or []
+        if strict and not services:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="notification_not_configured")
+        for svc in services:
             svc = svc.removeprefix("notify.")
             try:
                 await self.hass.services.async_call(
@@ -1719,6 +1772,8 @@ class SchulManager:
                     blocking=True,
                 )
             except (HomeAssistantError, ValueError) as err:
+                if strict:
+                    raise HomeAssistantError(translation_domain=DOMAIN, translation_key="notification_failed") from err
                 LOGGER.warning("Benachrichtigung über notify.%s fehlgeschlagen: %s", svc, err)
 
     def _tts_allowed(self) -> bool:
@@ -1727,7 +1782,7 @@ class SchulManager:
         end = _parse_time(self.opt(CONF_TTS_END), DEFAULT_TTS_END)
         return start <= now <= end
 
-    async def async_announce(self, text: str, force: bool = False) -> None:
+    async def async_announce(self, text: str, force: bool = False, *, strict: bool = False) -> None:
         targets = self.opt(CONF_TTS_TARGETS, []) or []
         if not targets or not (force or self._tts_allowed()):
             return
@@ -1753,6 +1808,8 @@ class SchulManager:
                         blocking=True,
                     )
             except HomeAssistantError as err:
+                if strict:
+                    raise HomeAssistantError(translation_domain=DOMAIN, translation_key="notification_failed") from err
                 LOGGER.warning("Ansage auf %s fehlgeschlagen: %s", target, err)
 
     async def _notify_item(self, item: dict[str, Any]) -> None:
@@ -1807,7 +1864,7 @@ class SchulManager:
     async def _scheduled_reminders(self, _now: datetime) -> None:
         await self.async_send_reminders()
 
-    async def async_send_reminders(self) -> int:
+    async def async_send_reminders(self, *, strict: bool = False) -> int:
         """Fällige Erinnerungen verschicken (einmal pro Stufe, überfällig täglich)."""
         today = dt_util.now().date()
         try:
@@ -1835,19 +1892,19 @@ class SchulManager:
                     key = f"d{days}"
             if key is None or key in t.get("reminded", []):
                 continue
+            await self._remind(t, today, strict=strict)
             t.setdefault("reminded", []).append(key)
             sent += 1
-            await self._remind(t, today)
             if t.get("due") and (date.fromisoformat(t["due"]) - today).days <= 1:
                 child = self.children.get(t["child"], {}).get("name", "")
                 spoken.append(f"für {child}: {t['title']}, {_days_text((date.fromisoformat(t['due']) - today).days)}")
         if spoken:
-            await self.async_announce("Erinnerung Schule. " + ". ".join(spoken) + ".")
+            await self.async_announce("Erinnerung Schule. " + ". ".join(spoken) + ".", strict=strict)
         if sent:
             self._changed()
         return sent
 
-    async def _remind(self, t: dict[str, Any], today: date) -> None:
+    async def _remind(self, t: dict[str, Any], today: date, *, strict: bool = False) -> None:
         child = self.children.get(t["child"], {}).get("name", t.get("child") or "")
         when = ""
         if t.get("due"):
@@ -1873,6 +1930,7 @@ class SchulManager:
                 "group": f"{TAG}-{t.get('child')}",
                 "actions": actions,
             },
+            strict=strict,
         )
         self.hass.bus.async_fire(
             EVENT_TASK_REMINDER,
@@ -1929,6 +1987,7 @@ class SchulManager:
             "🎒 Schule heute",
             self.digest_text(),
             {"tag": f"{TAG}-digest", "group": TAG},
+            strict=force,
         )
         return True
 
@@ -1950,9 +2009,11 @@ class SchulManager:
 
     def remove_portal_data(self, school: str) -> None:
         """Daten einer entfernten Schule löschen (Dateien bleiben liegen)."""
+        self.portal_status.pop(school, None)
         kids = [k for k, c in self.children.items() if c.get("school") == school]
         for k in kids:
             self.children.pop(k)
+            self.section_status.pop(k, None)
             self.data["appointments"].pop(k, None)
             self.data["timetable"].pop(k, None)
             self.data["substitutions"].pop(k, None)

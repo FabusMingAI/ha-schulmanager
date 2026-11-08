@@ -2,28 +2,35 @@
 
 This is a self-assessment against the [Home Assistant rules](https://contributors.home-assistant.io/core/quality-scale/rules/), checked on 8 November 2026. It is **not an official tier**. This HACS integration remains Custom. The machine-readable checklist is in [quality_scale.yaml](../custom_components/eltern_portal_schulmanager/quality_scale.yaml); no metal tier is declared in the manifest.
 
+## Bronze and Silver self-assessment
+
+All applicable Bronze and Silver rules are implemented for this custom integration. The brands rule follows the [current custom-integration mechanism](https://contributors.home-assistant.io/blog/2026/02/24/brands-proxy-api/): local light/dark PNG icons at 256px and 512px. Core-specific brands-repository submission and official documentation/review remain separate requirements if the integration is proposed for Core. We do not set a metal tier in the manifest or claim an official award.
+
 ## Current implementation and verification
 
 - Actions are registered when the integration loads, stay registered after unloading an entry, and raise a translated validation error when no entry is loaded.
-- UI setup validates each school before saving. Credentials can be changed using the entry menu → Reconfigure, without removing messages, tasks, settings or entity IDs. The school selector changes an existing school's credentials; add/remove schools under Configure instead.
+- UI setup validates each school before saving. Every integration setup, including a restart with cached records, awaits a live fetch and reports authentication failures to Home Assistant or requests setup retry for connection failures. Cached data is preserved through failures and retries. Credentials can be changed using the entry menu → Reconfigure, without removing messages, tasks, settings or entity IDs. The school selector changes an existing school's credentials; add/remove schools under Configure instead.
 - Authentication failure during polling starts Home Assistant's reauthentication flow. Repeated failures use the same active flow. Other schools continue to update.
-- Connection/authentication failures retain stored data. Timetable, substitution and sick-note sensors become unavailable for the affected school until it responds again. Locally stored tasks, inbox counters, payment totals and the calendar remain usable from the last stored data; they are local records, not confirmation that the portal is reachable. A partial response is recorded separately; its successfully fetched sections still merge. Section-level freshness needs further work.
+- Connection/authentication failures retain stored data. Timetable, substitution and sick-note sensors become unavailable for the affected school until it responds again. Locally stored tasks, inbox counters, payment totals and the calendar remain usable from the last stored data; they are local records, not confirmation that the portal is reachable. A partial response is recorded separately; its successfully fetched sections still merge. Failed or missing timetable/substitution/sick-note sections are unavailable independently, while their previous data remains stored. A suspicious empty response does not replace previously known timetable or sick-note data.
 - Failures and recovery are logged once per school/status transition. The diagnostic timestamp records the last fetch attempt, including failed attempts, not necessarily the last successful fetch. The error attribute provides the current errors.
 - Diagnostics can be downloaded from the integration entry's menu. The integration payload includes aggregate counts, fixed health categories, pending queue sizes and the last fetch time. It excludes credentials, entry data/options, school identifiers, names, messages, tasks, sick-note details, files, teacher lists, URLs, AI content and free-text errors. Home Assistant supplies its normal system metadata separately.
 - Each school/attempt keeps its own cookie session and connection pool, explicitly closed after the attempt. A migration to Home Assistant-managed sessions is a separate Platinum audit: its helper supplies a shared connector, so passing the existing private connector is incompatible. This preserves separation between accounts and the retry behaviour that addresses stale portal connections.
 
-CI runs all existing and new tests, saves coverage.json and coverage.xml as the integration-coverage artifact, and requires 100% line coverage of config_flow.py and diagnostics.py. It reports each module at or below 95% as an outstanding Silver requirement. A passing overall test suite or a high overall percentage does not establish Silver. No coverage exclusions are used to hide untested integration code.
+CI runs all existing and new tests, saves coverage.json and coverage.xml as the integration-coverage artifact, and requires 100% line coverage of config_flow.py and diagnostics.py plus strictly more than 95% in every other integration module. Missing modules or excluded runtime lines fail the check; coverage.py's standard TYPE_CHECKING import exclusion is allowed. An overall percentage cannot substitute for these per-module checks.
 
-## Verified baseline
+## Verification and remaining milestones
 
-GitHub Actions on implementation commit d360f0046bd7b50f2fb3cd96e3cb2eeb3d38c5dd: 89 Python tests passed (27 additional cases), plus passing HACS, hassfest and browser checks. The integration has 3,427 executable Python statements with 333 uncovered (about 90% overall). Configuration flow and diagnostics both have 100% line coverage. Nine modules are still at or below 95%; the most substantial gaps are in manager, portal, migration, analyzer and websocket behaviour. See the [test run](https://github.com/FabusMingAI/ha-schulmanager/actions/runs/42467913841) for the full report.
+Verified on 8 November 2026: **154 tests pass** against both the Home Assistant 2026.2.3 CI dependency and the isolated Home Assistant 2026.10.1 container. Overall Python line coverage is **98.02%**; the lowest module is **96.17%**. Coverage reports contain all integration Python modules without omissions or runtime-code exclusions. Each module exceeds 95%; the configuration flow and diagnostics have 100%. The [PR checks](https://github.com/FabusMingAI/ha-schulmanager/pull/43/checks) contain the exact test counts and per-module reports for each commit.
 
-## Remaining milestones
+The tests exercise cached restarts, wrong and updated credentials, multi-school isolation, recovery of optional sections, unknown identifiers, empty message IDs, atomic to-do deletion, failed notifications, reminders that remain retryable, malformed AI/portal responses, migration failures, and preservation of downloaded files. Children with equal first names receive distinct keys; known school/student identities retain their keys when names change and after restart.
 
-1. Bronze: full flow coverage, review every baseline rule, and resolve the cached-start connectivity audit item before claiming all requirements are met.
-2. Silver: more than 95% coverage **in every module**, plus complete error/action and availability review. Current measurements come from each CI run; the checklist deliberately keeps the overall coverage requirement open.
-3. Gold: dynamic child entity creation and stale-device handling, translated action exceptions/icons, full diagnostic review and documentation review. Devices are logical services per child; unsupported discovery is exempt because a remote Eltern-Portal account cannot be discovered on the local network.
-4. Platinum: strict typing, managed HTTP sessions and full asynchronous-dependency audit. It is not the current milestone.
+Gold remains the next milestone: dynamic child entity creation and stale-device handling, translated icons and further user-experience review. Platinum would additionally need strict typing, managed HTTP sessions and a full asynchronous-dependency audit.
+
+## Action failures and reminders
+
+Actions reject unknown child, message, task and event identifiers with validation errors. An empty message ID is invalid; omit the field to act on all matching messages. To-do removal validates every requested ID before changing anything and tolerates duplicate IDs. A manual refresh reports failed portal sections while retaining successful results. Rebuilding the dashboard remains successful when its content already matches.
+
+Manual summary/reminder actions report missing notification destinations and delivery errors instead of silently succeeding. A failed push reminder is not recorded as sent, so it can be retried. Automatic background notifications continue best-effort delivery and log failures. A retry after only some destinations succeeded can duplicate the notification at those destinations.
 
 ## Installation parameters
 
@@ -63,8 +70,8 @@ Configure → Settings stores options independently of credentials. Times use Ho
 ## Troubleshooting
 
 - **Wrong password:** the integration offers reauthentication. Select the affected school and enter the current password. To change credentials proactively, use Reconfigure. A failed validation leaves the old credentials untouched.
-- **Portal outage:** wait for the next regular fetch; the client retries one connection failure within a fetch. Do not remove the integration. Other schools and local tasks remain usable.
-- **One section missing:** check whether the school enables it and inspect the last-update sensor's errors. Retained data can be older than the most recent fetch; a successful login alone does not prove every optional section was refreshed.
+- **Portal outage during operation:** wait for the next regular fetch; the client retries one connection failure within a fetch. Do not remove the integration. Other schools and local tasks remain usable. During startup, a failed live validation delays the whole entry and Home Assistant retries it; cached records are retained.
+- **One section missing:** check whether the school enables it and inspect the last-update sensor's errors. Retained data can be older than the most recent fetch; a successful login alone does not prove every optional section was refreshed. Portal-backed sensors mark unavailable sections accordingly. Dashboard cards and the combined calendar can still show retained content; check the diagnostics sensor for current fetch errors.
 - **Report a bug:** attach the diagnostics download and describe the affected feature. Do not attach actual letters, account passwords or unredacted server logs. The counters deliberately omit school/child names; describe which section failed in your own words.
 
 ## Automation examples and use cases

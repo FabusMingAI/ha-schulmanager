@@ -231,6 +231,7 @@ def _lesson_line(x: dict[str, Any]) -> str:
 
 
 class SubstitutionSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "substitution"
     """Anzahl der Vertretungen/Ausfälle ab heute, Einträge als Attribut."""
 
     _attr_icon = "mdi:account-switch"
@@ -281,6 +282,7 @@ class SubstitutionSensor(SchulPortalEntity, SensorEntity):
 
 
 class TimetableSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "lesson"
     """Stundenplan: Zahl der Stunden heute, Tages- und Wochenplan als Attribut."""
 
     _attr_icon = "mdi:timetable"
@@ -330,6 +332,7 @@ class TimetableSensor(SchulPortalEntity, SensorEntity):
 
 
 class SicknoteSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "sicknote"
     """Krankmeldungen: Schultage im laufenden Schuljahr, Liste als Attribut."""
 
     _attr_icon = "mdi:emoticon-sick-outline"

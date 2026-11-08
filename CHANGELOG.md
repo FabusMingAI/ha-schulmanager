@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Bronze/Silver self-assessment: validate live connectivity on cached restarts; retain data but mark failed portal sections unavailable; report action/delivery errors and keep failed reminders retryable; preserve distinct child identities when first names coincide. CI now enforces >95% coverage in every module, 100% for configuration flow and diagnostics, and rejects missing/excluded runtime code. The integration remains Custom.
+- Bronze-/Silber-Selbsteinschätzung: Verbindung auch bei Neustarts mit gespeicherten Daten prüfen; ausgefallene Portalbereiche als nicht verfügbar kennzeichnen; Aktions- und Zustellfehler melden; fehlgeschlagene Erinnerungen erneut ermöglichen; gleichnamige Kinder eindeutig und bei Namensänderungen stabil zuordnen. CI verlangt >95% je Modul und 100% für Einrichtung und Diagnose. Die Integration bleibt Custom.
+
 - Quality foundations: test configuration-flow recovery, report coverage in CI, add privacy-preserving diagnostics and a credential reconfiguration flow. Runtime authentication failures request reauthentication; portal-backed sensors show unavailable during whole-school outages while local tasks remain usable. See docs/QUALITY_SCALE.md for the self-assessment and remaining Bronze/Silver/Gold requirements.
 - Qualitätsgrundlagen: Fehlerbehebung der Einrichtung testen, Testabdeckung in CI ausweisen, datensparsame Diagnose und Zugangsdatenänderung ergänzen. Anmeldefehler im Betrieb starten die erneute Anmeldung; portalbezogene Sensoren werden bei Schulausfällen nicht verfügbar, lokale Aufgaben bleiben nutzbar. Offene Anforderungen stehen in docs/QUALITY_SCALE.md.
 

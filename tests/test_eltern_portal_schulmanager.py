@@ -820,7 +820,8 @@ async def test_timetable_substitutions_flow(
         state["timetable"] = []
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
-        assert hass.states.get("sensor.schule_anna_vertretungen").state == "4"
+        assert hass.states.get("sensor.schule_anna_vertretungen").state == "unavailable"
+        assert m.data["substitutions"]["anna"]["days"]
         assert m.data["timetable"]["anna"]["lessons"]
         state["subst"] = good
         state.pop("timetable")
@@ -905,7 +906,7 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
         state["notes"] = []
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
-        assert hass.states.get("sensor.schule_anna_krankmeldungen").state == "3"
+        assert hass.states.get("sensor.schule_anna_krankmeldungen").state == "unavailable"
     ws = await hass_ws_client(hass)
     await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
@@ -1439,16 +1440,11 @@ async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     assert bell["reminder_days"].default() == "1,0"
     # so, wie die Oberfläche das Formular bekommt: Abschnitte ohne eigenen Vorgabewert,
     # die gespeicherten Werte stecken in den Feldern (sonst bleiben die Felder leer)
-    import voluptuous_serialize
-    from homeassistant.helpers import config_validation as cv
+    import voluptuous as vol
 
-    ui = voluptuous_serialize.convert(result["data_schema"], custom_serializer=cv.custom_serializer)
-    by_name = {f["name"]: f for f in ui}
-    assert all("default" not in f for f in ui)
-    fields = {f["name"]: f for f in by_name["benachrichtigungen"]["schema"]}
-    assert fields["reminder_days"]["default"] == "1,0"
-    langs = {f["name"]: f for f in by_name["ki"]["schema"]}["summary_languages"]
-    assert langs["default"] == ["de", "ca"]
+    assert all(marker.default is vol.UNDEFINED for marker in schema)
+    language_fields = {str(k): k for k in sec["ki"].schema.schema}
+    assert language_fields["summary_languages"].default() == ["de", "ca"]
     # jede Option steckt in genau einem Abschnitt und hat Texte in beiden Sprachen
     all_keys = [k for _n, keys, _c in SETTINGS_SECTIONS for k in keys]
     assert len(all_keys) == len(set(all_keys))
@@ -1586,7 +1582,11 @@ async def test_archive_events(hass: HomeAssistant, media_dir, hass_ws_client) ->
         assert child not in m.data["archived"]
 
         # verschwundene Termine werden beim nächsten fehlerfreien Abruf aus dem Archiv entfernt
-        await hass.services.async_call(DOMAIN, "archive_event", {"child": child, "event_id": "gibt-es-nicht"}, blocking=True)
+        from homeassistant.exceptions import ServiceValidationError
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(DOMAIN, "archive_event", {"child": child, "event_id": "gibt-es-nicht"}, blocking=True)
+        # Simulate a stale archive record from an older installation.
+        m.data["archived"].setdefault(child, {})["gibt-es-nicht"] = dt_util.now().isoformat()
         assert "gibt-es-nicht" in m.archived_events(child)
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
@@ -1746,7 +1746,9 @@ async def test_fetch_retries_after_disconnect(hass: HomeAssistant, media_dir) ->
     calls.clear()
     with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", always_down), \
          patch("custom_components.eltern_portal_schulmanager.manager.FETCH_RETRY_DELAY", 0):
-        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        from homeassistant.exceptions import HomeAssistantError
+        with pytest.raises(HomeAssistantError):
+            await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
     assert len(calls) == 2
     assert any("Portal nicht erreichbar" in e for e in m.last_errors), m.last_errors
@@ -2051,7 +2053,7 @@ async def test_migration_from_schulmanager(hass: HomeAssistant, media_dir) -> No
     # Gerät samt Raum bleibt erhalten
     dev = dev_reg.async_get(device.id)
     assert dev is not None and dev.area_id == "kinderzimmer"
-    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers and new.entry_id in dev.config_entries
+    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers and (dev.config_entry_id == new.entry_id if hasattr(dev, "config_entry_id") else new.entry_id in dev.config_entries)
     # Daten übernommen
     m = new.runtime_data
     assert m.tasks["t1"]["status"] == "in_arbeit" and m.tasks["t1"]["comment"] == "schon angefangen"

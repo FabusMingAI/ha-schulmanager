@@ -62,7 +62,7 @@ ATTR_CHILD = "child"
 def get_manager(hass: HomeAssistant) -> SchulManager:
     for entry in hass.config_entries.async_loaded_entries(DOMAIN):
         return entry.runtime_data
-    raise HomeAssistantError(f"{NAME} ist nicht eingerichtet")
+    raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
 
 
 def file_url(hass: HomeAssistant, uid: str, index: int) -> str:
@@ -257,13 +257,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: SchulConfigEntry) -> boo
     migration.async_watch_legacy_references(hass, entry)
     manager = SchulManager(hass, entry)
     await manager.async_load()
-    if manager.children:
-        # Daten vorhanden: Start nicht blockieren, Portale im Hintergrund abrufen
-        entry.async_create_background_task(
-            hass, manager.async_refresh(), f"{DOMAIN}_start_abruf"
-        )
-    else:
-        await manager.async_refresh(initial=True)
+    # Validate the live connection on every setup, including cached restarts.
+    await manager.async_refresh(initial=True)
     entry.runtime_data = manager
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await manager.async_start()
@@ -309,7 +304,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: SchulConfigEntry) -> bo
 # ----------------------------------------------------------------------
 def _register_services(hass: HomeAssistant) -> None:
     async def refresh(call: ServiceCall) -> None:
-        await get_manager(hass).async_refresh()
+        manager = get_manager(hass)
+        await manager.async_refresh()
+        if manager.last_errors:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="refresh_failed")
 
     async def mark_read(call: ServiceCall) -> ServiceResponse:
         n = get_manager(hass).mark_read(
@@ -366,18 +364,20 @@ def _register_services(hass: HomeAssistant) -> None:
             raise ServiceValidationError(str(err)) from err
 
     async def rebuild_dashboard(call: ServiceCall) -> None:
-        await dashboard.async_apply(hass, get_manager(hass), force=True)
+        if not await dashboard.async_apply(hass, get_manager(hass), force=True):
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="dashboard_failed")
 
     async def send_digest(call: ServiceCall) -> None:
         await get_manager(hass).async_send_digest(force=True)
 
     async def send_reminders(call: ServiceCall) -> ServiceResponse:
-        return {"sent": await get_manager(hass).async_send_reminders()}
+        return {"sent": await get_manager(hass).async_send_reminders(strict=True)}
 
     async def get_overview(call: ServiceCall) -> ServiceResponse:
         """Übersicht für Skripte, Dashboards und Sprachassistenten."""
         m = get_manager(hass)
         only = call.data.get(ATTR_CHILD)
+        m.validate_child(only)
         out: dict[str, Any] = {"children": {}}
         for key, child in m.children.items():
             if only and key != only:

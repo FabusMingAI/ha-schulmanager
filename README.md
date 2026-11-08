@@ -13,13 +13,16 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release status:** The latest release is [v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5). Screenshots show its cards with fictional data, including the compact footer, red archive × and selectable lesson details.
+> **Release status:** The latest published release is [v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8). Screenshots use fictional data and show the dashboard layout introduced in v0.14.5.
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
 
 > [!IMPORTANT]
 > **Formerly "Schulmanager".** Up to version 0.13 this integration was called *Schulmanager* and used the domain `schulmanager`. The same domain is used by **[Schulmanager Online](https://github.com/MrIcemanLE/Schulmanager-homeassistant)** – a different integration for schools that use *schulmanager-online.de* – so the two could not be installed side by side. Since 0.14 this integration is **Eltern Portal Manager Bavaria** (domain `eltern_portal_schulmanager`) and both work together, e.g. one child at an Eltern-Portal school and the other at a Schulmanager Online school. Updating from 0.13 or older? See [Renamed from Schulmanager](#renamed-from-schulmanager) – the bridge release 0.14.1 can take over your existing setup automatically.
+
+
+[Quality work (Bronze → Gold), diagnostics, troubleshooting and removal](docs/QUALITY_SCALE.md)
 
 ## Features
 
@@ -117,7 +120,7 @@ Download the source archive of the [latest release](https://github.com/FabusMing
 
 ## Releases and updates
 
-As of **5 November 2026**, the latest release is **[v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5)**. It adds the compact dashboard footer, red archive ×, selectable lesson details and integration category, recovers notice-board text and attachments, and includes refreshed documentation and screenshots.
+As of **8 November 2026**, the latest published release is **[v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8)**. It includes the Bronze/Silver technical self-assessment: live setup validation, reauthentication and credential changes, reliable availability reporting, retryable reminders, privacy-preserving diagnostics and enforced test coverage. The integration remains Custom; these are not official Home Assistant medals.
 
 Install updates through HACS or Marketplace and restart Home Assistant. The version displayed in the "Schule" status bar is the running integration’s version; the downloaded version only becomes active after a restart.
 

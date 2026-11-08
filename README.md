@@ -13,7 +13,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release status:** The latest release is [v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5). Screenshots show its cards with fictional data, including the compact footer, red archive × and selectable lesson details.
+> **Release status:** The latest published release is [v0.14.7](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.7). Screenshots use fictional data and show the dashboard layout introduced in v0.14.5.
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
@@ -120,7 +120,7 @@ Download the source archive of the [latest release](https://github.com/FabusMing
 
 ## Releases and updates
 
-As of **5 November 2026**, the latest release is **[v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5)**. It adds the compact dashboard footer, red archive ×, selectable lesson details and integration category, recovers notice-board text and attachments, and includes refreshed documentation and screenshots.
+As of **8 November 2026**, the latest published release is **[v0.14.7](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.7)**. It resolves timetable teachers through course evidence and tracks personal participation in optional courses. The Bronze/Silver quality improvements described in the quality checklist are under development and not part of this release.
 
 Install updates through HACS or Marketplace and restart Home Assistant. The version displayed in the "Schule" status bar is the running integration’s version; the downloaded version only becomes active after a restart.
 

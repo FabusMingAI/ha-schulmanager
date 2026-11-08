@@ -11,7 +11,7 @@
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release-Stand:** Das neueste Release ist [v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5). Die Screenshots zeigen dessen Karten mit erfundenen Daten, einschließlich kompakter Fußzeile, rotem Archiv-× und auswählbaren Stundendetails.
+> **Release-Stand:** Das neueste veröffentlichte Release ist [v0.14.7](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.7). Die Screenshots zeigen das mit v0.14.5 eingeführte Dashboard-Layout mit erfundenen Daten.
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
@@ -116,7 +116,7 @@ Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-s
 
 ## Releases und Updates
 
-Stand **5. November 2026** ist **[v0.14.5](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.5)** das neueste Release. Es ergänzt die kompakte Dashboard-Fußzeile, das rote Archiv-×, auswählbare Stundendetails und die Integrationskategorie, stellt Texte und Anhänge vom Schwarzen Brett wieder her und enthält aktualisierte Anleitungen und Screenshots.
+Stand **8. November 2026** ist **[v0.14.7](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.7)** das neueste veröffentlichte Release. Es ordnet Lehrkräfte anhand von Kursinformationen zu und berücksichtigt die persönliche Teilnahme an optionalen Kursen. Die in der Qualitätscheckliste beschriebenen Bronze-/Silber-Verbesserungen befinden sich in Entwicklung und sind noch nicht Teil dieses Releases.
 
 Updates über HACS oder Marketplace installieren und Home Assistant neu starten. Die Versionsanzeige in der Statusleiste von „Schule“ zeigt die tatsächlich laufende Integration; eine heruntergeladene Version wird erst nach dem Neustart aktiv.
 

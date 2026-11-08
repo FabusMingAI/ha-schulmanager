@@ -20,7 +20,7 @@ CI runs all existing and new tests, saves coverage.json and coverage.xml as the 
 
 ## Verification and remaining milestones
 
-Verified on 8 November 2026: **154 tests pass** against both the Home Assistant 2026.2.3 CI dependency and the isolated Home Assistant 2026.10.1 container. Overall Python line coverage is **98.02%**; the lowest module is **96.17%**. Coverage reports contain all integration Python modules without omissions or runtime-code exclusions. Each module exceeds 95%; the configuration flow and diagnostics have 100%. The [PR checks](https://github.com/FabusMingAI/ha-schulmanager/pull/43/checks) contain the exact test counts and per-module reports for each commit.
+Verified on 8 November 2026: **155 tests pass** against both the Home Assistant 2026.2.3 CI dependency and the isolated Home Assistant 2026.10.1 container. Overall Python line coverage is **98.03%**; the lowest module is **96.17%**. Coverage reports contain all integration Python modules without omissions or runtime-code exclusions. Each module exceeds 95%; the configuration flow and diagnostics have 100%. The [PR checks](https://github.com/FabusMingAI/ha-schulmanager/pull/43/checks) contain the exact test counts and per-module reports for each commit.
 
 The tests exercise cached restarts, wrong and updated credentials, multi-school isolation, recovery of optional sections, unknown identifiers, empty message IDs, atomic to-do deletion, failed notifications, reminders that remain retryable, malformed AI/portal responses, migration failures, and preservation of downloaded files. Children with equal first names receive distinct keys; known school/student identities retain their keys when names change and after restart.
 

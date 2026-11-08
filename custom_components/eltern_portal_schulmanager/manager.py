@@ -1758,10 +1758,11 @@ class SchulManager:
     # ------------------------------------------------------------------
     # Benachrichtigungen
     # ------------------------------------------------------------------
-    async def _notify(self, title: str, message: str, data: dict[str, Any] | None = None, *, strict: bool = False) -> None:
+    async def _notify(self, title: str, message: str, data: dict[str, Any] | None = None, *, strict: bool = False) -> bool:
         services = self.opt(CONF_NOTIFY, []) or []
         if strict and not services:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="notification_not_configured")
+        delivered = True
         for svc in services:
             svc = svc.removeprefix("notify.")
             try:
@@ -1774,7 +1775,9 @@ class SchulManager:
             except (HomeAssistantError, ValueError) as err:
                 if strict:
                     raise HomeAssistantError(translation_domain=DOMAIN, translation_key="notification_failed") from err
+                delivered = False
                 LOGGER.warning("Benachrichtigung über notify.%s fehlgeschlagen: %s", svc, err)
+        return delivered
 
     def _tts_allowed(self) -> bool:
         now = dt_util.now().time()
@@ -1892,7 +1895,8 @@ class SchulManager:
                     key = f"d{days}"
             if key is None or key in t.get("reminded", []):
                 continue
-            await self._remind(t, today, strict=strict)
+            if not await self._remind(t, today, strict=strict):
+                continue
             t.setdefault("reminded", []).append(key)
             sent += 1
             if t.get("due") and (date.fromisoformat(t["due"]) - today).days <= 1:
@@ -1904,7 +1908,7 @@ class SchulManager:
             self._changed()
         return sent
 
-    async def _remind(self, t: dict[str, Any], today: date, *, strict: bool = False) -> None:
+    async def _remind(self, t: dict[str, Any], today: date, *, strict: bool = False) -> bool:
         child = self.children.get(t["child"], {}).get("name", t.get("child") or "")
         when = ""
         if t.get("due"):
@@ -1922,7 +1926,7 @@ class SchulManager:
         ]
         if item:
             actions.append({"action": "URI", "title": "Im Portal öffnen", "uri": item["url"]})
-        await self._notify(
+        delivered = await self._notify(
             f"⏰ {child}: {TASK_TYPE_ICONS.get(t['type'], '✅')} Schul-Erinnerung",
             body,
             {
@@ -1932,10 +1936,13 @@ class SchulManager:
             },
             strict=strict,
         )
+        if not delivered:
+            return False
         self.hass.bus.async_fire(
             EVENT_TASK_REMINDER,
             {"child": t.get("child"), "task_id": t["id"], "title": t["title"], "due": t.get("due")},
         )
+        return True
 
     async def _scheduled_digest(self, _now: datetime) -> None:
         await self.async_send_digest()

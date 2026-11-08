@@ -349,7 +349,7 @@ async def test_task_reopening_reminder_stages_and_mobile_actions(hass, loaded):
     future["snoozed_until"] = (today+timedelta(days=1)).isoformat()
     done = loaded.add_task("anna", "Done")
     loaded.complete_task(done["id"])
-    with patch.object(loaded, "opt", side_effect=lambda key, default=None: "invalid" if key == "reminder_days" else default), patch.object(loaded, "_notify", return_value=None), patch.object(loaded, "async_announce", return_value=None) as voice:
+    with patch.object(loaded, "opt", side_effect=lambda key, default=None: "invalid" if key == "reminder_days" else default), patch.object(loaded, "_notify", return_value=True), patch.object(loaded, "async_announce", return_value=None) as voice:
         assert await loaded.async_send_reminders() >= 2
         voice.assert_awaited_once()
         assert reopened["reminded"] == [f"over-{today.isoformat()}"]
@@ -411,3 +411,17 @@ async def test_children_with_same_firstname_keep_distinct_stable_entities(hass, 
     # A historical unrelated key must not be overwritten on a later import.
     restored.children["anna_other_8"] = {"school": "unrelated", "student_id": "0"}
     assert restored._child_key("other", "8", "Anna") == "anna_other_8_2"
+
+
+async def test_background_reminders_retry_failed_delivery(hass, loaded):
+    with patch.object(hass.config_entries, "async_reload", return_value=True):
+        hass.config_entries.async_update_entry(loaded.entry, options={"notify_services": ["missing"]})
+        await hass.async_block_till_done()
+    task = loaded.add_task("anna", "Reminder", due=dt_util.now().date().isoformat())
+    assert await loaded.async_send_reminders() == 0
+    assert task["reminded"] == []
+    async def delivered(call):
+        return None
+    hass.services.async_register("notify", "missing", delivered)
+    assert await loaded.async_send_reminders() >= 1
+    assert task["reminded"] == ["d0"]

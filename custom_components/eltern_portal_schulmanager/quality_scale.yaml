@@ -9,7 +9,7 @@ rules:
     comment: Local custom-integration brand assets exist; Core brand requirements need review.
   common-modules: done
   config-flow: done
-  config-flow-test-coverage: todo
+  config-flow-test-coverage: done
   dependency-transparency: done
   docs-actions: done
   docs-conditions:
@@ -49,7 +49,7 @@ rules:
     comment: CI reports coverage; more than 95 percent of each module is required.
   # Gold
   devices: done
-  diagnostics: todo
+  diagnostics: done
   discovery:
     status: exempt
     comment: Remote authenticated school portals cannot be discovered on the local network.

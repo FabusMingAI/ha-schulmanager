@@ -14,6 +14,10 @@ This is a self-assessment against the [Home Assistant rules](https://contributor
 
 CI runs all existing and new tests, saves coverage.json and coverage.xml as the integration-coverage artifact, and requires 100% line coverage of config_flow.py and diagnostics.py. It reports each module at or below 95% as an outstanding Silver requirement. A passing overall test suite or a high overall percentage does not establish Silver. No coverage exclusions are used to hide untested integration code.
 
+## Verified baseline
+
+GitHub Actions on implementation commit d360f0046bd7b50f2fb3cd96e3cb2eeb3d38c5dd: 89 Python tests passed (27 additional cases), plus passing HACS, hassfest and browser checks. The integration has 3,427 executable Python statements with 333 uncovered (about 90% overall). Configuration flow and diagnostics both have 100% line coverage. Nine modules are still at or below 95%; the most substantial gaps are in manager, portal, migration, analyzer and websocket behaviour. See the [test run](https://github.com/FabusMingAI/ha-schulmanager/actions/runs/42467913841) for the full report.
+
 ## Remaining milestones
 
 1. Bronze: full flow coverage, review every baseline rule, and resolve the cached-start connectivity audit item before claiming all requirements are met.

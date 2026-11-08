@@ -10,7 +10,7 @@ This is a self-assessment against the [Home Assistant rules](https://contributor
 - Connection/authentication failures retain stored data. Timetable, substitution and sick-note sensors become unavailable for the affected school until it responds again. Locally stored tasks, inbox counters, payment totals and the calendar remain usable from the last stored data; they are local records, not confirmation that the portal is reachable. A partial response is recorded separately; its successfully fetched sections still merge. Section-level freshness needs further work.
 - Failures and recovery are logged once per school/status transition. The diagnostic timestamp records the last fetch attempt, including failed attempts, not necessarily the last successful fetch. The error attribute provides the current errors.
 - Diagnostics can be downloaded from the integration entry's menu. The integration payload includes aggregate counts, fixed health categories, pending queue sizes and the last fetch time. It excludes credentials, entry data/options, school identifiers, names, messages, tasks, sick-note details, files, teacher lists, URLs, AI content and free-text errors. Home Assistant supplies its normal system metadata separately.
-- Each school/attempt has its own cookie session and connection pool, managed by Home Assistant and explicitly closed. This preserves separation between accounts and the retry behaviour that addresses stale portal connections.
+- Each school/attempt keeps its own cookie session and connection pool, explicitly closed after the attempt. A migration to Home Assistant-managed sessions is a separate Platinum audit: its helper supplies a shared connector, so passing the existing private connector is incompatible. This preserves separation between accounts and the retry behaviour that addresses stale portal connections.
 
 CI runs all existing and new tests, saves coverage.json and coverage.xml as the integration-coverage artifact, and requires 100% line coverage of config_flow.py and diagnostics.py. It reports each module at or below 95% as an outstanding Silver requirement. A passing overall test suite or a high overall percentage does not establish Silver. No coverage exclusions are used to hide untested integration code.
 
@@ -19,7 +19,7 @@ CI runs all existing and new tests, saves coverage.json and coverage.xml as the 
 1. Bronze: full flow coverage, review every baseline rule, and resolve the cached-start connectivity audit item before claiming all requirements are met.
 2. Silver: more than 95% coverage **in every module**, plus complete error/action and availability review. Current measurements come from each CI run; the checklist deliberately keeps the overall coverage requirement open.
 3. Gold: dynamic child entity creation and stale-device handling, translated action exceptions/icons, full diagnostic review and documentation review. Devices are logical services per child; unsupported discovery is exempt because a remote Eltern-Portal account cannot be discovered on the local network.
-4. Platinum: strict typing and full asynchronous-dependency audit. It is not the current milestone.
+4. Platinum: strict typing, managed HTTP sessions and full asynchronous-dependency audit. It is not the current milestone.
 
 ## Installation parameters
 

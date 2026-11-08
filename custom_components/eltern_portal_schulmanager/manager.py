@@ -20,7 +20,6 @@ from homeassistant.exceptions import (
     HomeAssistantError,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.event import (
     async_track_time_change,
     async_track_time_interval,
@@ -409,8 +408,7 @@ class SchulManager:
             connector = aiohttp.TCPConnector(
                 ssl=get_default_context(), limit_per_host=2
             )
-            async with async_create_clientsession(
-                self.hass,
+            async with aiohttp.ClientSession(
                 connector=connector,
                 # kein Gesamtlimit: der erste Abruf lädt viele PDFs
                 timeout=aiohttp.ClientTimeout(

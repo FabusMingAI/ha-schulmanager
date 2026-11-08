@@ -42,7 +42,7 @@ async def test_auth_failure_starts_one_flow_and_recovers(hass):
         await hass.async_block_till_done()
         await manager.async_refresh()
         await hass.async_block_till_done()
-    flows = list(entry.async_get_active_flows(hass))
+    flows = list(entry.async_get_active_flows(hass, {"reauth"}))
     assert len(flows) == 1
     assert flows[0]["context"]["source"] == "reauth"
     assert manager.portal_status == {"bspgym": "auth_failed"}

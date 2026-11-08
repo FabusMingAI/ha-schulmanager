@@ -18,7 +18,6 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .migration import CONF_MIGRATED_FROM, legacy_entries
 from .const import (
@@ -94,7 +93,7 @@ async def _check_portal(
     hass: HomeAssistant, user_input: dict[str, Any]
 ) -> tuple[dict[str, Any] | None, dict[str, str]]:
     school = school_from_input(user_input[CONF_SCHOOL])
-    session = async_create_clientsession(hass, cookie_jar=aiohttp.CookieJar())
+    session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
     try:
         name = await async_validate(
             session, school, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]

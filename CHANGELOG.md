@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Quality foundations: test configuration-flow recovery, report coverage in CI, add privacy-preserving diagnostics and a credential reconfiguration flow. Runtime authentication failures request reauthentication; portal-backed sensors show unavailable during whole-school outages while local tasks remain usable. HTTP sessions are managed by Home Assistant. See docs/QUALITY_SCALE.md for the self-assessment and remaining Bronze/Silver/Gold requirements.
-- Qualitätsgrundlagen: Fehlerbehebung der Einrichtung testen, Testabdeckung in CI ausweisen, datensparsame Diagnose und Zugangsdatenänderung ergänzen. Anmeldefehler im Betrieb starten die erneute Anmeldung; portalbezogene Sensoren werden bei Schulausfällen nicht verfügbar, lokale Aufgaben bleiben nutzbar. HTTP-Sitzungen werden von Home Assistant verwaltet. Offene Anforderungen stehen in docs/QUALITY_SCALE.md.
+- Quality foundations: test configuration-flow recovery, report coverage in CI, add privacy-preserving diagnostics and a credential reconfiguration flow. Runtime authentication failures request reauthentication; portal-backed sensors show unavailable during whole-school outages while local tasks remain usable. See docs/QUALITY_SCALE.md for the self-assessment and remaining Bronze/Silver/Gold requirements.
+- Qualitätsgrundlagen: Fehlerbehebung der Einrichtung testen, Testabdeckung in CI ausweisen, datensparsame Diagnose und Zugangsdatenänderung ergänzen. Anmeldefehler im Betrieb starten die erneute Anmeldung; portalbezogene Sensoren werden bei Schulausfällen nicht verfügbar, lokale Aufgaben bleiben nutzbar. Offene Anforderungen stehen in docs/QUALITY_SCALE.md.
 
 ## 0.14.7 – 2026-11-06
 

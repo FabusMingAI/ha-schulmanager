@@ -85,5 +85,7 @@ rules:
   async-dependency:
     status: todo
     comment: Audit dependencies; PDF work already runs in executor jobs.
-  inject-websession: done
+  inject-websession:
+    status: todo
+    comment: Preserve isolated per-fetch connection pools; audit a managed-session migration separately.
   strict-typing: todo

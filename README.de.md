@@ -11,7 +11,7 @@
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release-Stand:** Das neueste veröffentlichte Release ist [v0.14.7](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.7). Die Screenshots zeigen das mit v0.14.5 eingeführte Dashboard-Layout mit erfundenen Daten.
+> **Release-Stand:** Das neueste veröffentlichte Release ist [v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8). Die Screenshots zeigen das mit v0.14.5 eingeführte Dashboard-Layout mit erfundenen Daten.
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
@@ -116,7 +116,7 @@ Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-s
 
 ## Releases und Updates
 
-Stand **8. November 2026** ist **[v0.14.7](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.7)** das neueste veröffentlichte Release. Es ordnet Lehrkräfte anhand von Kursinformationen zu und berücksichtigt die persönliche Teilnahme an optionalen Kursen. Die in der Qualitätscheckliste beschriebenen Bronze-/Silber-Verbesserungen befinden sich in Entwicklung und sind noch nicht Teil dieses Releases.
+Stand **8. November 2026** ist **[v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8)** das neueste veröffentlichte Release. Es enthält die technische Bronze-/Silber-Selbsteinschätzung: Verbindungsprüfung bei der Einrichtung, erneute Anmeldung und Zugangsdatenänderung, zuverlässige Verfügbarkeitsanzeige, erneut zustellbare Erinnerungen, datensparsame Diagnose und verbindliche Testabdeckung. Die Integration bleibt Custom; dies sind keine offiziellen Home-Assistant-Auszeichnungen.
 
 Updates über HACS oder Marketplace installieren und Home Assistant neu starten. Die Versionsanzeige in der Statusleiste von „Schule“ zeigt die tatsächlich laufende Integration; eine heruntergeladene Version wird erst nach dem Neustart aktiv.
 

@@ -2,11 +2,16 @@
 
 ## Unreleased
 
+## 0.14.8 – 2026-11-08
+
 - Bronze/Silver self-assessment: validate live connectivity on cached restarts; retain data but mark failed portal sections unavailable; report action/delivery errors and keep failed reminders retryable; preserve distinct child identities when first names coincide. CI now enforces >95% coverage in every module, 100% for configuration flow and diagnostics, and rejects missing/excluded runtime code. The integration remains Custom.
 - Bronze-/Silber-Selbsteinschätzung: Verbindung auch bei Neustarts mit gespeicherten Daten prüfen; ausgefallene Portalbereiche als nicht verfügbar kennzeichnen; Aktions- und Zustellfehler melden; fehlgeschlagene Erinnerungen erneut ermöglichen; gleichnamige Kinder eindeutig und bei Namensänderungen stabil zuordnen. CI verlangt >95% je Modul und 100% für Einrichtung und Diagnose. Die Integration bleibt Custom.
 
-- Quality foundations: test configuration-flow recovery, report coverage in CI, add privacy-preserving diagnostics and a credential reconfiguration flow. Runtime authentication failures request reauthentication; portal-backed sensors show unavailable during whole-school outages while local tasks remain usable. See docs/QUALITY_SCALE.md for the self-assessment and remaining Bronze/Silver/Gold requirements.
-- Qualitätsgrundlagen: Fehlerbehebung der Einrichtung testen, Testabdeckung in CI ausweisen, datensparsame Diagnose und Zugangsdatenänderung ergänzen. Anmeldefehler im Betrieb starten die erneute Anmeldung; portalbezogene Sensoren werden bei Schulausfällen nicht verfügbar, lokale Aufgaben bleiben nutzbar. Offene Anforderungen stehen in docs/QUALITY_SCALE.md.
+- Quality foundations: test configuration-flow recovery, report coverage in CI, add privacy-preserving diagnostics and a credential reconfiguration flow. Runtime authentication failures request reauthentication; portal-backed sensors show unavailable during whole-school outages while local tasks remain usable. See docs/QUALITY_SCALE.md for the completed Bronze/Silver self-assessment and remaining Gold work.
+- Qualitätsgrundlagen: Fehlerbehebung der Einrichtung testen, Testabdeckung in CI ausweisen, datensparsame Diagnose und Zugangsdatenänderung ergänzen. Anmeldefehler im Betrieb starten die erneute Anmeldung; portalbezogene Sensoren werden bei Schulausfällen nicht verfügbar, lokale Aufgaben bleiben nutzbar. Die abgeschlossene Bronze-/Silber-Selbsteinschätzung und offene Gold-Arbeit stehen in docs/QUALITY_SCALE.md.
+
+- Availability: setup waits for a live fetch from every configured school; an unavailable school delays setup while Home Assistant retries. At runtime, other schools and local tasks remain usable. Retrying partially delivered push notifications can duplicate delivery to destinations that already succeeded.
+- Verfügbarkeit: Die Einrichtung wartet auf eine aktuelle Abfrage aller konfigurierten Schulen; bei einem Ausfall versucht Home Assistant die Einrichtung später erneut. Im laufenden Betrieb bleiben andere Schulen und lokale Aufgaben nutzbar. Bei teilweise zugestellten Push-Mitteilungen kann der erneute Versuch bereits erfolgreiche Ziele nochmals benachrichtigen.
 
 ## 0.14.7 – 2026-11-06
 

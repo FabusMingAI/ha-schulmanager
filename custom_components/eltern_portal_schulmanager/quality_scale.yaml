@@ -2,9 +2,7 @@
 # Evidence and remaining review work: docs/QUALITY_SCALE.md.
 rules:
   # Bronze
-  action-setup:
-    status: todo
-    comment: Audit service schema validation and registration against the current rule.
+  action-setup: done
   appropriate-polling: done
   brands:
     status: todo

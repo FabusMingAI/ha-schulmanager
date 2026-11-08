@@ -4,6 +4,7 @@ This is a self-assessment against the [Home Assistant rules](https://contributor
 
 ## Current implementation and verification
 
+- Actions are registered when the integration loads, stay registered after unloading an entry, and raise a translated validation error when no entry is loaded.
 - UI setup validates each school before saving. Credentials can be changed using the entry menu → Reconfigure, without removing messages, tasks, settings or entity IDs. The school selector changes an existing school's credentials; add/remove schools under Configure instead.
 - Authentication failure during polling starts Home Assistant's reauthentication flow. Repeated failures use the same active flow. Other schools continue to update.
 - Connection/authentication failures retain stored data. Timetable, substitution and sick-note sensors become unavailable for the affected school until it responds again. Locally stored tasks, inbox counters, payment totals and the calendar remain usable from the last stored data; they are local records, not confirmation that the portal is reachable. A partial response is recorded separately; its successfully fetched sections still merge. Section-level freshness needs further work.
@@ -15,7 +16,7 @@ CI runs all existing and new tests, saves coverage.json and coverage.xml as the 
 
 ## Remaining milestones
 
-1. Bronze: full flow coverage, review every baseline rule, and resolve the cached-start connectivity and service-registration audit items before claiming all requirements are met.
+1. Bronze: full flow coverage, review every baseline rule, and resolve the cached-start connectivity audit item before claiming all requirements are met.
 2. Silver: more than 95% coverage **in every module**, plus complete error/action and availability review. Current measurements come from each CI run; the checklist deliberately keeps the overall coverage requirement open.
 3. Gold: dynamic child entity creation and stale-device handling, translated action exceptions/icons, full diagnostic review and documentation review. Devices are logical services per child; unsupported discovery is exempt because a remote Eltern-Portal account cannot be discovered on the local network.
 4. Platinum: strict typing and full asynchronous-dependency audit. It is not the current milestone.

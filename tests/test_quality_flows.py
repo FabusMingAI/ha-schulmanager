@@ -2,6 +2,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from aiohttp import ClientConnectionError
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
@@ -9,7 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.eltern_portal_schulmanager.const import DOMAIN
 from custom_components.eltern_portal_schulmanager.config_flow import _sectioned
-from custom_components.eltern_portal_schulmanager.portal import PortalAuthError, PortalConnectionError
+from custom_components.eltern_portal_schulmanager.portal import PortalAuthError
 
 FLOW = "custom_components.eltern_portal_schulmanager.config_flow"
 PORTAL = {"school": "demo", "school_name": "Demo", "username": "parent@example.invalid", "password": "secret"}
@@ -54,7 +55,7 @@ async def test_duplicate_entry(hass, entry):
 @pytest.mark.parametrize(("exception", "errors"), [
     (PortalAuthError("invalid school"), {"school": "invalid_school"}),
     (PortalAuthError("bad credentials"), {"base": "invalid_auth"}),
-    (PortalConnectionError("offline"), {"school": "cannot_connect"}),
+    (ClientConnectionError("offline"), {"school": "cannot_connect"}),
     (RuntimeError("unexpected"), {"base": "unknown"}),
 ])
 async def test_setup_errors_and_recovery(hass, exception, errors):
@@ -139,7 +140,7 @@ async def test_options_add_duplicate_error_and_recovery(hass, entry):
     flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "add_portal"})
     flow = await hass.config_entries.options.async_configure(flow["flow_id"], INPUT)
     assert flow["errors"] == {"school": "already_added"}
-    with patch(f"{FLOW}.async_validate", side_effect=PortalConnectionError("offline")):
+    with patch(f"{FLOW}.async_validate", side_effect=ClientConnectionError("offline")):
         flow = await hass.config_entries.options.async_configure(flow["flow_id"], {**INPUT, "school": "other"})
     assert flow["errors"] == {"school": "cannot_connect"}
     with patch(f"{FLOW}.async_validate", return_value="Other"):

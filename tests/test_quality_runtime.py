@@ -1,17 +1,18 @@
 """Runtime failure recovery and diagnostics without live portal access."""
 from copy import deepcopy
-from datetime import timedelta
 import json
 from unittest.mock import patch
+import logging
 
 import pytest
+from aiohttp import ClientConnectionError
 from homeassistant.util import dt as dt_util
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.eltern_portal_schulmanager.const import DOMAIN
 from custom_components.eltern_portal_schulmanager.diagnostics import async_get_config_entry_diagnostics
-from custom_components.eltern_portal_schulmanager.portal import PortalAuthError, PortalConnectionError
+from custom_components.eltern_portal_schulmanager.portal import PortalAuthError
 from tests.test_eltern_portal_schulmanager import _fake_result
 
 MANAGER = "custom_components.eltern_portal_schulmanager.manager.SchulManager"
@@ -58,6 +59,7 @@ async def test_auth_failure_starts_one_flow_and_recovers(hass):
 
 
 async def test_outage_does_not_block_other_school_and_logs_once(hass, caplog):
+    caplog.set_level(logging.INFO, logger="custom_components.eltern_portal_schulmanager")
     entry = await setup_entry(hass, [PORTAL, {**PORTAL, "school": "other"}])
     manager = entry.runtime_data
     before = deepcopy(manager.data)
@@ -65,7 +67,7 @@ async def test_outage_does_not_block_other_school_and_logs_once(hass, caplog):
     other.school = "other"
     other.children[0].firstname = "Ben"
     other.children[0].fullname = "Ben Example"
-    with patch(f"{MANAGER}._async_fetch_portal", side_effect=[PortalConnectionError("offline"), other, PortalConnectionError("offline"), other]):
+    with patch(f"{MANAGER}._async_fetch_portal", side_effect=[ClientConnectionError("offline"), other, ClientConnectionError("offline"), other]):
         await manager.async_refresh()
         await manager.async_refresh()
         await hass.async_block_till_done()
@@ -79,7 +81,7 @@ async def test_outage_does_not_block_other_school_and_logs_once(hass, caplog):
     await hass.config_entries.async_unload(entry.entry_id)
 
 
-@pytest.mark.parametrize(("error", "expected"), [(PortalAuthError("invalid"), ConfigEntryAuthFailed), (PortalConnectionError("offline"), ConfigEntryNotReady)])
+@pytest.mark.parametrize(("error", "expected"), [(PortalAuthError("invalid"), ConfigEntryAuthFailed), (ClientConnectionError("offline"), ConfigEntryNotReady)])
 async def test_initial_failure_has_home_assistant_retry_semantics(hass, error, expected):
     from custom_components.eltern_portal_schulmanager.manager import SchulManager
     entry = MockConfigEntry(domain=DOMAIN, data={"portals": [PORTAL]})
@@ -110,3 +112,23 @@ async def test_diagnostics_contains_counts_never_content(hass):
     assert report["last_fetch"] is None
     assert report["portals"]["not_checked"] == 1
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_actions_exist_without_loaded_entry(hass):
+    from homeassistant.exceptions import ServiceValidationError
+    from homeassistant.setup import async_setup_component
+    assert await async_setup_component(hass, DOMAIN, {})
+    assert hass.services.has_service(DOMAIN, "refresh")
+    with pytest.raises(ServiceValidationError) as error:
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+    assert error.value.translation_key == "not_loaded"
+
+
+async def test_actions_remain_registered_after_unload(hass):
+    from homeassistant.exceptions import ServiceValidationError
+    entry = await setup_entry(hass)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert hass.services.has_service(DOMAIN, "refresh")
+    with pytest.raises(ServiceValidationError) as error:
+        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+    assert error.value.translation_key == "not_loaded"

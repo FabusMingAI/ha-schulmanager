@@ -62,7 +62,7 @@ ATTR_CHILD = "child"
 def get_manager(hass: HomeAssistant) -> SchulManager:
     for entry in hass.config_entries.async_loaded_entries(DOMAIN):
         return entry.runtime_data
-    raise HomeAssistantError(f"{NAME} ist nicht eingerichtet")
+    raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
 
 
 def file_url(hass: HomeAssistant, uid: str, index: int) -> str:

@@ -448,5 +448,10 @@
       "title": "Automationen nutzen noch die alten Schulmanager-Namen",
       "description": "„Schulmanager“ heißt jetzt Eltern Portal Manager Bavaria. Diese Automationen bzw. Skripte rufen noch Aktionen `{old_domain}.…` auf oder reagieren auf Events `{old_domain}_…`:\n\n{items}\n\nBitte umstellen auf `{new_domain}.…` (z. B. `{new_domain}.refresh`) bzw. `{new_domain}_…` (z. B. `{new_domain}_new_item`). Der Hinweis verschwindet, sobald keine alten Namen mehr vorkommen."
     }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Eltern Portal Manager Bavaria ist nicht geladen. Prüfe die Integration unter Einstellungen → Geräte & Dienste."
+    }
   }
 }

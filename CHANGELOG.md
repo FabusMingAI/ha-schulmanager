@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.14.10 – 2026-11-11
+
+- Notification taps now open the referenced message or task directly in the Schule dashboard on iOS and Android, including after a cold app start. Substitution alerts open the child view; other notifications open the school overview. Portal action buttons remain available. Links are consumed after opening, so updates do not reopen closed dialogs; removed items show a clear message. Applies to newly sent notifications and generated dashboards with their standard paths.
+- Notifications öffnen beim Antippen die betreffende Mitteilung oder Aufgabe direkt im Dashboard Schule auf iOS und Android, auch nach einem App-Neustart. Vertretungsmeldungen öffnen den Kinder-Reiter, andere Meldungen die Schulübersicht. Portal-Buttons bleiben erhalten. Nach dem Öffnen werden die Linkparameter entfernt, damit Aktualisierungen geschlossene Dialoge nicht erneut öffnen; für entfernte Einträge erscheint ein Hinweis. Gilt für neu versendete Notifications und erzeugte Dashboards mit Standardpfaden.
+
 - Repository maintenance: remove the retired bridge-release workflow and duplicate documentation icons; separate historical test logs from current guidance and consolidate contributor instructions. / Repository-Pflege: Alten Brücken-Release-Workflow und doppelte Doku-Icons entfernen, historische Testprotokolle von aktuellen Anleitungen trennen und Hinweise für Mitwirkende bündeln.
 
 ## 0.14.9 – 2026-11-11

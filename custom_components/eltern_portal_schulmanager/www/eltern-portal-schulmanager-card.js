@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.14.9";
+  const VERSION = "0.14.10";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -290,6 +290,8 @@
     .info { padding: 4px 16px 8px; font-size:.82em; color: var(--secondary-text-color); }
   `;
 
+  let notificationRequest = null;
+
   class SchulmanagerCard extends HTMLElement {
     constructor() {
       super();
@@ -297,6 +299,7 @@
       this._tab = {};
       this._data = null;
       this._dialog = null;
+      this._notificationLocation = () => this._handleNotificationLink();
     }
 
     setConfig(config) {
@@ -322,13 +325,19 @@
         this._load();
         this._subscribe();
       }
+      this._handleNotificationLink();
     }
 
     connectedCallback() {
+      window.addEventListener("location-changed", this._notificationLocation);
+      window.addEventListener("popstate", this._notificationLocation);
+      this._handleNotificationLink();
       if (this._hass && !this._unsub) this._subscribe();
     }
 
     disconnectedCallback() {
+      window.removeEventListener("location-changed", this._notificationLocation);
+      window.removeEventListener("popstate", this._notificationLocation);
       if (this._unsub) {
         this._unsub.then((u) => u && u()).catch(() => {});
         this._unsub = null;
@@ -374,7 +383,33 @@
         }, wait);
       }
       this._render();
+      this._handleNotificationLink();
       if (refreshDialog && this._dialog && !this._editing && !this._hasSelection()) this._reopen();
+    }
+
+    async _handleNotificationLink() {
+      // Only the main task/message card handles links, never every derived card.
+      if (this.localName !== "eltern-portal-schulmanager-card" || !this.isConnected || !this._data || !this._hass) return;
+      const url = new URL(window.location.href);
+      const child = url.searchParams.get("sm_child");
+      const item = url.searchParams.get("sm_item");
+      const task = url.searchParams.get("sm_task");
+      if (!child || !(item || task) || (this._config.child && this._config.child !== child)
+          || !this._data.children.some(c => c.key === child)) return;
+      if (notificationRequest?.owner.isConnected) return;
+      const request = notificationRequest = {owner: this, href: url.href};
+      try {
+        const opened = item ? await this._openItem(item) : await this._openTask(task);
+        if (!this.isConnected || window.location.href !== request.href) return;
+        if (!opened) this._showDialog("Eintrag nicht verfügbar",
+          '<div class="sec">Der Eintrag konnte nicht geladen werden. Er wurde möglicherweise entfernt oder die Verbindung ist unterbrochen. Bitte die Mitteilungen oder Aufgaben im Dashboard prüfen.</div>', () => {});
+        // Consume only our parameters. Reloads and data updates must not reopen it.
+        for (const key of ["sm_child", "sm_item", "sm_task"]) url.searchParams.delete(key);
+        window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+      } finally {
+        if (notificationRequest === request) notificationRequest = null;
+        if (window.location.href !== request.href) this._handleNotificationLink();
+      }
     }
 
     // aufgeklappte Einträge („Kind:ID“)
@@ -829,6 +864,7 @@
           ov.querySelector(".saved-msg").innerHTML = `<span class="saved">gespeichert ✓</span>`;
         });
       });
+      return true;
     }
 
     async _openItem(uid, silent) {
@@ -876,6 +912,7 @@
           ev.target.textContent = "wird ausgewertet …";
         });
       });
+      return true;
     }
   }
 

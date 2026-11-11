@@ -240,6 +240,22 @@ Entity IDs follow your Home Assistant language (shown here for German).
 
 Events for your own automations: `eltern_portal_schulmanager_new_item` (with `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` and `eltern_portal_schulmanager_substitution` (new substitution plan entries, with `child` and `entries`).
 
+### Opening notifications
+
+Tapping a new message notification opens its detail dialog in the **Schule**
+dashboard, including the message text, summaries, tasks and attachment links.
+Task reminders open the relevant task; substitution alerts open the child's
+view, and daily summaries open the overview. Both iOS and Android Companion
+Apps receive a relative Home Assistant link, using the app's configured server.
+The separate **Im Portal öffnen** action still opens the external Eltern-Portal.
+
+This uses the generated dashboard (`dashboard-schule`) and supports both tabs
+and single-page layouts. If you disable dashboard management or change its URL,
+view paths or remove the task/message card, the generated links may no longer
+reach the content. Existing notifications keep their old links; the new behavior
+applies to notifications sent after updating and restarting Home Assistant.
+Deleted items show a message instead of an empty detail dialog.
+
 ## Good to know
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, the integration therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.

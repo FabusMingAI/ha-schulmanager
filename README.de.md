@@ -244,6 +244,22 @@ Entity-IDs richten sich nach der Sprache von Home Assistant; die Beispiele zeige
 
 Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` und `eltern_portal_schulmanager_substitution` (neue Vertretungen, mit `child` und `entries`). Damit lässt sich z. B. bei einer dringenden Mitteilung das Flurlicht kurz orange blinken lassen.
 
+### Benachrichtigungen öffnen
+
+Ein Tipp auf eine neue Mitteilungs-Notification öffnet den Detaildialog im
+Dashboard **Schule**, einschließlich Text, Zusammenfassungen, Aufgaben und
+Anhangslinks. Erinnerungen öffnen die betreffende Aufgabe, Vertretungsmeldungen
+den Reiter des Kindes und Tagesübersichten die Übersicht. iOS und Android
+bekommen einen relativen Home-Assistant-Link und verwenden den in der App
+konfigurierten Server. **Im Portal öffnen** führt weiterhin ins externe Eltern-Portal.
+
+Die Links verwenden das erzeugte Dashboard (`dashboard-schule`) und unterstützen
+Reiter und Einzelseite. Bei deaktivierter Dashboard-Verwaltung, geänderter URL,
+geänderten Ansichtspfaden oder entfernter Aufgaben-/Mitteilungskarte können sie
+ihr Ziel nicht mehr erreichen. Bereits versendete Notifications behalten ihre
+alten Links; die Verbesserung gilt für neue Notifications nach Update und
+Neustart von Home Assistant. Für gelöschte Einträge erscheint ein Hinweis.
+
 ## Gut zu wissen
 
 - **Empfangsbestätigung:** Das Eltern-Portal zählt das Herunterladen eines Elternbriefs als „Empfang bestätigt“. Mit aktivierter automatischer Ablage bestätigt die Integration deshalb neue Briefe, sobald sie die PDF holt. Wer das nicht will, schaltet „Anhänge/PDFs automatisch ablegen“ aus. Dann entsteht je Brief die Aufgabe „Empfang im Portal bestätigen“.

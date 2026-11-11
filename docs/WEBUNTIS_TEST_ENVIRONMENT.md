@@ -28,7 +28,7 @@ excluded to prevent a feedback loop. Clearing the selection removes the mapping.
 ## Versions and isolation
 
 - Runtime image: Home Assistant 2026.10.1, pinned by digest in
-  `dev/ha-test/env.example` (Linux ARM64 was exercised on Mireia).
+  `dev/ha-test/env.example` (verified on Linux ARM64).
 - Test plugin: `pytest-homeassistant-custom-component==0.13.372`, matching
   HA 2026.10.1 / Python 3.14. The existing Python 3.13 CI environment is separate.
 - The test image installs the full HA pytest plugin and manifest requirements.
@@ -52,17 +52,11 @@ excluded to prevent a feedback loop. Clearing the selection removes the mapping.
 
 ## Inspect before setup
 
-From the development checkout, check `git status --short --branch`, the current
-PR head, `docker context show`, `docker ps -a`, `docker compose ls --all`,
-`ss -ltn` and disk space. Docker must use Mireia's local Unix socket, not a
-remote production context. Inspect existing `~/ha-webuntis-test-*` directories
-and their logs first. Reuse an existing isolated environment where possible.
-
-On 16 October the existing attempt was reused. Preserve its original `.env`,
-Compose file, configuration and logs before changing them. Its initial tests
-failed collection because the HA test plugin was missing, and pip installed
-versions inconsistent with the runtime. Those failures were test preparation
-failures, not evidence that the WebUntis parser worked or failed.
+From the development checkout, inspect `git status --short --branch`,
+`docker context show`, `docker ps -a`, `docker compose ls --all`, `ss -ltn`
+and disk space. Use the development host's local Docker context and reuse an
+existing isolated environment where possible. Preserve its configuration and
+logs before changing it.
 
 ## Set up a dedicated configuration
 
@@ -78,7 +72,7 @@ Copy `dev/ha-test/env.example` to `$HA_TEST_DIR/.env` and set:
 - `HA_IMAGE`: the pinned digest (do not replace with a moving `stable` tag).
 - `HA_TEST_CONFIG`: the absolute path of this test environment's `config` directory.
 - `HA_TEST_BIND`: loopback or the development host's private Tailscale address.
-- `HA_TEST_PORT`: a verified free port; 8124 was selected on Mireia.
+- `HA_TEST_PORT`: a verified free port, for example 8124.
 
 The configuration snapshot is independent of the read-only source mount used
 by pytest. After changing integration code, copy the updated integration into
@@ -128,7 +122,7 @@ timeout. Check `/` returns HTTP 200, `/api/` requires authentication (HTTP 401)
 and `/api/onboarding` reports onboarding on a fresh instance. Record HTTP
 status and the container's running state/restart count. Test the bound Tailscale
 address from another Tailscale device to establish client-to-host reachability;
-a request on Mireia alone does not prove that remote path.
+a request on the development host alone does not prove that remote path.
 
 ```bash
 python3 dev/ha-test/check_http.py http://SELECTED_TEST_ADDRESS:8124 \
@@ -139,54 +133,19 @@ Stop only this environment with the same wrapper and `stop homeassistant`.
 Keep persistent test data; do not use `down -v` or delete the state directory
 as a routine shutdown action. Logs and `.env` stay outside Git.
 
-## Verified run
+## Verification status
 
-16 October 2026, Linux ARM64 / Debian 13, Docker 29.9.1, Compose 5.6.0:
+For v0.14.9 on 11 November 2026, all **191 tests** passed on the isolated
+HA 2026.10.1 / Python 3.14 image and on GitHub CI / Python 3.13. Python line
+coverage was **97.92%**, with every module above 95% and config flow,
+diagnostics and the WebUntis parser at 100%. Desktop/mobile browser checks
+also cover timed WebUntis changes without a portal timetable.
 
-- Source baseline: `d233286327eb7e4d1cb0528f5484d9be98f1b6ca` on
-  `feature/17-webuntis-parser`; the environment and compatibility fixes are
-  committed on that same draft PR. Local `AGENTS.md`, `CLAUDE.md` and editor
-  settings are not part of the PR.
-- Existing deployment directory reused:
-  `~/ha-webuntis-test-20261016-102747`; original attempt files preserved in
-  `previous-attempt/`, original root logs retained. New logs live in `logs/`.
-- Compose project: `ha-webuntis-test-20261016-102747`. The directory's
-  `compose.yaml` includes the checkout's development Compose file, and its
-  `.env` supplies the dedicated configuration path and bind address.
-  Set `HA_TEST_PROJECT` to that project name when using `run.sh` on Mireia.
-- Runtime config check exited 0. From Mireia, the configured Tailscale URL
-  on port 8124 returned frontend 200, unauthenticated API 401 and onboarding
-  200. Fresh onboarding has no account or production connections.
-- Runtime container was running with zero restarts and the pinned digest.
-  The custom integration was discovered at startup, but no portal or
-  WebUntis configuration entry was created.
-- First complete test run: 49 passed, 2 failed. Both failures were test
-  compatibility issues with HA 2026.10: obsolete `voluptuous_serialize` and
-  deprecated `DeviceEntry.config_entries` in assertions. Tests now use HA's
-  probatio serializer and single-entry device attribute when available,
-  retaining the earlier APIs for older supported HA test environments.
-  Targeted rerun: both passed.
-- Final complete rerun: **51 passed in 15.76 seconds**, including all six
-  WebUntis tests (five existing cases plus the new synthetic fixture batch).
-  This result applies to the pinned HA 2026.10.1 test environment.
+The suite exercises optional configuration, real HA calendar services,
+per-child assignments, combined events, source failures and recovery, removal
+of mappings, delayed notifications, persisted cache restart and daylight saving.
+No real WebUntis account has yet been tested. See
+[compatibility and limitations](WEBUNTIS_COMPATIBILITY.md) before community testing.
 
-The above 51-test run is the historical environment baseline before calendar
-assignment was implemented. `tests/test_webuntis_integration.py` now additionally
-exercises optional configuration, the real HA calendar service, per-child
-assignment, combined events, updates, deletions, source failures and removal of
-the mapping. Live WebUntis credentials have not been used. Production was not
-accessed, and no PR was merged by this work.
-
-Follow-up on 16 October: the full extended suite passed **59 tests**. In the
-running container, the new options flow was exercised through the browser with
-the synthetic Local Calendar. The child substitution sensor changed from five
-portal entries to eight combined entries (one cancellation, one teacher/room
-change and one room-only change added). The dashboard showed all three new
-events. Removing the mapping returned the count to five; restoring it returned
-to eight. Diagnostics remained empty. The demo source remains assigned for
-further review. No live WebUntis integration/account has been tested yet.
-
-The test profile also needs `config/www` before startup for persistent automatic
-Lovelace resource registration. It was initially missing in this minimal profile;
-creating it and restarting the test container enables the normal `/local` card
-resource instead of relying on the frontend fallback module.
+The [16 October development log](history/WEBUNTIS_TEST_RUN_2026-10-16.md)
+is retained separately for reproducibility; it is not the current test result.

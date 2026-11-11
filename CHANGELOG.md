@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Repository maintenance: remove the retired bridge-release workflow and duplicate documentation icons; separate historical test logs from current guidance and consolidate contributor instructions. / Repository-Pflege: Alten Brücken-Release-Workflow und doppelte Doku-Icons entfernen, historische Testprotokolle von aktuellen Anleitungen trennen und Hinweise für Mitwirkende bündeln.
+
 ## 0.14.9 – 2026-11-11
 
 - Optional WebUntis calendars per child: install the separate WebUntis integration, enable JSON calendar descriptions and cancelled lessons, then assign the calendar under Configure → WebUntis calendar. Imports cancellations and teacher/room changes for the next 14 days into sensors, calendar, dashboard and notifications. Without a mapping, no WebUntis calendar is queried.

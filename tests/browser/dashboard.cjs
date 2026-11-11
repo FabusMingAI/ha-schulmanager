@@ -12,10 +12,10 @@ const path = require('node:path');
       await page.setContent('<!doctype html><html lang="de"><body></body></html>');
       await page.addScriptTag({path: path.resolve(__dirname, '../../custom_components/eltern_portal_schulmanager/www/eltern-portal-schulmanager-card.js')});
       await page.evaluate(() => {
-        const data = {today: '2026-11-05', version: '0.14.4', last_update: '2026-11-05T12:34:00Z', children: [{key:'mireia',name:'Mireia',timetable:[{weekday:2,lesson:'1',subject:'M',room:'101',teacher:'AB',teacher_label:'AB (Anna Beispiel)',start:'08:00',end:'08:45'}],substitutions:{available:true,days:[{date:'2026-11-10',entries:[{uid:'sub1',lesson:'1',kind:'vertretung',teacher_label:'AB (Anna Beispiel)',substitute_label:'CD (Clara Demo)',room:'202',info:'Buch mitbringen'}]}]},events:[{uid:'vertretung-sub1',date:'2026-11-10',category:'vertretung',title:'Mathematik',child:'mireia',links:{ics:'/test.ics'}}]}]};
+        const data = {today: '2026-11-05', version: '0.14.4', last_update: '2026-11-05T12:34:00Z', children: [{key:'anna',name:'Anna',timetable:[{weekday:2,lesson:'1',subject:'M',room:'101',teacher:'AB',teacher_label:'AB (Anna Beispiel)',start:'08:00',end:'08:45'}],substitutions:{available:true,days:[{date:'2026-11-10',entries:[{uid:'sub1',lesson:'1',kind:'vertretung',teacher_label:'AB (Anna Beispiel)',substitute_label:'CD (Clara Demo)',room:'202',info:'Buch mitbringen'}]}]},events:[{uid:'vertretung-sub1',date:'2026-11-10',category:'vertretung',title:'Mathematik',child:'anna',links:{ics:'/test.ics'}}]}]};
         window.calls = [];
         window.fixture = data;
-        for (const [tag, cfg] of [['stundenplan',{child:'mireia',view:'week'}],['header',{}],['termine',{child:'mireia'}]]) {
+        for (const [tag, cfg] of [['stundenplan',{child:'anna',view:'week'}],['header',{}],['termine',{child:'anna'}]]) {
           const card = document.createElement('eltern-portal-schulmanager-' + tag);
           card.setConfig(cfg);
           card._data = data;
@@ -46,7 +46,7 @@ const path = require('node:path');
         await plan.evaluate((card, kind) => {
           const child = card._data.children[0];
           child.substitutions.days[0].entries = kind ? [{lesson:'1',kind,room:kind === 'raum' ? '303' : '',info:''}] : [];
-          card._week = {mireia:false};
+          card._week = {anna:false};
           card._render();
         }, kind);
         const details = await plan.locator('ha-card').innerText();
@@ -101,7 +101,7 @@ const path = require('node:path');
       assert.deepEqual(errors,[]);
       await page.screenshot({path:`/tmp/schulmanager-${width}.png`,fullPage:true});
       await page.close();
-      console.log(`PASS Chromium ${width}px: Mireia, selected date, keyboard, teachers, room, calendar, WebUntis without timetable, footer`);
+      console.log(`PASS Chromium ${width}px: Anna, selected date, keyboard, teachers, room, calendar, WebUntis without timetable, footer`);
     }
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});

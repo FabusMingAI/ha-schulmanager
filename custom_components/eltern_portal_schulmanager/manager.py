@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+from urllib.parse import quote, urlencode
 from typing import Any
 
 import aiohttp
@@ -57,6 +58,10 @@ from .const import (
     CONF_ANALYZE_DAYS,
     CONF_APPOINTMENT_KINDS,
     CONF_AUTO_DOWNLOAD,
+    CONF_DASHBOARD,
+    DASHBOARD_SINGLE,
+    DASHBOARD_URL,
+    DEFAULT_DASHBOARD,
     CONF_DIGEST_ENABLED,
     CONF_DIGEST_TIME,
     CONF_LOOKBACK_DAYS,
@@ -1998,7 +2003,8 @@ class SchulManager:
         await self._notify(
             f"🔁 Vertretungsplan {name}",
             "\n".join(lines[:8]) + (f"\n… und {len(lines) - 8} weitere" if len(lines) > 8 else ""),
-            {"tag": f"{TAG}-vertretung-{child}", "group": f"{TAG}-{child}"},
+            {"tag": f"{TAG}-vertretung-{child}", "group": f"{TAG}-{child}",
+             "url": self.notification_url(child), "clickAction": self.notification_url(child)},
         )
         self.hass.bus.async_fire(
             EVENT_SUBSTITUTION,
@@ -2087,7 +2093,20 @@ class SchulManager:
     # ------------------------------------------------------------------
     # Benachrichtigungen
     # ------------------------------------------------------------------
+    def notification_url(self, child: str | None = None, *, item: str | None = None, task: str | None = None) -> str:
+        """Relative app link, with only internal identifiers in the query."""
+        mode = self.data.get("dashboard", {}).get("mode") or self.opt(CONF_DASHBOARD, DEFAULT_DASHBOARD)
+        view = quote(child, safe="") if child and mode != DASHBOARD_SINGLE else "0"
+        url = f"/{DASHBOARD_URL}/{view}"
+        if child and (item or task):
+            params = {"sm_child": child}
+            params["sm_item" if item else "sm_task"] = item or task
+            url += "?" + urlencode(params)
+        return url
+
     async def _notify(self, title: str, message: str, data: dict[str, Any] | None = None, *, strict: bool = False) -> bool:
+        target = self.notification_url()
+        data = {"url": target, "clickAction": target, **(data or {})}
         services = self.opt(CONF_NOTIFY, []) or []
         if strict and not services:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="notification_not_configured")
@@ -2170,8 +2189,8 @@ class SchulManager:
             {
                 "tag": f"{TAG}-{item['uid']}",
                 "group": f"{TAG}-{item['child']}",
-                "url": item["url"],
-                "clickAction": item["url"],
+                "url": self.notification_url(item["child"], item=item["uid"]),
+                "clickAction": self.notification_url(item["child"], item=item["uid"]),
                 "actions": actions,
             },
         )
@@ -2259,6 +2278,8 @@ class SchulManager:
             f"⏰ {child}: {TASK_TYPE_ICONS.get(t['type'], '✅')} Schul-Erinnerung",
             body,
             {
+                "url": self.notification_url(t.get("child"), task=t["id"]),
+                "clickAction": self.notification_url(t.get("child"), task=t["id"]),
                 "tag": f"{TAG}-task-{t['id']}",
                 "group": f"{TAG}-{t.get('child')}",
                 "actions": actions,

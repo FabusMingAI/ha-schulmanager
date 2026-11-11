@@ -32,6 +32,9 @@ from custom_components.eltern_portal_schulmanager.const import DOMAIN, LEGACY_DO
 from .test_eltern_portal_schulmanager import _fake_result
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+VERSION = json.loads(
+    (ROOT / "custom_components" / "eltern_portal_schulmanager" / "manifest.json").read_text()
+)["version"]
 PORTALS = [{"school": "bspgym", "school_name": "Beispiel-Gymnasium", "username": "x@y.de", "password": "p"}]
 
 
@@ -115,7 +118,7 @@ async def test_bridge_takes_over_automatically(hass: HomeAssistant, bridge) -> N
 
     # the new integration was installed next to the bridge …
     installed = pathlib.Path(hass.config.path("custom_components", DOMAIN))
-    assert json.loads((installed / "manifest.json").read_text())["version"] == "0.14.1"
+    assert json.loads((installed / "manifest.json").read_text())["version"] == VERSION
     # … took over the old setup …
     entries = hass.config_entries.async_entries(DOMAIN)
     assert len(entries) == 1
@@ -215,7 +218,7 @@ def test_install_payload_versions(tmp_path) -> None:
     config = tmp_path / "config"
     target = config / "custom_components" / "eltern_portal_schulmanager"
     assert mod.install_payload(str(config))
-    assert json.loads((target / "manifest.json").read_text())["version"] == "0.14.1"
+    assert json.loads((target / "manifest.json").read_text())["version"] == VERSION
     assert not mod.install_payload(str(config))  # same version: nothing to do
     manifest = json.loads((target / "manifest.json").read_text())
     manifest["version"] = "0.15.0"

@@ -392,9 +392,35 @@ async def test_file_view_signed(hass: HomeAssistant, media_dir, hass_client_no_a
     letter = next(i for i in st.attributes["mitteilungen"] if i["dateien"])
     url = letter["dateien"][0]["url"]
     client = await hass_client_no_auth()
-    resp = await client.get(url)
-    assert resp.status == 200
-    assert (await resp.read()).startswith(b"%PDF")
+    import threading
+    from custom_components.eltern_portal_schulmanager import _attachment_path
+
+    loop_thread = threading.get_ident()
+
+    def checked_path(path, root):
+        assert threading.get_ident() != loop_thread
+        return _attachment_path(path, root)
+
+    with patch("custom_components.eltern_portal_schulmanager._attachment_path", new=checked_path):
+        resp = await client.get(url)
+        assert resp.status == 200
+        assert (await resp.read()).startswith(b"%PDF")
+    # Fehlende Dateien, Verzeichnisse und Ausbrüche (auch per Symlink) bleiben gesperrt.
+    m = entry.runtime_data
+    source = next(i for i in m.items.values() if i["files"])
+    meta = source["files"][0]
+    original = meta["path"]
+    sibling = media_dir.with_name(media_dir.name + "-outside")
+    sibling.mkdir()
+    outside = sibling / "secret.pdf"
+    outside.write_bytes(b"private")
+    link = media_dir / "escape.pdf"
+    link.symlink_to(outside)
+    for candidate in (str(outside), "../" + sibling.name + "/secret.pdf", "escape.pdf", "missing.pdf", "."):
+        meta["path"] = candidate
+        resp = await client.get(url)
+        assert resp.status == 404, candidate
+    meta["path"] = original
     resp = await client.get(url.split("?")[0])
     assert resp.status == 401
     # Regel-Erkennung (ohne KI) hat Betrag + Frist aus dem PDF gelesen
@@ -565,25 +591,44 @@ async def test_websocket_and_task_status(hass: HomeAssistant, media_dir, hass_ws
     await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_card_registered_as_lovelace_resource(hass: HomeAssistant) -> None:
-    """Die Karte liegt unter /local und steht in den Dashboard-Ressourcen."""
-    import os
+async def test_card_registered_as_lovelace_resource(hass: HomeAssistant, hass_client_no_auth) -> None:
+    """Karte und Icon funktionieren ohne www; alte Ressourcen werden ersetzt."""
+    from custom_components.eltern_portal_schulmanager import _async_register_resource
+    from custom_components.eltern_portal_schulmanager.const import (
+        CARD_URL, ICON_URL, LEGACY_LOCAL_CARD_URL,
+    )
 
-    from homeassistant.setup import async_setup_component
-
-    os.makedirs(hass.config.path("www"), exist_ok=True)
     assert await async_setup_component(hass, "lovelace", {})
+    res = hass.data["lovelace"].resources
+    await res.async_load()
+    res.loaded = True
+    await res.async_create_item({"res_type": "module", "url": f"{LEGACY_LOCAL_CARD_URL}?v=old"})
+    await res.async_create_item({"res_type": "module", "url": f"{CARD_URL}?v=duplicate"})
+    await res.async_create_item({"res_type": "module", "url": "/unrelated.js"})
+    # Update von 0.14.0–0.14.2: Ressourcen und Kopien werden bereinigt.
+    copies = pathlib.Path(hass.config.path("www", DOMAIN))
+    copies.mkdir(parents=True)
+    (copies / "eltern-portal-schulmanager-card.js").write_text("old card")
+    (copies / "icon.png").write_bytes(b"old icon")
     assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
-    res = hass.data["lovelace"].resources
-    urls = [i["url"] for i in res.async_items()]
-    assert len(urls) == 1 and urls[0].startswith("/local/eltern_portal_schulmanager/eltern-portal-schulmanager-card.js?v="), urls
-    assert os.path.isfile(hass.config.path("www", "eltern_portal_schulmanager", "eltern-portal-schulmanager-card.js"))
-    # zweiter Start: kein Duplikat
-    from custom_components.eltern_portal_schulmanager import _async_register_resource, _card_path
-
-    await _async_register_resource(hass, _card_path())
-    assert len(res.async_items()) == 1
+    items = res.async_items()
+    urls = [i["url"] for i in items]
+    url = next(u for u in urls if u.startswith(f"{CARD_URL}?v="))
+    assert len(items) == 2 and "/unrelated.js" in urls
+    assert not any(u.startswith(LEGACY_LOCAL_CARD_URL) for u in urls)
+    assert not pathlib.Path(hass.config.path("www", DOMAIN)).exists()
+    # Wiederholtes Eintragen erzeugt keine Duplikate.
+    assert await _async_register_resource(hass, url.split("?v=")[1])
+    assert res.async_items() == items
+    # Öffentlich sind ausschließlich die mitgelieferten statischen Dateien.
+    client = await hass_client_no_auth()
+    resp = await client.get(url)
+    assert resp.status == 200 and "javascript" in resp.content_type
+    assert "eltern-portal-schulmanager-card" in await resp.text()
+    resp = await client.get(ICON_URL)
+    assert resp.status == 200 and resp.content_type == "image/png"
+    assert (await resp.read()).startswith(b"\x89PNG")
 
 
 async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_dir) -> None:
@@ -627,7 +672,8 @@ async def test_dashboard_tabs_single_and_protection(hass: HomeAssistant, media_d
     child_view = json.dumps(cfg["views"][1])
     assert "custom:eltern-portal-schulmanager-stundenplan" in child_view and '"child": "erika"' in child_view
     assert '"view": "week"' in child_view
-    assert os.path.isfile(hass.config.path("www", "eltern_portal_schulmanager", "icon.png"))
+    assert all("header" not in view for view in cfg["views"])
+    assert all(view["sections"][-1]["cards"][0]["type"] == "custom:eltern-portal-schulmanager-header" for view in cfg["views"])
 
     # eigene Änderung bleibt erhalten
     cfg["views"].append({"title": "Eigene Ansicht", "cards": []})
@@ -774,7 +820,8 @@ async def test_timetable_substitutions_flow(
         state["timetable"] = []
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
-        assert hass.states.get("sensor.schule_anna_vertretungen").state == "4"
+        assert hass.states.get("sensor.schule_anna_vertretungen").state == "unavailable"
+        assert m.data["substitutions"]["anna"]["days"]
         assert m.data["timetable"]["anna"]["lessons"]
         state["subst"] = good
         state.pop("timetable")
@@ -859,7 +906,7 @@ async def test_sicknotes_fake_portal(hass: HomeAssistant, media_dir, hass_ws_cli
         state["notes"] = []
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
-        assert hass.states.get("sensor.schule_anna_krankmeldungen").state == "3"
+        assert hass.states.get("sensor.schule_anna_krankmeldungen").state == "unavailable"
     ws = await hass_ws_client(hass)
     await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
@@ -895,6 +942,97 @@ async def test_optional_section_disconnect_keeps_fetch(hass: HomeAssistant, medi
     assert "erika" in m.children and m.items, "Abruf darf nicht abbrechen"
     assert m.data["timetable"]["erika"]["lessons"]
     assert any("sicknote" in e for e in m.last_errors), m.last_errors
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+def test_clean_appointment_title() -> None:
+    """Termintitel mit Uhrzeit kommen als HTML aus dem Portal (#24)."""
+    from custom_components.eltern_portal_schulmanager.portal import clean_appointment_title
+
+    assert clean_appointment_title("14:00 - 16:00<br />5: Lernwerkstatt") == ("5: Lernwerkstatt", "14:00", "16:00")
+    assert clean_appointment_title("8:30 - 9:15<br>Elternabend<br>") == ("Elternabend", "08:30", "09:15")
+    assert clean_appointment_title("19.00 Uhr<br/>Info &amp; Austausch") == ("Info & Austausch", "19:00", None)
+    assert clean_appointment_title("Wandertag<br />Klassen 5–7") == ("Wandertag Klassen 5–7", None, None)
+    assert clean_appointment_title("<b>SA</b> in Deutsch (Mü)") == ("SA in Deutsch (Mü)", None, None)
+    assert clean_appointment_title("SA in Deutsch (Mü)") == ("SA in Deutsch (Mü)", None, None)
+    assert clean_appointment_title("8.30 Uhr Gottesdienst") == ("8.30 Uhr Gottesdienst", None, None)
+    assert clean_appointment_title("25:00 - 26:00<br />Ungültig") == ("25:00 - 26:00 Ungültig", None, None)
+    assert clean_appointment_title(None) == ("", None, None)
+    # Datum mit Punkt ist keine Uhrzeit, mit „Uhr“ oder als Spanne schon
+    assert clean_appointment_title("12.10<br />Wandertag") == ("12.10 Wandertag", None, None)
+    assert clean_appointment_title("8.30 - 9.15<br />Elternsprechtag") == ("Elternsprechtag", "08:30", "09:15")
+    # Maskierte Tags und echtes „<“ als Zeichen
+    assert clean_appointment_title("Info &lt;b&gt;neu&lt;/b&gt;") == ("Info neu", None, None)
+    assert clean_appointment_title("Nachschrift bei Note &lt; 3") == ("Nachschrift bei Note < 3", None, None)
+    # Erneutes Bereinigen ändert nichts (gespeicherte Titel)
+    for raw in ("14:00 - 16:00<br />A &amp; B", "Info &lt;b&gt;neu&lt;/b&gt;", "Note &lt; 3", "12.10<br />Wandertag"):
+        once = clean_appointment_title(raw)[0]
+        assert clean_appointment_title(once)[0] == once
+
+
+async def test_appointment_html_and_time(hass: HomeAssistant, media_dir) -> None:
+    """Termine mit Uhrzeit: keine HTML-Tags, Beginn/Ende aus dem Titel, auch für alte Daten (#24)."""
+    from custom_components.eltern_portal_schulmanager.ics import build_ics
+    from custom_components.eltern_portal_schulmanager.portal import portal_appointment
+
+    today = dt_util.now().date()
+    tomorrow = dt_util.start_of_local_day(today + timedelta(days=1))
+    end = tomorrow + timedelta(hours=2)
+
+    timed = portal_appointment("t1", "14:00 - 16:00<br />5: Lernwerkstatt", "14:00 - 16:00<br />5: Lernwerkstatt", "event-info", tomorrow, end)
+    assert timed["title"] == "5: Lernwerkstatt" and timed["detail"] is None
+    assert (timed["time"], timed["time_end"]) == ("14:00", "16:00") and timed["kind"] == "schule"
+    # Uhrzeit nur im langen Titel (pyelternportal hat sie im Kurztitel schon entfernt)
+    exam = portal_appointment("t2", "SA in Englisch", "10:00 - 11:30<br />Schulaufgabe in Englisch", "event-important", tomorrow, end)
+    assert exam["title"] == "SA in Englisch" and exam["detail"] == "Schulaufgabe in Englisch"
+    assert exam["time"] == "10:00" and exam["kind"] == "schulaufgabe"
+    plain = portal_appointment("t3", "kLN in Chemie (Sch)", "kLN in Chemie (Sch)", "event-warning", tomorrow, end)
+    assert plain["time"] is None and plain["detail"] is None
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        res = _fake_result(today)
+        res.children[0].appointments = [timed, exam, plain]
+        return res
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"portals": [{"school": "bspgym", "school_name": "M", "username": "x", "password": "p"}]},
+        options={"appointment_kinds": ["schulaufgabe", "test", "schule"]},
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        m = entry.runtime_data
+        ev = {e["uid"]: e for e in m.child_events("anna")}
+        for e in ev.values():
+            assert "<" not in e["summary"] and "<" not in e["hover"]
+        t1 = ev["t1"]
+        assert t1["title"] == "5: Lernwerkstatt" and t1["summary"].endswith("5: Lernwerkstatt")
+        assert isinstance(t1["start"], datetime) and dt_util.as_local(t1["start"]).strftime("%H:%M") == "14:00"
+        assert dt_util.as_local(t1["end"]).strftime("%H:%M") == "16:00"
+        assert t1["start"].date() == tomorrow.date()
+        t2 = ev["t2"]
+        assert dt_util.as_local(t2["start"]).strftime("%H:%M") == "10:00" and t2["subject"] == "Englisch"
+        assert ev["t3"]["start"] == tomorrow.date()  # ohne Uhrzeit weiter ganztägig
+        assert "📝 Morgen: SA in Englisch" in m.digest_text()
+
+        ics = build_ics(t1, "anna", "Anna")
+        assert "DTSTART:" in ics and "VALUE=DATE" not in ics.split("DTSTART")[1].split("\n")[0]
+        assert "<br" not in ics
+
+        # Daten aus älteren Versionen (ungereinigt gespeichert) werden beim Anzeigen bereinigt
+        m.data["appointments"]["anna"] = [
+            {"uid": "old", "title": "14:00 - 16:00<br />5: Lernwerkstatt", "detail": None, "kind": "schule",
+             "start": tomorrow.isoformat(), "end": end.isoformat()}
+        ]
+        old = {e["uid"]: e for e in m.child_events("anna")}["old"]
+        assert old["title"] == "5: Lernwerkstatt"
+        assert dt_util.as_local(old["start"]).strftime("%H:%M") == "14:00"
+
+        state = hass.states.get("calendar.schule_anna_kalender")
+        assert state is not None
     await hass.config_entries.async_unload(entry.entry_id)
 
 
@@ -1103,7 +1241,7 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
 
         # Einstellungen von der Startseite erreichbar
         cfg = dash_mod.build_config(hass, m, "tabs")
-        head = cfg["views"][0]["header"]["card"]
+        head = cfg["views"][0]["sections"][-1]["cards"][0]
         assert head["type"] == "custom:eltern-portal-schulmanager-header"
         assert head["settings_path"] == "/config/integrations/integration/eltern_portal_schulmanager"
     await hass.config_entries.async_unload(entry.entry_id)
@@ -1302,21 +1440,11 @@ async def test_settings_sections(hass: HomeAssistant, media_dir) -> None:
     assert bell["reminder_days"].default() == "1,0"
     # so, wie die Oberfläche das Formular bekommt: Abschnitte ohne eigenen Vorgabewert,
     # die gespeicherten Werte stecken in den Feldern (sonst bleiben die Felder leer)
-    from homeassistant.helpers import config_validation as cv
+    import voluptuous as vol
 
-    # HA 2026.10 uses probatio; earlier supported versions use voluptuous-serialize.
-    if serializer := getattr(cv, "probatio", None):
-        ui = serializer.to_field_list(result["data_schema"], custom_serializer=cv.custom_serializer)
-    else:
-        import voluptuous_serialize
-
-        ui = voluptuous_serialize.convert(result["data_schema"], custom_serializer=cv.custom_serializer)
-    by_name = {f["name"]: f for f in ui}
-    assert all("default" not in f for f in ui)
-    fields = {f["name"]: f for f in by_name["benachrichtigungen"]["schema"]}
-    assert fields["reminder_days"]["default"] == "1,0"
-    langs = {f["name"]: f for f in by_name["ki"]["schema"]}["summary_languages"]
-    assert langs["default"] == ["de", "ca"]
+    assert all(marker.default is vol.UNDEFINED for marker in schema)
+    language_fields = {str(k): k for k in sec["ki"].schema.schema}
+    assert language_fields["summary_languages"].default() == ["de", "ca"]
     # jede Option steckt in genau einem Abschnitt und hat Texte in beiden Sprachen
     all_keys = [k for _n, keys, _c in SETTINGS_SECTIONS for k in keys]
     assert len(all_keys) == len(set(all_keys))
@@ -1454,7 +1582,11 @@ async def test_archive_events(hass: HomeAssistant, media_dir, hass_ws_client) ->
         assert child not in m.data["archived"]
 
         # verschwundene Termine werden beim nächsten fehlerfreien Abruf aus dem Archiv entfernt
-        await hass.services.async_call(DOMAIN, "archive_event", {"child": child, "event_id": "gibt-es-nicht"}, blocking=True)
+        from homeassistant.exceptions import ServiceValidationError
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(DOMAIN, "archive_event", {"child": child, "event_id": "gibt-es-nicht"}, blocking=True)
+        # Simulate a stale archive record from an older installation.
+        m.data["archived"].setdefault(child, {})["gibt-es-nicht"] = dt_util.now().isoformat()
         assert "gibt-es-nicht" in m.archived_events(child)
         await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
@@ -1546,9 +1678,11 @@ async def test_teacher_names(hass: HomeAssistant, media_dir, hass_ws_client, mon
     ev = next(x for x in m.child_events("anna") if x["uid"].startswith("vertretung-") and "Ph" in x["title"])
     # unbekanntes Kürzel bleibt stehen
     assert "Lehrkräfte laut Plan: Kurz (Karla Kurzweil), Unbek" in ev["hover"]
+    m.data["timetable"]["anna"] = {"lessons": [{"weekday": 1, "lesson": "1", "subject": "M", "teacher": "Kurz"}]}
     ws = await hass_ws_client(hass)
     await ws.send_json({"id": 1, "type": "eltern_portal_schulmanager/data"})
     res = (await ws.receive_json())["result"]
+    assert res["children"][0]["timetable"][0]["teacher_label"] == "Kurz (Karla Kurzweil)"
     ent = next(x for d in res["children"][0]["substitutions"]["days"] for x in d["entries"] if x["substitute"] == "Lang")
     assert ent["substitute_label"] == "Lang (Lena Lang-Weilig)"
 
@@ -1612,7 +1746,9 @@ async def test_fetch_retries_after_disconnect(hass: HomeAssistant, media_dir) ->
     calls.clear()
     with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", always_down), \
          patch("custom_components.eltern_portal_schulmanager.manager.FETCH_RETRY_DELAY", 0):
-        await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
+        from homeassistant.exceptions import HomeAssistantError
+        with pytest.raises(HomeAssistantError):
+            await hass.services.async_call(DOMAIN, "refresh", {}, blocking=True)
         await hass.async_block_till_done()
     assert len(calls) == 2
     assert any("Portal nicht erreichbar" in e for e in m.last_errors), m.last_errors
@@ -1917,11 +2053,7 @@ async def test_migration_from_schulmanager(hass: HomeAssistant, media_dir) -> No
     # Gerät samt Raum bleibt erhalten
     dev = dev_reg.async_get(device.id)
     assert dev is not None and dev.area_id == "kinderzimmer"
-    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers
-    if hasattr(dev, "config_entry_id"):
-        assert dev.config_entry_id == new.entry_id
-    else:
-        assert new.entry_id in dev.config_entries
+    assert (DOMAIN, f"{new.entry_id}_anna") in dev.identifiers and (dev.config_entry_id == new.entry_id if hasattr(dev, "config_entry_id") else new.entry_id in dev.config_entries)
     # Daten übernommen
     m = new.runtime_data
     assert m.tasks["t1"]["status"] == "in_arbeit" and m.tasks["t1"]["comment"] == "schon angefangen"
@@ -2127,3 +2259,279 @@ async def test_legacy_push_buttons_still_work(hass: HomeAssistant, media_dir) ->
     await hass.async_block_till_done()
     assert m.tasks[task2["id"]]["status"] == "erledigt"
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("extra", [None, "notes.txt", "directory", "symlink", "folder_symlink"])
+async def test_cleanup_static_copies(hass: HomeAssistant, tmp_path, extra) -> None:
+    """Altdateien bereinigen; fremde Dateien, Ordner und Links erhalten."""
+    from custom_components.eltern_portal_schulmanager.migration import async_cleanup_static_copies
+
+    hass.config.config_dir = str(tmp_path)
+    folder = tmp_path / "www" / DOMAIN
+    folder.mkdir(parents=True)
+    for name in ("eltern-portal-schulmanager-card.js", "eltern-portal-schulmanager-card.txt", "icon.png"):
+        (folder / name).write_text("old")
+    target = tmp_path / "user-data"
+    target.write_text("keep me")
+    if extra == "notes.txt":
+        (folder / extra).write_text("keep me")
+    elif extra == "directory":
+        (folder / "icon.png").unlink()
+        (folder / "icon.png").mkdir()
+        (folder / "icon.png" / "user.txt").write_text("keep me")
+    elif extra == "symlink":
+        (folder / "icon.png").unlink()
+        (folder / "icon.png").symlink_to(target)
+    elif extra == "folder_symlink":
+        real = tmp_path / "other-folder"
+        folder.rename(real)
+        folder.symlink_to(real, target_is_directory=True)
+    assert await async_cleanup_static_copies(hass) is (extra is None)
+    assert folder.exists() is (extra is not None)
+    assert target.read_text() == "keep me"
+    if extra is not None:
+        assert (folder / "eltern-portal-schulmanager-card.js").read_text() == "old"
+    else:
+        assert not await async_cleanup_static_copies(hass)  # wiederholter Start
+
+
+def test_migrated_icon_uses_static_path() -> None:
+    from custom_components.eltern_portal_schulmanager.const import ICON_URL
+    from custom_components.eltern_portal_schulmanager.migration import rewrite_config
+
+    config = {"icon": "/local/schulmanager/icon.png", "other": "/local/other/icon.png"}
+    migrated = rewrite_config(config)
+    assert migrated == {"icon": ICON_URL, "other": config["other"]}
+    assert rewrite_config(migrated) == migrated
+
+
+async def test_blackboard_rich_text_and_attachments() -> None:
+    """Text und mehrere Anhänge funktionieren unabhängig von ihrer Position."""
+    import aiohttp
+    from pyelternportal.student import Student
+    from custom_components.eltern_portal_schulmanager.portal import SchulPortal, _stable_id
+
+    today = date.today()
+    stamp = today.strftime('%d.%m.%Y')
+    async with aiohttp.ClientSession() as session:
+        portal = SchulPortal(session, 'demo', '', '')
+        portal._student = Student('1', 'Anna Muster (6c)')
+        markup = f'''<div id="asam_content"><div class="grid"><div class="grid-item"><div class="well">
+          <p>eingestellt am {stamp} 08:00:00</p><h4>Nachrichten der Schulleitung</h4>
+          <div><p>Liebe Eltern,<br>bitte beachten Sie:</p><p>Der Elternabend beginnt um 19 Uhr.</p></div>
+          <div>Anhänge: <a href="aktuelles/get_file/?repo=17&amp;csrf=first">Info.pdf</a>
+          <a href="aktuelles/get_file/?repo=18&amp;csrf=first" title="Programm.pdf herunterladen">📎</a>
+          <a href="aktuelles/get_file/?repo=17&amp;csrf=first">Info.pdf</a></div>
+          <a href="https://example.org/info">Weitere Informationen</a>
+          <script>doNotIncludeThis()</script>
+        </div></div></div></div>'''
+        await portal.async_blackboard_parse(markup)
+        item = portal._collect_items()[0]
+        assert item.uid == portal._uid('schwarzes_brett', _stable_id(today, 'Nachrichten der Schulleitung'))
+        assert 'Liebe Eltern,\nbitte beachten Sie:' in item.body
+        assert 'Der Elternabend beginnt um 19 Uhr.' in item.body
+        assert 'Weitere Informationen' in item.body
+        assert 'doNotIncludeThis' not in item.body and 'eingestellt am' not in item.body
+        assert len(item.attachments) == 2
+        assert item.attachments[0].name == 'Info.pdf'
+        await portal.async_blackboard_parse(markup.replace('csrf=first', 'csrf=second'))
+        assert portal._collect_items()[0].version == item.version
+        await portal.async_blackboard_parse(markup.replace('repo=17', 'repo=19'))
+        assert portal._collect_items()[0].version != item.version
+        # Die erkannten Anhänge gehen durch denselben Sitzungs-Download wie Elternbriefe.
+        from unittest.mock import AsyncMock
+        pdf = _pdf_bytes('Programm des Elternabends')
+        response = AsyncMock()
+        response.status = 200
+        response.headers = {'Content-Type': 'application/pdf'}
+        response.content_length = len(pdf)
+        response.read.return_value = pdf
+        context = AsyncMock()
+        context.__aenter__.return_value = response
+        with patch.object(session, 'get', return_value=context) as request:
+            await portal._download_item(item)
+        assert request.call_count == 2 and len(item.files) == 2
+        assert all(f.content == pdf and f.content_type == 'application/pdf' for f in item.files)
+        await portal.async_blackboard_parse('<div id="asam_content"></div>')
+        assert not portal._collect_items()  # keine Aushänge vom vorigen Kind übernehmen
+
+
+async def test_blackboard_original_layout_and_missing_date() -> None:
+    import aiohttp
+    from pyelternportal.student import Student
+    from pyelternportal.demo import DEMO_HTML_BLACKBOARD
+    from custom_components.eltern_portal_schulmanager.portal import SchulPortal
+
+    async with aiohttp.ClientSession() as session:
+        portal = SchulPortal(session, 'demo', '', '')
+        portal._student = Student('1', 'Anna Muster (6c)')
+        await portal.async_blackboard_parse(DEMO_HTML_BLACKBOARD)
+        item = portal._collect_items()[0]
+        assert item.body == 'Medienpädagogik'
+        assert len(item.attachments) == 1
+        await portal.async_blackboard_parse('''<div id="asam_content"><div class="grid"><div class="grid-item">
+          <div class="well"><h4>Ohne Datum</h4><div>Wichtiger Text</div></div>
+          <div class="well"><p>eingestellt am 01.01.2000 00:00:00</p><h4>Alt</h4><p>Archiv</p></div>
+        </div></div></div>''')
+        assert len(portal._collect_items()) == 1
+        assert portal._collect_items()[0].sent is None
+        assert portal._collect_items()[0].body == 'Wichtiger Text'
+
+
+async def test_blackboard_recovers_content_and_analysis(hass: HomeAssistant, media_dir) -> None:
+    """Ein gespeicherter leerer Aushang bekommt Text/PDF, bleibt gelesen und wird neu ausgewertet."""
+    from custom_components.eltern_portal_schulmanager.manager import SchulManager
+    from custom_components.eltern_portal_schulmanager.const import KIND_BLACKBOARD
+
+    entry = MockConfigEntry(domain=DOMAIN, data={'portals': []}, unique_id=DOMAIN)
+    entry.add_to_hass(hass)
+    manager = SchulManager(hass, entry)
+    await manager.async_load()
+    item = PortalItem(uid='school-1-blackboard-test', kind=KIND_BLACKBOARD,
+        title='Schulleitung', body='', sent=dt_util.now(), url='', version='empty')
+    result = PortalResult(school='school', school_name='Demo', base_url='', children=[
+        PortalChild(student_id='1', fullname='Anna Muster', firstname='Anna', classname='6c', items=[item])])
+    await manager._merge(result)
+    stored = manager.items[item.uid]
+    stored.update(read=True, status='erledigt', analysis={'status': 'ok', 'summary': 'Reine Information'}, notify=False)
+    item.body = 'Bitte lesen Sie den Elternbrief.'
+    item.files = [PortalFile('Info.pdf', _pdf_bytes('Bitte bis 20.11.2026 25 EUR ueberweisen.'), 'application/pdf')]
+    item.version = 'recovered'
+    await manager._merge(result)
+    assert stored['read'] and stored['status'] == 'erledigt' and not stored['notify']
+    assert stored['analysis']['status'] == 'pending'
+    assert stored['body'] == item.body and len(stored['files']) == 1
+    assert pathlib.Path(manager.file_abspath(stored['files'][0]['path'])).read_bytes().startswith(b'%PDF')
+    assert '25 EUR' in stored['text']
+    context = manager._context(stored)
+    assert item.body in context['body'] and '25 EUR' in context['body']
+    await manager._analyze(stored)
+    assert stored['analysis']['status'] == 'fertig'
+    # Ein unveränderter Abruf startet keine erneute Auswertung und speichert keine Duplikate.
+    analysis = stored['analysis'].copy()
+    await manager._merge(result)
+    assert stored['analysis'] == analysis and len(stored['files']) == 1
+
+
+async def test_timetable_regular_teachers_from_child_table() -> None:
+    """Use personal course memberships, without guessing intensive teachers."""
+    from custom_components.eltern_portal_schulmanager.portal import parse_timetable
+
+    html = """<div id="asam_content"><div class="table-responsive"><table>
+      <tr><td>1.<br>08.00 - 08.45</td>
+        <td><span><span>M<br>N115</span></span></td>
+        <td>L/F<br>226/227</td><td>PhÜ/ChÜ<br>037/207</td>
+        <td>MInt<br>N115</td><td>Unbekannt<br>123</td></tr>
+      <tr><td>2.<br>08.45 - 09.30</td><td>Sm/Sw<br>TH/TH</td>
+        <td>NuT<br>N115</td><td></td><td></td><td></td></tr>
+    </table></div><table>
+      <tr><td colspan="2"><b>Lehrkräfte von Anna Beispiel</b></td></tr>
+      <tr><td colspan="2"><b>Ganze Klasse</b></td></tr>
+      <tr><td>Mathematik</td><td>Maria Muster</td></tr>
+      <tr><td>Latein</td><td>Lena Lang</td></tr>
+      <tr><td>Französisch</td><td>Fritz Frei</td></tr>
+      <tr><td>Sport</td><td>Sara Sommer</td></tr>
+      <tr><td>Sport</td><td>Stefan Sport</td></tr>
+      <tr><td>Natur und Technik</td><td>Nora Natur</td></tr>
+      <tr><td>Natur und Technik</td><td>Ingo Info</td></tr>
+      <tr><td colspan="2"><b>Geteilte Klassen</b></td></tr>
+      <tr><td>8_L_8AB_LAN, Latein</td><td>Lena Lang</td></tr>
+      <tr><td>8_PhÜ_8AB_KUR, Physik</td><td>Paul Probe</td></tr>
+      <tr><td>8_ChÜ_8AB_CHE, Chemie</td><td>Clara Chemie</td></tr>
+      <tr><td colspan="2"><b>Schülergruppen</b></td></tr>
+      <tr><td>MInt</td><td>Falsche Zuordnung</td></tr>
+    </table></div>"""
+    plan = {(x["weekday"], x["lesson"]): x for x in parse_timetable(html)}
+    assert plan[1, "1"]["teacher"] == "Maria Muster"
+    assert plan[2, "1"]["teacher"] == "Lena Lang"
+    assert plan[3, "1"]["teacher"] == "Paul Probe, Clara Chemie"
+    assert "teacher" not in plan[4, "1"]  # no base-subject inference for MInt
+    assert "teacher" not in plan[5, "1"]
+    assert "teacher" not in plan[1, "2"]  # ambiguous whole-class sports list
+    assert "teacher" not in plan[2, "2"]  # two teachers for the same subject
+    # Exact course codes do support intensive lessons when supplied by the portal.
+    html = html.replace("8_L_8AB_LAN, Latein", "8_MInt_8AB_LAN, Mathematik")
+    plan = {(x["weekday"], x["lesson"]): x for x in parse_timetable(html)}
+    assert plan[4, "1"]["teacher"] == "Lena Lang"
+    assert plan[1, "1"]["teacher"] == "Maria Muster"
+    # Without the child table, retain the original timetable fields unchanged.
+    assert all("teacher" not in x for x in parse_timetable(html.split("</table></div>")[0] + "</table></div></div>"))
+
+
+async def test_timetable_course_codes_resolve_teacher_initials() -> None:
+    from custom_components.eltern_portal_schulmanager.portal import parse_timetable
+
+    html = """<div id="asam_content"><div class="table-responsive"><table>
+    <tr><td>1.<br>08.00 - 08.45</td><td>Inf<br>A1</td><td>NuT<br>A2</td><td></td><td></td><td></td></tr>
+    </table></div><table>
+    <tr><td colspan="2"><b>Lehrkräfte von Beispiel</b></td></tr>
+    <tr><td colspan="2">Ganze Klasse</td></tr>
+    <tr><td>Natur und Technik</td><td>Karla Kurz</td></tr>
+    <tr><td>Natur und Technik</td><td>K. Kurz</td></tr>
+    <tr><td colspan="2">Geteilte Klassen</td></tr>
+    <tr><td>6_NuTBio_6A_KUR, Natur und Technik</td><td>Karla Kurz</td></tr>
+    <tr><td>6_NuTInf_6A_KUR, Natur und Technik</td><td>K. Kurz</td></tr>
+    </table></div>"""
+    assert [l["teacher"] for l in parse_timetable(html)] == ["Karla Kurz", "Karla Kurz"]
+    html = html.replace("6_NuTInf_6A_KUR", "6_NuTInf_6A_AND")
+    assert [l["teacher"] for l in parse_timetable(html)] == ["K. Kurz", "Karla Kurz"]
+
+
+async def test_personal_course_evidence_persists_and_reaches_card_and_sensor(hass, media_dir, hass_ws_client) -> None:
+    from custom_components.eltern_portal_schulmanager.manager import school_year
+    from custom_components.eltern_portal_schulmanager.sensor import TimetableSensor
+
+    today = dt_util.now().date()
+    year = today.year if today.month >= 8 else today.year - 1
+    await async_setup_component(hass, "http", {})
+    state = {"registrations": ["Int_M_6a"]}
+
+    async def fake_fetch(self, need_download=None, teachers=False):
+        result = _fake_result(today)
+        child = result.children[0]
+        child.classname = "6A"
+        child.timetable = [
+            {"subject":"M", "weekday":1, "lesson":"6", "end":"13:10"},
+            {"subject":"MInt", "weekday":1, "lesson":"7", "end":"14:00"},
+        ]
+        child.course_registrations = state["registrations"]
+        result.teachers = {"KUR":"Karla Kurz"}
+        return result
+
+    entry = MockConfigEntry(domain=DOMAIN,
+        data={"portals":[{"school":"bspgym","school_name":"M","username":"x","password":"p"}]},
+        unique_id=DOMAIN)
+    entry.add_to_hass(hass)
+    with patch("custom_components.eltern_portal_schulmanager.portal.SchulPortal.async_fetch", fake_fetch):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        manager = entry.runtime_data
+        # Read the already-stored PDF text; a different child's letter cannot contribute.
+        item = {**next(iter(manager.items.values())), "uid":"evidence", "child":"anna", "title":f"Förderangebote {year}/{year+1}",
+                "sent":today.isoformat(), "text":"Freiwillige Intensivierungen Int_M_6a Mathe Mo 7. Std. in X101 KUR 1"}
+        manager.items["evidence"] = item
+        assert manager.child_timetable("anna")[1]["teacher"] == "Karla Kurz"
+        assert manager.child_timetable("anna")[1]["participation"] == "registered"
+        item["child"] = "other"
+        assert "teacher" not in manager.child_timetable("anna")[1]
+        item["child"] = "anna"
+        # A failed optional-page read preserves the last confirmed registration.
+        state["registrations"] = None
+        await manager.async_refresh()
+        assert manager.child_timetable("anna")[1]["participation"] == "registered"
+        # A successful explicit empty list clears the previous registration.
+        state["registrations"] = []
+        await manager.async_refresh()
+        assert manager.child_timetable("anna")[1]["participation"] == "not_registered"
+        sensor = TimetableSensor(manager, "anna")
+        assert [l["lesson"] for l in sensor._lessons()] == ["6"]
+        client = await hass_ws_client(hass)
+        await client.send_json({"id":1,"type":f"{DOMAIN}/data"})
+        message = await client.receive_json()
+        anna = next(c for c in message["result"]["children"] if c["key"] == "anna")
+        assert anna["timetable"][1]["teacher_label"] == "Karla Kurz"
+        assert anna["timetable"][1]["teacher_source"]["item_uid"] == "evidence"
+        # Stale registrations must not determine next year's participation.
+        manager.data["timetable"]["anna"]["registrations_year"] = f"{year-1}-{year%100:02d}"
+        assert manager.child_timetable("anna")[1]["participation"] == "unknown"
+        assert school_year(today) != manager.data["timetable"]["anna"]["registrations_year"]

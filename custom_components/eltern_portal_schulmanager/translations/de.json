@@ -30,6 +30,15 @@
       "migrate": {
         "title": "Schulmanager übernehmen",
         "description": "„Schulmanager“ heißt jetzt **Eltern Portal Manager Bavaria**. Es gibt bereits eine Einrichtung („{title}“, Schulen: {schools}).\n\nBeim Übernehmen bleiben Zugangsdaten, Einstellungen, Aufgaben, Mitteilungen, Archiv, abgelegte Dateien, Entity-IDs und Verlauf erhalten. Der alte Eintrag wird danach entfernt, Dashboards werden auf die neuen Karten umgestellt.\n\nAutomationen und Skripte mit `schulmanager.…`-Aktionen oder `schulmanager_…`-Events müssen danach von Hand umgestellt werden – sie erscheinen unter Einstellungen → Reparaturen."
+      },
+      "reconfigure": {
+        "title": "Zugangsdaten ändern",
+        "description": "Wähle eine bestehende Schule und gib die neuen Zugangsdaten ein. Aufgaben, Mitteilungen und Einstellungen bleiben erhalten.",
+        "data": {
+          "school": "Schule",
+          "username": "E-Mail-Adresse (optional)",
+          "password": "Passwort"
+        }
       }
     },
     "error": {
@@ -42,7 +51,8 @@
     "abort": {
       "already_configured": "Eltern Portal Manager Bavaria ist bereits eingerichtet. Weitere Schulen fügst du über „Konfigurieren“ hinzu.",
       "reauth_successful": "Anmeldung aktualisiert.",
-      "no_legacy_entry": "Es wurde keine bestehende Schulmanager-Einrichtung zum Übernehmen gefunden."
+      "no_legacy_entry": "Es wurde keine bestehende Schulmanager-Einrichtung zum Übernehmen gefunden.",
+      "reconfigure_successful": "Zugangsdaten aktualisiert."
     }
   },
   "options": {
@@ -455,6 +465,44 @@
     "legacy_references": {
       "title": "Automationen nutzen noch die alten Schulmanager-Namen",
       "description": "„Schulmanager“ heißt jetzt Eltern Portal Manager Bavaria. Diese Automationen bzw. Skripte rufen noch Aktionen `{old_domain}.…` auf oder reagieren auf Events `{old_domain}_…`:\n\n{items}\n\nBitte umstellen auf `{new_domain}.…` (z. B. `{new_domain}.refresh`) bzw. `{new_domain}_…` (z. B. `{new_domain}_new_item`). Der Hinweis verschwindet, sobald keine alten Namen mehr vorkommen."
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Eltern Portal Manager Bavaria ist nicht geladen. Prüfe die Integration unter Einstellungen → Geräte & Dienste."
+    },
+    "unknown_child": {
+      "message": "Unbekanntes Kind. Prüfe die Kennung in den Sensorattributen."
+    },
+    "unknown_item": {
+      "message": "Die Mitteilung existiert nicht."
+    },
+    "unknown_task": {
+      "message": "Die Aufgabe existiert nicht."
+    },
+    "invalid_status": {
+      "message": "Ungültiger Aufgaben- oder Mitteilungsstatus."
+    },
+    "refresh_failed": {
+      "message": "Ein oder mehrere Portalbereiche konnten nicht abgerufen werden. Prüfe den Diagnose-Sensor."
+    },
+    "dashboard_failed": {
+      "message": "Das Dashboard konnte nicht erstellt werden. Prüfe die Lovelace-Konfiguration."
+    },
+    "portal_auth_failed": {
+      "message": "Anmeldung bei {school} fehlgeschlagen."
+    },
+    "portal_connection_failed": {
+      "message": "Das Portal {school} ist nicht erreichbar."
+    },
+    "notification_failed": {
+      "message": "Die Benachrichtigung konnte nicht gesendet werden. Prüfe die konfigurierten Benachrichtigungsdienste."
+    },
+    "notification_not_configured": {
+      "message": "Es ist kein Benachrichtigungsdienst eingerichtet. Wähle einen Dienst in den Integrationseinstellungen."
+    },
+    "unknown_event": {
+      "message": "Der Termin oder die Frist existiert nicht."
     }
   }
 }

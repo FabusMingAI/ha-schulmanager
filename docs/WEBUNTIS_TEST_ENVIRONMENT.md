@@ -1,9 +1,9 @@
 # Isolated Home Assistant / WebUntis test environment (#17)
 
-This environment is for development of [draft PR #26](https://github.com/FabusMingAI/ha-schulmanager/pull/26).
+This environment was created for development of [PR #26](https://github.com/FabusMingAI/ha-schulmanager/pull/26).
 It does not use production configuration, credentials, school data, host networking,
-privileged containers, USB devices or the Docker socket. Do not merge the draft
-as part of setting up or running these tests.
+privileged containers, USB devices or the Docker socket. The community release
+remains unverified against a real WebUntis account.
 
 ## Scope
 

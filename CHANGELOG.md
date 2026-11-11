@@ -1,11 +1,64 @@
 # Changelog
 
-## Unreleased – WebUntis (draft #26)
+## Unreleased
 
-- Review follow-up: cross-source notification slots survive delayed arrivals and restarts; source fingerprints ignore timetable-derived periods and migrate old cache data quietly. Period assignment tolerates overlap, calendar queries wait for HA started, missing teacher fields appear in diagnostics, and the upstream requirements are documented precisely. Irregular lessons without original data remain an open product decision. / Review-Punkte zu Meldungen, Stundenzuordnung, Start-Reihenfolge und WebUntis-Kompatibilität bearbeitet.
-- Optional per-child calendar assignment under **Configure → WebUntis calendar**. Users install and configure WebUntis themselves (JSON descriptions and cancelled lessons enabled; the upstream room-change title prefix is optional). No selection means no WebUntis queries. / Optionale Zuordnung eines vorhandenen WebUntis-Kalenders pro Kind; ohne Auswahl bleibt alles wie bisher.
-- Selected calendars are read for the next 14 days and combined with the Eltern-Portal substitution plan. Changes reach sensors, calendar, dashboard and substitution notifications; exact duplicates are suppressed. Failed/unavailable sources retain their last data and appear in diagnostics; successful empty results remove obsolete entries. / Beide Quellen werden zusammengeführt; Fehler löschen keine bekannten Daten.
-- Robustness (review of #26): a single WebUntis entry without valid times is skipped instead of blocking the calendar; unexpected calendar errors no longer abort the portal refresh; WebUntis errors no longer prevent archive cleanup; portal and WebUntis changes of one refresh are sent as one notification per child. / Ein fehlerhafter Eintrag blockiert nicht mehr alle Änderungen, WebUntis-Fehler stören das Portal nicht mehr, und beide Quellen kommen in einer gemeinsamen Meldung.
+## 0.14.9 – 2026-11-11
+
+- Optional WebUntis calendars per child: install the separate WebUntis integration, enable JSON calendar descriptions and cancelled lessons, then assign the calendar under Configure → WebUntis calendar. Imports cancellations and teacher/room changes for the next 14 days into sensors, calendar, dashboard and notifications. Without a mapping, no WebUntis calendar is queried.
+- Optionale WebUntis-Kalender pro Kind: Separate WebUntis-Integration einrichten, JSON-Beschreibungen und ausgefallene Stunden aktivieren und unter Konfigurieren → WebUntis-Kalender zuordnen. Ausfälle sowie Lehrer-/Raumwechsel der nächsten 14 Tage erscheinen in Sensoren, Kalender, Dashboard und Meldungen. Ohne Zuordnung erfolgt keine WebUntis-Abfrage.
+
+- Both sources keep their data separate; failures preserve the previous records. Notifications group matching time slots across sources and avoid repeated alerts after delayed arrivals/restarts. The substitution sensor is available if either source was fetched successfully; records retained from a failed source can still be displayed. Existing portal reauthentication and availability handling remain in place.
+- Quellen werden getrennt gespeichert; Fehler bewahren die letzten Daten. Meldungen gleicher Zeitfenster werden zusammengefasst und nach verzögertem Eintreffen/Neustart nicht erneut gesendet. Der Vertretungssensor ist verfügbar, wenn eine Quelle erfolgreich abgefragt wurde; gespeicherte Daten ausgefallener Quellen können weiterhin erscheinen. Portal-Wiederanmeldung und Verfügbarkeitsprüfung bleiben erhalten.
+
+- Community-test limitation: no real WebUntis account has yet been exercised. Missing teacher fields prevent detection of teacher-only changes. Normal lessons and irregular/moved lessons without original data are not imported; a move may therefore show only its cancellation. Please compare against WebUntis and report anonymized examples with HA/WebUntis versions in #17. Do not share credentials or child/teacher names.
+- Einschränkung des Community-Tests: Noch kein Test mit echtem WebUntis-Konto. Ohne Lehrerfelder sind reine Lehrerwechsel nicht erkennbar. Regulärer Unterricht und verlegte/zusätzliche Stunden ohne Originaldaten werden nicht importiert; bei Verlegungen kann nur der Ausfall erscheinen. Bitte mit WebUntis vergleichen und anonymisierte Beispiele samt HA-/WebUntis-Version in #17 melden, ohne Zugangsdaten oder Kinder-/Lehrernamen.
+
+## 0.14.8 – 2026-11-08
+
+- Bronze/Silver self-assessment: validate live connectivity on cached restarts; retain data but mark failed portal sections unavailable; report action/delivery errors and keep failed reminders retryable; preserve distinct child identities when first names coincide. CI now enforces >95% coverage in every module, 100% for configuration flow and diagnostics, and rejects missing/excluded runtime code. The integration remains Custom.
+- Bronze-/Silber-Selbsteinschätzung: Verbindung auch bei Neustarts mit gespeicherten Daten prüfen; ausgefallene Portalbereiche als nicht verfügbar kennzeichnen; Aktions- und Zustellfehler melden; fehlgeschlagene Erinnerungen erneut ermöglichen; gleichnamige Kinder eindeutig und bei Namensänderungen stabil zuordnen. CI verlangt >95% je Modul und 100% für Einrichtung und Diagnose. Die Integration bleibt Custom.
+
+- Quality foundations: test configuration-flow recovery, report coverage in CI, add privacy-preserving diagnostics and a credential reconfiguration flow. Runtime authentication failures request reauthentication; portal-backed sensors show unavailable during whole-school outages while local tasks remain usable. See docs/QUALITY_SCALE.md for the completed Bronze/Silver self-assessment and remaining Gold work.
+- Qualitätsgrundlagen: Fehlerbehebung der Einrichtung testen, Testabdeckung in CI ausweisen, datensparsame Diagnose und Zugangsdatenänderung ergänzen. Anmeldefehler im Betrieb starten die erneute Anmeldung; portalbezogene Sensoren werden bei Schulausfällen nicht verfügbar, lokale Aufgaben bleiben nutzbar. Die abgeschlossene Bronze-/Silber-Selbsteinschätzung und offene Gold-Arbeit stehen in docs/QUALITY_SCALE.md.
+
+- Availability: setup waits for a live fetch from every configured school; an unavailable school delays setup while Home Assistant retries. At runtime, other schools and local tasks remain usable. Retrying partially delivered push notifications can duplicate delivery to destinations that already succeeded.
+- Verfügbarkeit: Die Einrichtung wartet auf eine aktuelle Abfrage aller konfigurierten Schulen; bei einem Ausfall versucht Home Assistant die Einrichtung später erneut. Im laufenden Betrieb bleiben andere Schulen und lokale Aufgaben nutzbar. Bei teilweise zugestellten Push-Mitteilungen kann der erneute Versuch bereits erfolgreiche Ziele nochmals benachrichtigen.
+
+## 0.14.7 – 2026-11-06
+
+- Timetable: resolve teacher initials through shared course codes and use explicit current-school-year course tables in stored notices/PDF text to fill missing intensive-course teachers. Show the source and personal registration status for optional class offers; unregistered offers do not extend the timetable sensor's personal end-of-school time. Unavailable registration pages preserve the last confirmed state for the current school year. No extra message downloads or booking submissions are triggered.
+- Stundenplan: Lehrkraftinitialen über gemeinsame Kurskennungen auflösen und fehlende Intensivierungs-Lehrkräfte aus ausdrücklich zugeordneten Kurszeilen aktueller Mitteilungen/PDF-Texte ergänzen. Quelle und persönlicher Anmeldestatus werden bei optionalen Klassenangeboten angezeigt; nicht angemeldete Angebote verlängern den persönlichen Unterrichtsschluss im Sensor nicht. Bei nicht erreichbarer Anmeldeseite bleibt der letzte bestätigte Stand des laufenden Schuljahrs erhalten. Keine zusätzlichen Nachrichtendownloads oder Kursbuchungen.
+
+## 0.14.6 – 2026-11-06
+
+- Fix: read regular teachers from the child-specific teacher table below the portal timetable, including explicit course assignments for split classes. Ambiguous assignments remain empty. / Behoben: Reguläre Lehrkräfte aus der kindbezogenen Lehrkräftetabelle unter dem Portal-Stundenplan übernehmen, einschließlich expliziter Kurszuordnungen für geteilte Klassen. Mehrdeutige Zuordnungen bleiben leer.
+
+## 0.14.5 – 2026-11-05
+
+- Documentation: refresh German and English installation and calendar-export guidance; replace all README screenshots with current cards and fictional data. / Dokumentation: Deutsche und englische Installations- und Kalenderexport-Hinweise aktualisieren; alle README-Screenshots mit aktuellen Karten und erfundenen Daten neu aufnehmen.
+
+- Metadata: classify the integration under Calendars & to-dos for discovery in Home Assistant and Marketplace; resolves the HACS missing-category warning. / Metadaten: Integration für Home Assistant und Marketplace unter Kalender und Aufgaben einordnen; behebt den HACS-Hinweis zur fehlenden Kategorie.
+
+- Dashboard: replace the large header with a compact live footer in every view (#36); use a red × to archive appointments and a dedicated archive icon (#35).
+- Timetable: select a lesson by mouse, touch or keyboard to open its actual date in the day view, highlight and focus the lesson, and read teacher, substitute, room and status details. Calendar export remains available (#37).
+
+- Fix: read all text blocks and attachments from blackboard notices instead of relying on fixed HTML positions. Previously empty saved notices receive the recovered content and are analysed again while keeping their read/completion state and without sending a duplicate notification. Refs #30. / Behoben: Texte und Anhänge vom Schwarzen Brett werden unabhängig von ihrer HTML-Position gelesen; bisher leere Einträge werden ergänzt und neu ausgewertet, ohne Gelesen-/Erledigt-Status zurückzusetzen oder erneut zu benachrichtigen.
+
+## 0.14.4 – 2026-11-04
+
+- Fix: remove leftover card and icon copies from `www/eltern_portal_schulmanager` on startup after updates from 0.14.0–0.14.2, only when the folder contains the known files and no subdirectories or symlinks. Foreign contents are preserved. / Behoben: Alte Karten- und Icon-Kopien aus 0.14.0–0.14.2 werden beim Start entfernt, sofern der Ordner nur die bekannten Dateien enthält; fremde Inhalte bleiben erhalten.
+- Fix: migrated dashboards now reference the integration’s static `ICON_URL` instead of the obsolete `/local/` icon. Completes the follow-up from hacs/default#12349. / Behoben: Übernommene Dashboards verwenden den statischen Icon-Pfad der Integration statt des veralteten `/local/`-Pfads.
+
+## 0.14.3 – 2026-10-24
+
+- Fix: serve the dashboard card and brand icon directly from the integration through Home Assistant static paths. No files are copied into `/config/www`; existing dashboard resources are updated to the static URL with a content hash, and duplicate resources are removed. / Behoben: Karte und Icon werden direkt aus der Integration ausgeliefert, ohne Kopien nach `/config/www`; vorhandene Dashboard-Ressourcen werden automatisch umgestellt.
+- Fix: use Home Assistant’s cached time zone helper for Google Calendar links and resolve attachment paths (including containment and file checks) in the executor, avoiding blocking disk access in the event loop. / Behoben: Zeitzonen für Google-Kalender-Links aus dem Home-Assistant-Cache; alle Dateipfad-Prüfungen für Anhänge laufen im Executor.
+- Docs: installation instructions in English and German lead with searching in HACS, with custom repository instructions retained until catalog inclusion. Addresses the review in hacs/default#12349. / Doku: Installation über die HACS-Suche zuerst, mit Hinweis zum benutzerdefinierten Repository bis zur Aufnahme.
+
+## 0.14.2 – 2026-10-21
+
+- **Still on 0.13?** This release no longer contains the bridge from 0.14.1. Install 0.14.1 first (HACS → *Eltern Portal Manager Bavaria* → ⋮ → *Redownload* → version **v0.14.1**, restart twice), then update to 0.14.2. Users of Schulmanager Online who skipped 0.14.1 can update straight to 0.14.2 – it installs into `custom_components/eltern_portal_schulmanager` again. / **Noch auf 0.13?** Diese Version enthält die Brücke aus 0.14.1 nicht mehr. Zuerst 0.14.1 installieren (HACS → ⋮ → *Erneut herunterladen* → Version **v0.14.1**, zweimal neu starten), dann auf 0.14.2 aktualisieren. Wer wegen Schulmanager Online 0.14.1 übersprungen hat, aktualisiert direkt auf 0.14.2.
+- Fix: **HTML tags in portal appointments.** Eltern-Portal delivers the title of appointments that have a time as HTML (`14:00 - 16:00<br />5: Lernwerkstatt`); `pyelternportal` only cleans it up in some cases, so tags appeared in "Termine & Fristen", the calendar and the morning summary. Titles are now cleaned by the integration itself, and the time is used for start and end, so these appointments show up with their time instead of all day. Entries stored by older versions are cleaned as well. A date like "12.10" in front of the title is no longer mistaken for a time, and escaped tags (`&lt;b&gt;`) are removed too. Closes #24. / Behoben: **HTML-Tags in Terminen aus dem Portal.** Termine mit Uhrzeit zeigten Tags wie `<br />`; die Titel werden jetzt bereinigt, und die Uhrzeit wird für Beginn und Ende genutzt. Ein Datum wie „12.10“ vor dem Titel gilt nicht mehr als Uhrzeit.
 
 ## 0.14.1 – 2026-10-12 (bridge release)
 

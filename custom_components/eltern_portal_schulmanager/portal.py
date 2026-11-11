@@ -13,8 +13,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import hashlib
+import html
 import re
 from typing import Any
 from urllib import parse
@@ -29,6 +30,8 @@ from pyelternportal.exception import (
     ResolveHostnameException,
     StudentListException,
 )
+
+from .timetable import parse_course_registrations
 
 from .const import (
     KIND_BLACKBOARD,
@@ -100,6 +103,7 @@ class PortalChild:
     appointments: list[dict[str, Any]] = field(default_factory=list)
     # Stundenplan: None = nicht gelesen (Fehler), sonst Liste der Stunden
     timetable: list[dict[str, Any]] | None = None
+    course_registrations: list[str] | None = None
     # Vertretungsplan: None = nicht gelesen (Fehler), sonst Tage mit Einträgen
     substitutions: dict[str, Any] | None = None
     # Krankmeldungen: None = nicht gelesen (Fehler), sonst Liste {start, end, comment}
@@ -188,6 +192,7 @@ class SchulPortal(ElternPortalAPI):
         self._timetable: list[dict[str, Any]] = []
         self._subst: dict[str, Any] = {"days": [], "stand": None, "available": False}
         self._extra_messages: list[PortalItem] = []
+        self._blackboard_items: list[PortalItem] = []
         self._keep_session = False
 
     # ------------------------------------------------------------------
@@ -330,6 +335,69 @@ class SchulPortal(ElternPortalAPI):
                 )
         return subject, "\n\n".join(parts), attachments
 
+    async def async_blackboard_parse(self, html: str) -> None:
+        """Aushänge ohne feste Positionen für Text und Anhänge auswerten (#30)."""
+        self._student.blackboards = []
+        self._blackboard_items = []
+        soup = bs4.BeautifulSoup(html, self._beautiful_soup_parser)
+        threshold = date.today() + timedelta(days=self.blackboard_threshold)
+        for card in soup.select("#asam_content .grid .grid-item .well"):
+            heading = card.find(["h4", "h3"])
+            if heading is None:
+                continue
+            title = heading.get_text(" ", strip=True) or "Aushang"
+            stamp = card.find(string=re.compile(r"eingestellt am", re.I))
+            match = re.search(r"eingestellt am (\d{2}\.\d{2}\.\d{4})", str(stamp), re.I)
+            sent = None
+            if match:
+                try:
+                    sent = datetime.strptime(match[1], "%d.%m.%Y").date()
+                except ValueError:
+                    pass
+            if sent is not None and sent < threshold:
+                continue
+            native = _stable_id(sent, title)  # gleiche IDs wie bisher: gespeicherte Zustände behalten
+            heading.decompose()
+            if stamp is not None:
+                stamp.extract()
+            attachments: list[PortalAttachment] = []
+            fingerprints: list[str] = []
+            for link in card.find_all("a", href=True):
+                href = link["href"]
+                url = parse.urlsplit(parse.urljoin(self.base_url, href))
+                if url.netloc != parse.urlsplit(self.base_url).netloc:
+                    continue
+                if not (
+                    "get_file" in url.path or "download" in url.path
+                    or url.path.lower().endswith((".pdf", ".png", ".jpg", ".jpeg"))
+                    or link.has_attr("download")
+                ):
+                    continue
+                if not any(att.href == href for att in attachments):
+                    name = link.get_text(" ", strip=True) or link.get("title")
+                    attachments.append(PortalAttachment(name, href))
+                    # Sitzungsabhängige CSRF-Parameter sind keine Inhaltsänderung.
+                    query = parse.urlencode(sorted(
+                        (k, v) for k, v in parse.parse_qsl(url.query)
+                        if "csrf" not in k.lower()
+                    ))
+                    fingerprints.append(parse.urlunsplit(("", "", url.path, query, "")))
+                link.decompose()
+            for node in card.select("script, style"):
+                node.decompose()
+            for br in card.find_all("br"):
+                br.replace_with("\n")
+            for block in card.find_all(["p", "div", "li"]):
+                block.append("\n")
+            body = re.sub(r"[ \t]+", " ", card.get_text())
+            body = "\n".join(line.strip() for line in body.splitlines() if line.strip() not in ("", "Anhang:", "Anhänge:"))
+            self._blackboard_items.append(PortalItem(
+                uid=self._uid(KIND_BLACKBOARD, native), kind=KIND_BLACKBOARD,
+                title=title, body=body, sent=datetime.combine(sent, datetime.min.time()) if sent else None,
+                url=parse.urljoin(self.base_url, "aktuelles/schwarzes_brett"),
+                version=_stable_id(body, *sorted(fingerprints)), attachments=attachments,
+            ))
+
     # ------------------------------------------------------------------
     # Abruf
     # ------------------------------------------------------------------
@@ -345,10 +413,10 @@ class SchulPortal(ElternPortalAPI):
             # Zusatzbereiche (Stundenplan, Vertretungen, Krankmeldungen) sind nicht
             # bei jeder Schule freigeschaltet; manche Portale trennen dann die
             # Verbindung. Das darf den Abruf der übrigen Bereiche nicht abbrechen.
-            LOGGER.info("%s: Bereich '%s' nicht verfügbar: %s", self.school, name, err)
+            LOGGER.debug("%s: Bereich '%s' nicht verfügbar: %s", self.school, name, err)
             return f"{name}: nicht verfügbar ({err or type(err).__name__})"
         except Exception as err:  # noqa: BLE001 - Portal-HTML ändert sich gern
-            LOGGER.warning(
+            LOGGER.debug(
                 "%s: Bereich '%s' konnte nicht gelesen werden: %s",
                 self.school,
                 name,
@@ -363,6 +431,13 @@ class SchulPortal(ElternPortalAPI):
             resp.raise_for_status()
             html = await resp.text()
         return parse_teachers(html, self._beautiful_soup_parser) or {}
+
+    async def async_course_registrations_online(self) -> list[str] | None:
+        """Read the existing registrations without submitting the booking form."""
+        url = parse.urljoin(self.base_url, "/buchungen/intensivierungskurse")
+        async with self._session.get(url) as resp:
+            resp.raise_for_status()
+            return parse_course_registrations(await resp.text(), self._beautiful_soup_parser)
 
     async def async_fetch(
         self,
@@ -402,6 +477,7 @@ class SchulPortal(ElternPortalAPI):
                 sfx = "demo" if self._demo else "online"
                 failed: set[str] = set()
                 self._timetable = []
+                self._blackboard_items = []
                 self._subst = {"days": [], "stand": None, "available": False}
                 for name in (
                     "appointment",
@@ -424,6 +500,11 @@ class SchulPortal(ElternPortalAPI):
                     firstname=st.firstname,
                     classname=st.classname,
                 )
+                if not self._demo:
+                    try:
+                        child.course_registrations = await self.async_course_registrations_online()
+                    except Exception:  # optional page is absent at some schools
+                        LOGGER.debug("%s: Kursanmeldungen nicht lesbar", self.school)
                 child.items = self._collect_items()
                 if "lesson" not in failed:
                     child.timetable = list(self._timetable)
@@ -440,14 +521,14 @@ class SchulPortal(ElternPortalAPI):
                         if n.start
                     ]
                 child.appointments = [
-                    {
-                        "uid": f"{self.school}-{st.student_id}-termin-{a.appointment_id}",
-                        "title": a.short or a.title,
-                        "detail": a.title if a.short and a.title != a.short else None,
-                        "kind": appointment_kind(a.classname, a.short or a.title),
-                        "start": a.start,
-                        "end": a.end,
-                    }
+                    portal_appointment(
+                        f"{self.school}-{st.student_id}-termin-{a.appointment_id}",
+                        a.short,
+                        a.title,
+                        a.classname,
+                        a.start,
+                        a.end,
+                    )
                     for a in st.appointments
                 ]
                 if need_download and not self._demo:
@@ -496,25 +577,7 @@ class SchulPortal(ElternPortalAPI):
                 )
             )
         items.extend(self._extra_messages)
-        for bb in st.blackboards:
-            native = _stable_id(bb.sent, bb.subject)
-            atts = []
-            if bb.attachment and bb.attachment.href:
-                atts.append(PortalAttachment(bb.attachment.name, bb.attachment.href))
-            items.append(
-                PortalItem(
-                    uid=self._uid(KIND_BLACKBOARD, native),
-                    kind=KIND_BLACKBOARD,
-                    title=bb.subject or "Aushang",
-                    body=bb.body or "",
-                    sent=datetime.combine(bb.sent, datetime.min.time())
-                    if bb.sent
-                    else None,
-                    url=parse.urljoin(self.base_url, "aktuelles/schwarzes_brett"),
-                    version=_stable_id(bb.body),
-                    attachments=atts,
-                )
-            )
+        items.extend(self._blackboard_items)
         for poll in st.polls:
             native = (poll.href or poll.title or "").rsplit("/", 1)[-1]
             atts = []
@@ -600,6 +663,75 @@ def appointment_kind(classname: str | None, title: str | None = None) -> str:
     return "schule"
 
 
+_APPT_TIME_RE = re.compile(
+    r"^\s*(\d{1,2})([:.])(\d{2})(?:\s*(?:-|–|bis)\s*(\d{1,2})[:.](\d{2}))?\s*(Uhr)?\s*(?:<br\s*/?>|$)",
+    re.I,
+)
+_BR_RE = re.compile(r"<br\s*/?>", re.I)
+# Nur echte Tags (``<b>``, ``</p>``, ``<!-- -->``), nicht ``<`` als Zeichen („Note < 3“).
+_TAG_RE = re.compile(r"<[a-zA-Z/!][^>]*>")
+
+
+def _hhmm(hour: str, minute: str) -> str | None:
+    h, m = int(hour), int(minute)
+    return f"{h:02d}:{m:02d}" if h < 24 and m < 60 else None
+
+
+def has_html_tag(text: str | None) -> bool:
+    """Enthält der Text echte HTML-Tags (nicht nur ein ``<`` als Zeichen)?"""
+    return bool(text) and _TAG_RE.search(text) is not None
+
+
+def clean_appointment_title(raw: str | None) -> tuple[str, str | None, str | None]:
+    """Termintitel aus dem Portal bereinigen (#24).
+
+    Termine mit Uhrzeit kommen als HTML, z. B. ``14:00 - 16:00<br />5: Lernwerkstatt``.
+    Liefert ``(Titel ohne Tags, Beginn "HH:MM" oder None, Ende "HH:MM" oder None)``.
+    """
+    text = raw or ""
+    start = end = None
+    # „12.10“ allein ist eher ein Datum als eine Uhrzeit: mit Punkt nur mit „Uhr“ oder als Spanne
+    if (m := _APPT_TIME_RE.match(text)) and (m[2] == ":" or m[4] or m[6]):
+        start = _hhmm(m[1], m[3])
+        end = _hhmm(m[4], m[5]) if m[4] else None
+        if start:
+            text = text[m.end():]
+        else:
+            end = None
+    # Erst Entities auflösen, dann Tags entfernen: so bleibt das Ergebnis stabil,
+    # wenn bereits bereinigte Titel noch einmal durchlaufen (gespeicherte Daten).
+    text = html.unescape(_BR_RE.sub(" ", text))
+    text = _TAG_RE.sub("", _BR_RE.sub(" ", text))
+    text = re.sub(r"\s+", " ", text).strip(" -–:")
+    return text, start, end
+
+
+def portal_appointment(
+    uid: str,
+    short: str | None,
+    title: str | None,
+    classname: str | None,
+    start: datetime | None,
+    end: datetime | None,
+) -> dict[str, Any]:
+    """Termin aus ``pyelternportal`` in das Format der Integration bringen."""
+    short_text, t_start, t_end = clean_appointment_title(short)
+    long_text, l_start, l_end = clean_appointment_title(title)
+    if not t_start:
+        t_start, t_end = l_start, l_end
+    shown = short_text or long_text
+    return {
+        "uid": uid,
+        "title": shown,
+        "detail": long_text if long_text and long_text != shown else None,
+        "kind": appointment_kind(classname, shown),
+        "start": start,
+        "end": end,
+        "time": t_start,
+        "time_end": t_end if t_start else None,
+    }
+
+
 def appointment_subject(title: str | None) -> str | None:
     """Fach aus 'SA in Deutsch (Mü)' oder 'kLN in Französisch (8_F_8B_Ab) (Ab)'."""
     if m := re.search(r"\bin\s+([^()]+?)\s*(\(|$)", title or ""):
@@ -611,10 +743,100 @@ def _lines(tag: Any) -> list[str]:
     return [t.strip() for t in tag.find_all(string=True) if t.strip()]
 
 
+# Names in the additional, child-specific table below the weekly grid.
+_TIMETABLE_SUBJECTS = {
+    "D": "Deutsch", "M": "Mathematik", "E": "Englisch", "F": "Französisch",
+    "L": "Latein", "Sp": "Spanisch", "Spa": "Spanisch", "It": "Italienisch",
+    "Gr": "Griechisch", "Ku": "Kunst", "Mu": "Musik", "Geo": "Geographie",
+    "G": "Geschichte", "B": "Biologie", "C": "Chemie",
+    "Ph": "Physik", "Inf": "Informatik", "NuT": "Natur und Technik",
+    "WR": "Wirtschaft und Recht", "Sk": "Sozialkunde", "PuG": "Politik und Gesellschaft",
+    "Ev": "Evang. Religionslehre", "K": "Kath. Religionslehre", "Eth": "Ethik",
+    "Sm": "Sport", "Sw": "Sport", "S": "Sport", "Smw": "Sport", "Spo": "Sport",
+}
+
+
+def _timetable_teachers(soup: bs4.BeautifulSoup) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Read only the teacher table; group memberships belong to this child."""
+    subjects: dict[str, list[str]] = {}
+    groups: dict[str, list[str]] = {}
+    by_code: dict[str, list[str]] = {}
+    for table in soup.select("#asam_content table"):
+        heading = table.find("b")
+        if not heading or not heading.get_text(" ", strip=True).startswith("Lehrkräfte von "):
+            continue
+        section = ""
+        for row in table.find_all("tr"):
+            cells = row.find_all("td", recursive=False)
+            if len(cells) == 1:
+                section = cells[0].get_text(" ", strip=True)
+            elif len(cells) == 2 and section in ("Ganze Klasse", "Geteilte Klassen"):
+                subject, teacher = (c.get_text(" ", strip=True) for c in cells)
+                if not subject or not teacher:
+                    continue
+                target = subjects
+                if section == "Geteilte Klassen":
+                    target = groups
+                    # E.g. 8_PhÜ_8AB_KUR, Physik: keep the course token, including
+                    # exercise/intensive suffixes. Never infer those from base subjects.
+                    course, sep, name = subject.partition(",")
+                    if sep:
+                        tokens = course.strip().split("_")
+                        if len(tokens) < 3:
+                            continue
+                        by_code.setdefault(tokens[-1], []).append(teacher)
+                        token = {"NuTBio": "NuT", "NuTInf": "Inf"}.get(tokens[1], tokens[1])
+                        names = target.setdefault(token, [])
+                        if teacher not in names:
+                            names.append(teacher)
+                        subject = name.strip()
+                        # An intensive/exercise course must not override the
+                        # teacher of the ordinary base subject.
+                        if _TIMETABLE_SUBJECTS.get(tokens[1]) != subject:
+                            continue
+                names = target.setdefault(subject, [])
+                if teacher not in names:
+                    names.append(teacher)
+    # A shared course-code suffix establishes identity; an initial alone does not.
+    aliases = {}
+    for names in by_code.values():
+        full = [n for n in names if not re.search(r"(?:^|\s)[A-ZÄÖÜ]\.", n)]
+        if len(set(full)) == 1:
+            aliases.update({n: full[0] for n in names})
+    for mapping in (subjects, groups):
+        for key, names in mapping.items():
+            mapping[key] = list(dict.fromkeys(aliases.get(n, n) for n in names))
+    return subjects, groups
+
+
+def _lesson_teachers(
+    subject: str, subjects: dict[str, list[str]], groups: dict[str, list[str]]
+) -> str:
+    teachers = []
+    tokens = [token.strip() for token in subject.split("/")]
+    personal = any(groups.get(t) or groups.get(_TIMETABLE_SUBJECTS.get(t, t)) for t in tokens)
+    for token in tokens:
+        name = _TIMETABLE_SUBJECTS.get(token, token)
+        # Specific personal groups take precedence over whole-class lists.
+        specific = groups.get(token) or groups.get(name)
+        if len(tokens) > 1 and personal and not specific:
+            continue
+        names = specific or subjects.get(name, [])
+        # Several whole-class teachers for one subject cannot be assigned to
+        # a particular lesson safely (e.g. boys' and girls' sports).
+        if not specific and len(names) != 1:
+            continue
+        for teacher in names:
+            if teacher not in teachers:
+                teachers.append(teacher)
+    return ", ".join(teachers)
+
+
 def parse_timetable(html: str, parser: str = "html.parser") -> list[dict[str, Any]]:
     """Stundenplan der Klasse: eine Zeile je Stunde und Wochentag (1 = Montag)."""
     soup = bs4.BeautifulSoup(html, parser)
     out: list[dict[str, Any]] = []
+    subjects, groups = _timetable_teachers(soup)
     for row in soup.select("#asam_content div.table-responsive table tr"):
         cells = row.find_all("td", recursive=False)
         if len(cells) < 6:
@@ -646,6 +868,9 @@ def parse_timetable(html: str, parser: str = "html.parser") -> list[dict[str, An
                     "room": room.strip(" /") and room,
                 }
             )
+    for lesson in out:
+        if teacher := _lesson_teachers(lesson["subject"], subjects, groups):
+            lesson["teacher"] = teacher
     out.sort(key=lambda x: (x["weekday"], _lesson_sort(x["lesson"])))
     return out
 
@@ -842,6 +1067,9 @@ __all__ = [
     "async_validate",
     "appointment_kind",
     "appointment_subject",
+    "clean_appointment_title",
+    "has_html_tag",
+    "portal_appointment",
     "parse_substitutions",
     "parse_teachers",
     "parse_timetable",

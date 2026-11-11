@@ -11,6 +11,9 @@
     "notify",
     "tts"
   ],
+  "categories": [
+    "productivity_information.calendars_todos"
+  ],
   "codeowners": [
     "@FabusMingAI"
   ],
@@ -30,5 +33,5 @@
     "pyelternportal==0.0.27",
     "pypdf>=4.0.0"
   ],
-  "version": "0.14.1"
+  "version": "0.14.9"
 }

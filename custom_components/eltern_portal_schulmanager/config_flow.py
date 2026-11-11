@@ -54,7 +54,6 @@ from .const import (
     DEFAULT_OWN_CLASS_ONLY,
     DEFAULT_TEACHER_NAMES,
     DEFAULT_SUMMARY_LANGUAGES,
-    MAX_SUMMARY_LANGUAGES,
     SUMMARY_LANGUAGES,
     DEFAULT_DASHBOARD,
     DEFAULT_DIGEST_ENABLED,
@@ -218,7 +217,17 @@ class SchulmanagerConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        entry = self._get_reauth_entry()
+        return await self._async_credentials(self._get_reauth_entry(), "reauth_confirm", user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change credentials without deleting local data or the config entry."""
+        return await self._async_credentials(self._get_reconfigure_entry(), "reconfigure", user_input)
+
+    async def _async_credentials(
+        self, entry: ConfigEntry, step_id: str, user_input: dict[str, Any] | None
+    ) -> ConfigFlowResult:
         portals = entry.data[CONF_PORTALS]
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -233,9 +242,12 @@ class SchulmanagerConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             if portal:
                 new = [portal if p[CONF_SCHOOL] == portal[CONF_SCHOOL] else p for p in portals]
-                return self.async_update_reload_and_abort(entry, data={CONF_PORTALS: new})
+                return self.async_update_reload_and_abort(
+                    entry, data={**entry.data, CONF_PORTALS: new},
+                    reason="reauth_successful" if step_id == "reauth_confirm" else "reconfigure_successful",
+                )
         return self.async_show_form(
-            step_id="reauth_confirm",
+            step_id=step_id,
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_SCHOOL): selector.SelectSelector(
@@ -343,11 +355,10 @@ class SchulmanagerOptionsFlow(OptionsFlow):
             # Abschnitte liefern verschachtelte Werte; gespeichert wird weiterhin flach
             user_input = _flatten(user_input, dict(self.config_entry.options))
             langs = [x for x in SUMMARY_LANGUAGES if x in (user_input.get(CONF_SUMMARY_LANGUAGES) or [])]
-            if len(langs) > MAX_SUMMARY_LANGUAGES:
-                errors["base"] = "too_many_languages"
-            else:
-                user_input[CONF_SUMMARY_LANGUAGES] = langs or list(DEFAULT_SUMMARY_LANGUAGES)
-                return self.async_create_entry(data=user_input)
+            # The selector exposes exactly four supported languages. Normalize
+            # order and duplicates before storing; an empty selection uses defaults.
+            user_input[CONF_SUMMARY_LANGUAGES] = langs or list(DEFAULT_SUMMARY_LANGUAGES)
+            return self.async_create_entry(data=user_input)
         o = {**self.config_entry.options, **(user_input or {})}
         notify_services = sorted(
             s
@@ -450,7 +461,7 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                 portal, errors = await _check_portal(self.hass, user_input)
                 if portal:
                     self.hass.config_entries.async_update_entry(
-                        self.config_entry, data={CONF_PORTALS: [*portals, portal]}
+                        self.config_entry, data={**self.config_entry.data, CONF_PORTALS: [*portals, portal]}
                     )
                     return self.async_abort(reason="portal_added")
         defaults = user_input or (
@@ -473,7 +484,7 @@ class SchulmanagerOptionsFlow(OptionsFlow):
                 manager.remove_portal_data(school)
             self.hass.config_entries.async_update_entry(
                 self.config_entry,
-                data={CONF_PORTALS: [p for p in portals if p[CONF_SCHOOL] != school]},
+                data={**self.config_entry.data, CONF_PORTALS: [p for p in portals if p[CONF_SCHOOL] != school]},
             )
             return self.async_abort(reason="portal_removed")
         return self.async_show_form(

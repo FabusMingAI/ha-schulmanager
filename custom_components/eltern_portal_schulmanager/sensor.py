@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 from . import SchulConfigEntry, file_url
 from .analyzer import fmt_eur
 from .const import (
+    CONF_WEBUNTIS_CALENDARS,
     NAME,
     AMPEL_GREEN,
     AMPEL_RED,
@@ -25,9 +26,12 @@ from .const import (
     SIGNAL_UPDATED,
     TASK_TYPE_ICONS,
 )
-from .entity import SchulEntity
+from .entity import SchulEntity, SchulPortalEntity
 from .manager import SchulManager
 
+
+# All updates use the manager lock; entities do not perform their own I/O.
+PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -222,10 +226,13 @@ class UnreadSensor(SchulEntity, SensorEntity):
 def _lesson_line(x: dict[str, Any]) -> str:
     time_ = f" {x['start']}" if x.get("start") else ""
     room = f" ({x['room']})" if x.get("room") else ""
-    return f"{x['lesson']}.{time_} {x['subject']}{room}"
+    teacher = f" – {x['teacher']}" if x.get("teacher") else ""
+    optional = " · optional, Teilnahme ungeklärt" if x.get("participation") == "unknown" else ""
+    return f"{x['lesson']}.{time_} {x['subject']}{room}{teacher}{optional}"
 
 
-class SubstitutionSensor(SchulEntity, SensorEntity):
+class SubstitutionSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "substitution"
     """Anzahl der Vertretungen/Ausfälle ab heute, Einträge als Attribut."""
 
     _attr_icon = "mdi:account-switch"
@@ -234,6 +241,16 @@ class SubstitutionSensor(SchulEntity, SensorEntity):
 
     def __init__(self, manager: SchulManager, child: str) -> None:
         super().__init__(manager, child, "vertretungen")
+
+    @property
+    def available(self) -> bool:
+        """Either source can supply substitutions; cached data alone cannot."""
+        selected = self.manager.opt(CONF_WEBUNTIS_CALENDARS, {}).get(self.child)
+        return super().available or (
+            self.child in self.manager.children
+            and selected is not None
+            and self.manager.webuntis_status.get(self.child) == selected
+        )
 
     @property
     def native_value(self) -> int:
@@ -275,22 +292,23 @@ class SubstitutionSensor(SchulEntity, SensorEntity):
         }
 
 
-class TimetableSensor(SchulEntity, SensorEntity):
+class TimetableSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "lesson"
     """Stundenplan: Zahl der Stunden heute, Tages- und Wochenplan als Attribut."""
 
     _attr_icon = "mdi:timetable"
     _attr_native_unit_of_measurement = "Stunden"
-    _unrecorded_attributes = frozenset({"woche", "heute", "naechster_schultag_plan"})
+    _unrecorded_attributes = frozenset({"woche", "heute", "naechster_schultag_plan", "eintraege"})
 
     def __init__(self, manager: SchulManager, child: str) -> None:
         super().__init__(manager, child, "stundenplan")
 
     def _lessons(self) -> list[dict[str, Any]]:
-        return self.manager.data["timetable"].get(self.child, {}).get("lessons", [])
+        return [l for l in self.manager.child_timetable(self.child) if l.get("participation") != "not_registered"]
 
     @property
     def available(self) -> bool:
-        return bool(self._lessons())
+        return super().available and bool(self._lessons())
 
     @property
     def native_value(self) -> int:
@@ -311,6 +329,7 @@ class TimetableSensor(SchulEntity, SensorEntity):
         return {
             "heute": [_lesson_line(x) for x in todays],
             "schluss_heute": todays[-1].get("end") if todays else None,
+            "eintraege": self.manager.child_timetable(self.child),
             "naechster_schultag": nxt.isoformat(),
             "naechster_schultag_plan": [
                 _lesson_line(x) for x in lessons if x["weekday"] == nxt.isoweekday()
@@ -323,7 +342,8 @@ class TimetableSensor(SchulEntity, SensorEntity):
         }
 
 
-class SicknoteSensor(SchulEntity, SensorEntity):
+class SicknoteSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "sicknote"
     """Krankmeldungen: Schultage im laufenden Schuljahr, Liste als Attribut."""
 
     _attr_icon = "mdi:emoticon-sick-outline"

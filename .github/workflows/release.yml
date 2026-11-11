@@ -1,0 +1,55 @@
+name: Release
+
+# Publishes a normal release from main (domain "eltern_portal_schulmanager").
+# Started by hand only: Actions → "Release" → "Run workflow".
+# Version comes from custom_components/eltern_portal_schulmanager/manifest.json,
+# release notes from the matching "## <version>" section of CHANGELOG.md.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Read version and check tag, changelog and card
+        id: version
+        run: |
+          VERSION=$(python -c "import json; print(json.load(open('custom_components/eltern_portal_schulmanager/manifest.json'))['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null; then
+            echo "::error::Tag v$VERSION already exists – bump the version in manifest.json first."
+            exit 1
+          fi
+          grep -q "^## $VERSION " CHANGELOG.md || { echo "::error::CHANGELOG.md has no section '## $VERSION – <date>'."; exit 1; }
+          grep -q "const VERSION = \"$VERSION\";" custom_components/eltern_portal_schulmanager/www/eltern-portal-schulmanager-card.js \
+            || { echo "::error::Version in the dashboard card differs from manifest.json."; exit 1; }
+
+      - name: Run tests on main
+        run: |
+          pip install -r requirements_test.txt
+          pytest -q
+
+      - name: Tag and publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="## $VERSION " 'index($0, v) == 1 {on=1; next} on && /^## / {exit} on {print}' CHANGELOG.md > notes.md
+          test -s notes.md
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file notes.md --target "$(git rev-parse HEAD)" --latest

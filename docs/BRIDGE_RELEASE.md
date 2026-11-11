@@ -1,5 +1,10 @@
 # Releasing the bridge (0.14.1)
 
+> **Done.** 0.14.1 was published on 2026-10-12 and stayed the latest release until 0.14.2
+> (2026-10-21). The *Bridge release* workflow now refuses to run; new versions are published
+> from `main` with the **Release** workflow (*Actions → Release → Run workflow*). Users still on
+> 0.13 install v0.14.1 first via HACS → ⋮ → *Redownload* (see README, "Renamed from Schulmanager").
+
 0.14.1 must be installed by HACS **into `custom_components/schulmanager`**, over the old 0.13
 installation. HACS installs the *first* folder below `custom_components` of the release tag,
 so the tag must contain only `custom_components/schulmanager` (bridge + payload).

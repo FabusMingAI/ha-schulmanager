@@ -11,7 +11,8 @@ from datetime import date, datetime, timedelta, timezone
 import re
 from typing import Any
 from urllib.parse import urlencode
-from zoneinfo import ZoneInfo
+
+from homeassistant.util import dt as dt_util
 
 PRODID = "-//FabusMingAI//Eltern Portal Manager Bavaria for Home Assistant//DE"
 GOOGLE_URL = "https://calendar.google.com/calendar/render"
@@ -148,7 +149,7 @@ def google_url(
 ) -> str:
     """Link „In Google Kalender öffnen“ (Fallback für Android)."""
     if _is_timed(ev):
-        tz = ZoneInfo(time_zone)
+        tz = dt_util.get_time_zone(time_zone) or dt_util.get_default_time_zone()
         fmt = "%Y%m%dT%H%M%S"
         dates = f"{ev['start'].astimezone(tz).strftime(fmt)}/{ev['end'].astimezone(tz).strftime(fmt)}"
     else:

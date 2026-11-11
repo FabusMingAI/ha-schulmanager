@@ -30,6 +30,15 @@
       "migrate": {
         "title": "Take over Schulmanager",
         "description": "“Schulmanager” is now called **Eltern Portal Manager Bavaria**. An existing setup was found (“{title}”, schools: {schools}).\n\nTaking it over keeps credentials, settings, tasks, messages, archive, stored files, entity IDs and history. The old entry is removed afterwards and dashboards are switched to the new cards.\n\nAutomations and scripts using `schulmanager.…` actions or `schulmanager_…` events have to be changed by hand – they are listed under Settings → Repairs."
+      },
+      "reconfigure": {
+        "title": "Change credentials",
+        "description": "Choose an existing school and enter its new credentials. Tasks, messages and settings are kept.",
+        "data": {
+          "school": "School",
+          "username": "E-mail address (optional)",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -42,7 +51,8 @@
     "abort": {
       "already_configured": "Eltern Portal Manager Bavaria is already set up. Add more schools via “Configure”.",
       "reauth_successful": "Credentials updated.",
-      "no_legacy_entry": "No existing Schulmanager setup was found to take over."
+      "no_legacy_entry": "No existing Schulmanager setup was found to take over.",
+      "reconfigure_successful": "Credentials updated."
     }
   },
   "options": {
@@ -455,6 +465,44 @@
     "legacy_references": {
       "title": "Automations still use the old Schulmanager names",
       "description": "“Schulmanager” is now called Eltern Portal Manager Bavaria. These automations or scripts still call `{old_domain}.…` actions or listen to `{old_domain}_…` events:\n\n{items}\n\nPlease change them to `{new_domain}.…` (e.g. `{new_domain}.refresh`) and `{new_domain}_…` (e.g. `{new_domain}_new_item`). This notice disappears once no old names are left."
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Eltern Portal Manager Bavaria is not loaded. Check the integration under Settings → Devices & services."
+    },
+    "unknown_child": {
+      "message": "Unknown child. Check the identifier in the sensor attributes."
+    },
+    "unknown_item": {
+      "message": "The message does not exist."
+    },
+    "unknown_task": {
+      "message": "The task does not exist."
+    },
+    "invalid_status": {
+      "message": "Invalid task or message status."
+    },
+    "refresh_failed": {
+      "message": "One or more portal sections could not be refreshed. Check the diagnostics sensor."
+    },
+    "dashboard_failed": {
+      "message": "The dashboard could not be created. Check the Lovelace configuration."
+    },
+    "portal_auth_failed": {
+      "message": "Authentication failed for {school}."
+    },
+    "portal_connection_failed": {
+      "message": "The portal {school} is unreachable."
+    },
+    "notification_failed": {
+      "message": "The notification could not be sent. Check the configured notification services."
+    },
+    "notification_not_configured": {
+      "message": "No notification service is configured. Select one in the integration settings."
+    },
+    "unknown_event": {
+      "message": "The appointment or deadline does not exist."
     }
   }
 }

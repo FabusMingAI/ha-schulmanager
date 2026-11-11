@@ -42,7 +42,7 @@ remember when that field has been observed. An empty calendar alone is not
 treated as proof of missing permissions. The warning does not identify the cause
 as a confirmed permissions failure: explicit exclusion can produce the same data.
 
-## Open product decision: irregular lessons
+## Community-test limitation: irregular lessons
 
 Upstream labels `code == "irregular"` in its calendar title and exposes the code
 in JSON. Our parser still requires cancellation or an actual teacher/room change.
@@ -50,10 +50,10 @@ An irregular lesson without usable `original_*` data is ignored; if a move is
 represented by an old cancellation plus such a new lesson, only the cancellation
 is imported.
 
-**Open for Fabian:** should these irregular lessons become an additional event
-kind, and how should they be distinguished from substitutions, moved lessons and
-ordinary timetable additions? No irregular-lesson behavior is implemented by this
-review follow-up.
+For the first community release this remains an explicit limitation. No additional
+lesson kind is inferred without source evidence. Reports of moved lessons should
+include anonymized JSON examples so future support can distinguish moves from
+ordinary additions. See [issue #17](https://github.com/FabusMingAI/ha-schulmanager/issues/17).
 
 ## Notification and timetable decisions
 

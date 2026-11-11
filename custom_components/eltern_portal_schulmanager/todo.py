@@ -11,11 +11,12 @@ from homeassistant.components.todo import (
     TodoListEntity,
     TodoListEntityFeature,
 )
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import SchulConfigEntry
-from .const import STATUS_DONE, STATUS_OPEN, STATUS_PROGRESS, TASK_TYPE_ICONS
+from .const import DOMAIN, STATUS_DONE, STATUS_OPEN, STATUS_PROGRESS, TASK_TYPE_ICONS
 from .entity import SchulEntity
 from .manager import SchulManager
 
@@ -24,6 +25,9 @@ _RE_DECOR = re.compile(
     rf"^(?:⏳\s*)?(?:(?:{_ICONS})\s*)?(?:\d{{2}}\.\d{{2}}\.(?:\d{{4}})?\s*·\s*)?|\s*\([\d.,]+\s*€\)$"
 )
 
+
+# All updates use the manager lock; entities do not perform their own I/O.
+PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -79,7 +83,7 @@ class SchulTodo(SchulEntity, TodoListEntity):
     async def async_update_todo_item(self, item: TodoItem) -> None:
         task = self.manager.tasks.get(item.uid or "")
         if task is None:
-            return
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_task")
         changes = {
             "status": STATUS_DONE if item.status == TodoItemStatus.COMPLETED else STATUS_OPEN,
             "due": _due(item.due),

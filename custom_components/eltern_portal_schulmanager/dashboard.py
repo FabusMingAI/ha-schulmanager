@@ -19,6 +19,7 @@ import inspect
 import json
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -35,7 +36,6 @@ from .const import (
     DASHBOARD_URL,
     DEFAULT_DASHBOARD,
     DOMAIN,
-    LOCAL_ICON_URL,
     LOGGER,
 )
 
@@ -62,19 +62,17 @@ def _child_entities(hass: HomeAssistant, manager: SchulManager, key: str) -> dic
 SETTINGS_PATH = f"/config/integrations/integration/{DOMAIN}"
 
 
-def _header(names: list[str]) -> dict[str, Any]:
-    """Kopf der Übersicht: Titel, letzter Abruf, Version und Link zu den Einstellungen.
-
-    Eigene Karte statt Markdown, damit die Abrufzeit live aktualisiert wird.
-    """
-    card: dict[str, Any] = {
-        "type": f"custom:{CARD_PREFIX}-header",
-        "settings_path": SETTINGS_PATH,
-        "icon": LOCAL_ICON_URL,
+def _footer() -> dict[str, Any]:
+    """Full-width final section with live status and dashboard actions."""
+    return {
+        "type": "grid",
+        "column_span": 2,
+        "cards": [{
+            "type": f"custom:{CARD_PREFIX}-header",
+            "settings_path": SETTINGS_PATH,
+            "grid_options": {"columns": 12},
+        }],
     }
-    if names:
-        card["subtitle"] = " & ".join(names)
-    return {"layout": "start", "card": card}
 
 
 def _schulmanager_card(
@@ -143,7 +141,6 @@ def _portal_button(child: dict[str, Any]) -> dict[str, Any] | None:
 def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[str, Any]:
     """Lovelace-Konfiguration für die gewählte Ansicht."""
     children = manager.children
-    names = [c["name"] for c in children.values()]
 
     if mode == DASHBOARD_SINGLE:
         sections: list[dict[str, Any]] = []
@@ -168,8 +165,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
             "icon": DASHBOARD_ICON,
             "type": "sections",
             "max_columns": 2,
-            "header": _header(names),
-            "sections": sections,
+            "sections": [*sections, _footer()],
         }
         return {"title": DASHBOARD_TITLE, "views": [view]}
 
@@ -180,7 +176,6 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
             "path": "uebersicht",
             "type": "sections",
             "max_columns": 2,
-            "header": _header(names),
             "sections": [
                 {
                     "type": "grid",
@@ -208,6 +203,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
             ],
         }
     ]
+    views[0]["sections"].append(_footer())
     for key, child in children.items():
         side: list[dict[str, Any]] = [
             {"type": "heading", "heading": "Stundenplan & Vertretungen", "icon": "mdi:timetable"},
@@ -233,7 +229,7 @@ def build_config(hass: HomeAssistant, manager: SchulManager, mode: str) -> dict[
                 "path": key,
                 "type": "sections",
                 "max_columns": 2,
-                "sections": sections,
+                "sections": [*sections, _footer()],
             }
         )
     return {"title": DASHBOARD_TITLE, "views": views}
@@ -305,7 +301,7 @@ async def async_apply(hass: HomeAssistant, manager: SchulManager, force: bool = 
             current = None
         state = manager.data.setdefault("dashboard", {})
         new = build_config(hass, manager, effective)
-        if _hash(new) == _hash(current):
+        if _hash(new) == _hash(current) and not force:
             state.update(hash=_hash(new), mode=mode)
             return False
         allowed = (
@@ -328,7 +324,9 @@ async def async_apply(hass: HomeAssistant, manager: SchulManager, force: bool = 
         manager.store.async_delay_save(lambda: manager.data, 2)
         LOGGER.debug("Dashboard „%s“ aktualisiert (%s)", DASHBOARD_URL, effective)
         return True
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        if force:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="dashboard_failed") from err
         LOGGER.warning("Dashboard „%s“ konnte nicht aktualisiert werden", DASHBOARD_URL, exc_info=True)
         return False
 

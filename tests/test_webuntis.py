@@ -68,3 +68,9 @@ def test_fixture_batch_preserves_changes_and_ignores_ambiguous_lessons():
     assert substitution["room"] == "201"
     assert substitution["original_room"] == "202"
     assert substitution["source"] == "webuntis"
+
+
+def test_missing_description_and_non_object_payload_ignored():
+    for raw in ({}, {"description": None}, {"description": "[]"},
+                {"description": "null"}, {"description": '{"unrelated": true}'}):
+        assert parse_webuntis_event(raw) is None

@@ -45,8 +45,10 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    CARD_FILE,
     CONF_PORTALS,
     DOMAIN,
+    ICON_URL,
     LEGACY_CARD_TYPES,
     LEGACY_CARD_URLS,
     LEGACY_DOMAIN,
@@ -108,7 +110,7 @@ def replace_legacy_names(text: str) -> str:
         f"/config/integrations/integration/{LEGACY_DOMAIN}\"",
         f"/config/integrations/integration/{DOMAIN}\"",
     )
-    text = text.replace(f"/local/{LEGACY_DOMAIN}/icon.png", f"/local/{DOMAIN}/icon.png")
+    text = text.replace(f"/local/{LEGACY_DOMAIN}/icon.png", ICON_URL)
     text = _SERVICE_RE.sub(lambda m: f"{DOMAIN}.{m[1]}", text)
     return _EVENT_RE.sub(lambda m: f"{DOMAIN}_{m[1]}", text)
 
@@ -321,6 +323,38 @@ async def _async_cleanup_frontend(hass: HomeAssistant) -> None:
             shutil.rmtree(old, ignore_errors=True)
 
     await hass.async_add_executor_job(_www)
+
+
+async def async_cleanup_static_copies(hass: HomeAssistant) -> bool:
+    """Kopien aus 0.14.0–0.14.2 entfernen; fremde Inhalte erhalten.
+
+    Nach erfolgreicher Bereinigung existiert der Ordner nicht mehr. Bei fremden
+    Inhalten oder Dateifehlern bleibt er erhalten; ein späterer Start prüft erneut.
+    Alle Dateisystemzugriffe laufen im Executor.
+    """
+    def _cleanup() -> bool:
+        folder = hass.config.path("www", DOMAIN)
+        try:
+            if os.path.islink(folder) or not os.path.isdir(folder):
+                return False
+            ours = {CARD_FILE, CARD_FILE.removesuffix(".js") + ".txt", "icon.png"}
+            with os.scandir(folder) as entries:
+                files = list(entries)
+            if any(
+                item.name not in ours or not item.is_file(follow_symlinks=False)
+                for item in files
+            ):
+                return False
+            for item in files:
+                os.unlink(item.path)
+            os.rmdir(folder)
+        except OSError:
+            LOGGER.warning("Alte statische Kopien konnten nicht entfernt werden", exc_info=True)
+            return False
+        LOGGER.info("Alte statische Kopien unter www/%s entfernt", DOMAIN)
+        return True
+
+    return await hass.async_add_executor_job(_cleanup)
 
 
 def _remove_legacy_folder(hass: HomeAssistant) -> bool:

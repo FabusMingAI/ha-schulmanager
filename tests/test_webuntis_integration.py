@@ -527,3 +527,45 @@ async def test_calendar_window_across_dst_keeps_local_days(hass, source, freezer
         "2026-10-24T08:00:00+02:00", "2026-10-26T08:00:00+01:00",
     ]
     assert manager.last_errors == []
+
+
+async def test_options_without_children_and_invalid_child(hass):
+    entry, manager = await setup_manager(hass)
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "webuntis"})
+    manager.children.pop("anna")  # Child disappeared while the form was open.
+    result = await hass.config_entries.options.async_configure(flow["flow_id"], {"child": "anna"})
+    assert result["errors"] == {"child": "webuntis_invalid_child"}
+    manager.children.clear()
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "webuntis"})
+    assert result["type"] == "abort" and result["reason"] == "webuntis_no_children"
+
+
+async def test_combined_sensor_availability_tracks_live_sources(hass, source):
+    from custom_components.eltern_portal_schulmanager.portal import PortalConnectionError
+
+    entry, manager = await setup_manager(hass, {CONF_WEBUNTIS_CALENDARS: {"anna": source.entity_id}})
+    sensor = "sensor.schule_anna_vertretungen"
+    assert hass.states.get(sensor).state == "3"
+    # WebUntis remains usable through a portal outage.
+    with patch.object(SchulManager, "_async_fetch_portal", side_effect=PortalConnectionError[0]("offline")):
+        await manager.async_refresh()
+        await hass.async_block_till_done()
+    assert hass.states.get(sensor).state == "3"
+    source.error = HomeAssistantError("offline")
+    await refresh(manager)
+    assert hass.states.get(sensor).state == "unavailable"
+    assert len(changed(manager)) == 3  # Preserve cached content, without claiming availability.
+    source.error = None
+    source.events = []
+    await refresh(manager)
+    assert hass.states.get(sensor).state == "0"
+    # A working portal still supplies the sensor when WebUntis fails.
+    result = portal_result()
+    result.children[0].substitutions = {"available": True, "days": []}
+    source.error = HomeAssistantError("offline")
+    with patch.object(SchulManager, "_async_fetch_portal", return_value=result):
+        await manager.async_refresh()
+        await hass.async_block_till_done()
+    assert hass.states.get(sensor).state == "0"

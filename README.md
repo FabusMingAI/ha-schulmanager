@@ -257,16 +257,11 @@ Events for your own automations: `eltern_portal_schulmanager_new_item` (with `ch
 
 ## Development
 
-The test workflow uses **Python 3.13**. From the repository root:
-
-```bash
-python3.13 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements_test.txt
-python -m pytest
-```
-
-Before publishing a release, keep the version in the integration manifest, the card and the bridge manifest aligned, update [CHANGELOG.md](CHANGELOG.md), and ensure Tests, HACS and hassfest pass. The manual **Release** workflow publishes from `main` and runs the tests again.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository layout, Python/coverage
+checks, browser tests, screenshot generation and release process. The
+[quality assessment](docs/QUALITY_SCALE.md) records implemented criteria and
+remaining milestones. The v0.14.1 bridge is historical; its migration fixtures
+remain covered by tests.
 
 Issues and pull requests are welcome.
 

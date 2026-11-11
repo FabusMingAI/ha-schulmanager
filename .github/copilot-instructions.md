@@ -14,13 +14,13 @@ Eltern Portal Manager Bavaria (domain `eltern_portal_schulmanager`, called *Schu
   - `dashboard.py` – builds the "Schule" dashboard; never overwrite a dashboard the user edited by hand.
   - `migration.py` – takes over setups of the old domain `schulmanager` (≤ 0.13) and reports automations/scripts with old names as a repair issue. Never touch config entries of *Schulmanager Online* (same old domain; ours have `data["portals"]`).
   - `www/eltern-portal-schulmanager-card.js` – plain JavaScript, no build step, custom elements `eltern-portal-schulmanager-card`, `-termine`, `-stundenplan`, `-header`. Bump `VERSION` when you change it.
-- `tests/test_eltern_portal_schulmanager.py` – runs against a real Home Assistant test instance (`pytest-homeassistant-custom-component`). Use the demo portal or fake `PortalResult` objects; never real portal access.
+- `tests/` – tests run against a real Home Assistant test instance (`pytest-homeassistant-custom-component`). Use the demo portal or fake `PortalResult` objects; never real portal access.
 
 ## Rules for every change
 
-1. **Tests:** add or extend tests in `tests/test_eltern_portal_schulmanager.py`; `pip install -r requirements_test.txt && pytest -q` must pass.
+1. **Tests:** use the relevant module under `tests/`; follow [CONTRIBUTING.md](../CONTRIBUTING.md) for Python, coverage and browser checks. Add tests for behavior changes, not for documentation-only cleanup.
 2. **Documentation in both languages:** update **README.md (English) and README.de.md (German)** equally – features, cards, entities, actions, events, notes. Never update only one of them.
-3. **CHANGELOG.md:** new entry on top, English and German (`English text. / Deutscher Text.`), and bump `version` in `manifest.json` accordingly.
+3. **CHANGELOG.md:** add user-visible changes under Unreleased in English and German. Bump the integration, card and bridge fixture versions together when preparing a release; documentation-only maintenance does not need a version bump.
 4. **No personal data:** use only fictional names (Anna, Max, Erika), fictional schools (bspgym, demo) and fictional teachers in code, tests, docs and screenshots.
 5. **User-facing texts** (cards, notifications, AI prompts) are German; config flow texts exist in `translations/en.json` and `translations/de.json` – keep both in sync.
 6. **Robustness:** the portal HTML is unofficial and changes. Parsers must tolerate missing elements; an empty or unexpected page must never wipe data that is already stored.

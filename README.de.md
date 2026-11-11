@@ -261,16 +261,11 @@ Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `chi
 
 ## Entwicklung
 
-Der Test-Workflow verwendet **Python 3.13**. Im Hauptverzeichnis des Repositorys:
-
-```bash
-python3.13 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements_test.txt
-python -m pytest
-```
-
-Vor einer Veröffentlichung die Version in Integrations-Manifest, Karte und Brücken-Manifest abgleichen, [CHANGELOG.md](CHANGELOG.md) ergänzen und Tests, HACS sowie hassfest erfolgreich ausführen. Der manuell gestartete Workflow **Release** veröffentlicht von `main` und führt die Tests erneut aus.
+[CONTRIBUTING.md](CONTRIBUTING.md) beschreibt den Repository-Aufbau, Python- und
+Coverage-Prüfungen, Browsertests, Screenshots und Veröffentlichungen (Englisch).
+Die [Qualitätsbewertung](docs/QUALITY_SCALE.md) dokumentiert umgesetzte Kriterien
+und offene Meilensteine. Die Brücke v0.14.1 ist historisch; ihre
+Migrations-Testdaten werden weiterhin geprüft.
 
 Issues und Pull-Requests sind willkommen.
 

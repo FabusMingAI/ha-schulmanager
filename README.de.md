@@ -165,6 +165,7 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
 
 ## Einrichtung
 
+
 1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Eltern Portal Manager Bavaria“**
 2. Schulkennung eingeben (der Teil vor `.eltern-portal.org`) oder einfach den Link aus einer Benachrichtigungs-Mail des Portals einfügen, dazu E-Mail und Passwort. Weitere Schulen direkt im selben Dialog hinzufügen.
 3. **Integration → Konfigurieren → Einstellungen** – in einklappbaren Abschnitten: *KI & Sprachen*, *Benachrichtigungen & Erinnerungen* und *Termine & Klassen* stehen offen, *Sprachansagen*, *Abruf & Ablage* und *Dashboard* sind zugeklappt. Jedes Feld hat einen kurzen Erklärtext.
@@ -178,6 +179,36 @@ Nicht übernommen: PDF- und Kalender-Links in Push-Nachrichten von vor dem Updat
 4. **Dashboard**: Die Integration legt das Dashboard **„Schule“** in der Seitenleiste selbst an – mit den Reitern **Übersicht** (links Termine & Fristen aller Kinder, rechts der Stundenplan mit Vertretungen je Kind, mit einer kompakten Fußzeile in jeder Ansicht für letzten Abruf, Version und Link „⚙️ Einstellungen“) und **einem Reiter pro Kind** (Aufgaben, Mitteilungen, Stundenplan mit Vertretungen, Termine), ideal fürs Handy. Unter **Konfigurieren → Einstellungen → Dashboard „Schule“** lässt sich auf *Eine Seite* oder *Nicht verwalten* umstellen. Von Hand geänderte Dashboards bleiben unangetastet (neu erzeugen mit der Aktion `eltern_portal_schulmanager.rebuild_dashboard`). Die YAML-Datei unter [`dashboard/`](dashboard/eltern_portal_schulmanager_dashboard.yaml) ist nur noch ein Beispiel für eigene Dashboards.
 
 Beim ersten Abruf werden die Mitteilungen der letzten 120 Tage übernommen. Mitteilungen der letzten 21 Tage, noch unbestätigte Briefe und Umfragen mit noch nicht abgelaufenem Enddatum werden ausgewertet und als ungelesen markiert, ältere Mitteilungen werden als gelesen ohne automatische Auswertung gespeichert. Es gibt einmalig einen kurzen Einrichtungs-Push statt einer Flut.
+
+### Optionaler WebUntis-Kalender
+
+Nutzt die Schule WebUntis, zuerst die separate
+[WebUntis-Integration](https://github.com/JonasJoKuJonas/homeassistant-WebUntis)
+installieren und einrichten. Dort **Kalender-Beschreibung: JSON** sowie
+**ausfallende Stunden anzeigen** einschalten. Die Option **Raumwechsel** steuert
+dort nur das Präfix des Kalendertitels; zum Lesen von Raumwechseln aus JSON ist
+sie nicht erforderlich. Anschließend hier unter
+**Konfigurieren → WebUntis-Kalender (optional)** das Kind und seinen Kalender
+auswählen. Für weitere Kinder wiederholen. Ein leeres Kalenderfeld entfernt die
+Zuordnung. Ohne Auswahl ist WebUntis nicht erforderlich und wird nicht abgefragt.
+Änderungen der nächsten 14 Tage werden mit dem Vertretungsplan des Eltern-Portals
+zusammengeführt. Bei Fehlern bleiben die letzten Daten erhalten; der Fehler
+erscheint im Diagnose-Sensor. Normale Stunden werden nicht als eigener
+WebUntis-Stundenplan importiert.
+
+Lehrerdaten hängen von Kontorechten, Backend und WebUntis-Version ab. Fehlen die
+Lehrerfelder oder sind sie über `exclude_data` ausgeschlossen, können keine
+Lehrerwechsel erkannt werden; Ausfälle und Raumwechsel funktionieren weiter.
+Ein Kalender, der bisher kein Feld `teachers` geliefert hat, erscheint in der
+Diagnose. Upstream besitzt einen Fallback für Lehrerdaten; die JSON-Ausgabe kann
+bei `no right for getTeachers()` aber `teachers` dauerhaft zu `exclude_data`
+hinzufügen. Bei fehlenden Lehrerdaten diese Optionen prüfen, insbesondere bei
+Eltern-/Schülerkonten. Das fehlende Recht allein bedeutet nicht, dass der aktuelle
+Fallback scheitert.
+Siehe [Kompatibilitätsprüfung und offene Entscheidungen](docs/WEBUNTIS_COMPATIBILITY.md).
+
+**Community-Test:** Diese optionale Funktion ist automatisiert getestet, aber noch nicht mit einem echten WebUntis-Konto geprüft. Verlegte/zusätzliche Stunden mit `irregular` ohne ursprüngliche Lehrer-/Raumdaten werden nicht importiert; bei einer Verlegung erscheint gegebenenfalls nur der Ausfall. Bitte mit WebUntis vergleichen und Probleme in [Issue #17](https://github.com/FabusMingAI/ha-schulmanager/issues/17) mit HA-/WebUntis-Version und anonymisierten Beispielen melden, ohne Zugangsdaten oder Kinder-/Lehrernamen. Der Vertretungssensor bleibt verfügbar, solange eine der beiden Quellen erfolgreich antwortet; gespeicherte Einträge der ausgefallenen Quelle können weiterhin angezeigt werden.
+
 
 ## Was in Home Assistant entsteht (pro Kind)
 

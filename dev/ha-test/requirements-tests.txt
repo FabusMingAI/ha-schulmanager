@@ -1,0 +1,4 @@
+# Matches the pinned Home Assistant 2026.10.1 runtime (Python 3.14).
+pytest-homeassistant-custom-component==0.13.372
+pyelternportal==0.0.27
+pypdf==6.20.1

@@ -1,0 +1,34 @@
+services:
+  homeassistant:
+    image: ${HA_IMAGE:?Set HA_IMAGE to a pinned Home Assistant image digest}
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Berlin
+    ports:
+      - "${HA_TEST_BIND:-127.0.0.1}:${HA_TEST_PORT:-8124}:8123"
+    volumes:
+      - ${HA_TEST_CONFIG:?Set HA_TEST_CONFIG to the dedicated test config directory}:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  tests:
+    profiles: [test]
+    image: ha-schulmanager-webuntis-tests:2026.10.1
+    build:
+      context: .
+      dockerfile: Dockerfile.tests
+      args:
+        HA_IMAGE: ${HA_IMAGE:?Set HA_IMAGE to a pinned Home Assistant image digest}
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    network_mode: none
+    volumes:
+      - ../../:/src:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

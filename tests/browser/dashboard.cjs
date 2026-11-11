@@ -68,6 +68,20 @@ const path = require('node:path');
       }
       await plan.getByRole('button',{name:'Woche',exact:true}).click();
       assert.match(await plan.locator('[data-lesson]').innerText(), /Teilnahme ungeklärt/);
+      // WebUntis can supply timed changes without any portal timetable.
+      await plan.evaluate(card => {
+        const child = card._data.children[0];
+        child.timetable = [];
+        child.substitutions.days[0].entries = [{kind:'raum',subject:'Biologie',lesson:'',
+          start:'2026-11-10T10:15:00Z',end:'2026-11-10T11:00:00Z',
+          original_room:'101',room:'303',source:'webuntis'}];
+        card._render();
+      });
+      assert.match(await plan.locator('ha-card').innerText(), /Weitere Änderungen/i);
+      assert.match(await plan.locator('ha-card').innerText(), /101 → 303/);
+      await plan.getByRole('button',{name:'Woche',exact:true}).click();
+      assert.match(await plan.locator('ha-card').innerText(), /10:15/);
+      assert.match(await plan.locator('ha-card').innerText(), /Biologie/);
       const footer = page.locator('eltern-portal-schulmanager-header');
       assert.equal(await footer.locator('.ttl, img, .sub').count(),0);
       assert.match(await footer.locator("ha-card").innerText(),/Stand:.*12:34/);
@@ -87,7 +101,7 @@ const path = require('node:path');
       assert.deepEqual(errors,[]);
       await page.screenshot({path:`/tmp/schulmanager-${width}.png`,fullPage:true});
       await page.close();
-      console.log(`PASS Chromium ${width}px: Mireia, selected date, keyboard, teachers, room, calendar, footer`);
+      console.log(`PASS Chromium ${width}px: Mireia, selected date, keyboard, teachers, room, calendar, WebUntis without timetable, footer`);
     }
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 from . import SchulConfigEntry, file_url
 from .analyzer import fmt_eur
 from .const import (
+    CONF_WEBUNTIS_CALENDARS,
     NAME,
     AMPEL_GREEN,
     AMPEL_RED,
@@ -242,13 +243,23 @@ class SubstitutionSensor(SchulPortalEntity, SensorEntity):
         super().__init__(manager, child, "vertretungen")
 
     @property
+    def available(self) -> bool:
+        """Either source can supply substitutions; cached data alone cannot."""
+        selected = self.manager.opt(CONF_WEBUNTIS_CALENDARS, {}).get(self.child)
+        return super().available or (
+            self.child in self.manager.children
+            and selected is not None
+            and self.manager.webuntis_status.get(self.child) == selected
+        )
+
+    @property
     def native_value(self) -> int:
         return sum(len(d["entries"]) for d in self.manager.child_substitutions(self.child))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         m = self.manager
-        plan = m.data["substitutions"].get(self.child, {})
+        plan = m.substitution_plan(self.child)
         days = m.child_substitutions(self.child)
         today = dt_util.now().date().isoformat()
         tomorrow = (dt_util.now().date() + timedelta(days=1)).isoformat()

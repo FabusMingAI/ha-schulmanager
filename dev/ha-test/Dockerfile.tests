@@ -1,0 +1,16 @@
+ARG HA_IMAGE=ghcr.io/home-assistant/home-assistant@sha256:130241f28d01fa80dfa3b44f7d89781c188d8642ecab9024f079f19f9f82baa0
+FROM ${HA_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1
+COPY requirements-tests.txt /opt/ha-test/requirements-tests.txt
+# Keep HA's runtime versions; the test-only codspeed plugin needs newer rich.
+# Install tests in a venv so this exception never replaces the base installation.
+RUN python -m venv --system-site-packages /opt/ha-test/venv \
+    && python -c 'from importlib.metadata import distributions; print("\n".join(sorted("{}=={}".format(d.metadata["Name"], d.version) for d in distributions() if d.metadata["Name"].lower() != "rich")))' > /opt/ha-test/base-constraints.txt \
+    && /opt/ha-test/venv/bin/python -m pip install --no-cache-dir \
+        --constraint /opt/ha-test/base-constraints.txt \
+        --requirement /opt/ha-test/requirements-tests.txt
+
+WORKDIR /src
+ENTRYPOINT ["/opt/ha-test/venv/bin/python", "-m", "pytest"]
+CMD ["-q", "-p", "no:cacheprovider", "--basetemp=/tmp/ha-pytest", "tests/"]

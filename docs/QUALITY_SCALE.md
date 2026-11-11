@@ -24,6 +24,14 @@ Verified on 8 November 2026: **155 tests pass** against both the Home Assistant 
 
 The tests exercise cached restarts, wrong and updated credentials, multi-school isolation, recovery of optional sections, unknown identifiers, empty message IDs, atomic to-do deletion, failed notifications, reminders that remain retryable, malformed AI/portal responses, migration failures, and preservation of downloaded files. Children with equal first names receive distinct keys; known school/student identities retain their keys when names change and after restart.
 
+WebUntis merge verification on 11 November 2026 adds the optional calendar source
+and regression tests for combined-source availability. The substitution sensor is
+available after a successful live fetch from either source, while retained data
+from a failed source can still be displayed. Cached WebUntis data alone does not
+establish availability after a restart. The existing per-module coverage gate
+also covers the WebUntis module. Live WebUntis account testing remains pending;
+see README and docs/WEBUNTIS_COMPATIBILITY.md for community-test limitations.
+
 Gold remains the next milestone: dynamic child entity creation and stale-device handling, translated icons and further user-experience review. Platinum would additionally need strict typing, managed HTTP sessions and a full asynchronous-dependency audit.
 
 ## Action failures and reminders

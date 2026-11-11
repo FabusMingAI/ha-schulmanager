@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.14.9 – 2026-11-11
+
+- Optional WebUntis calendars per child: install the separate WebUntis integration, enable JSON calendar descriptions and cancelled lessons, then assign the calendar under Configure → WebUntis calendar. Imports cancellations and teacher/room changes for the next 14 days into sensors, calendar, dashboard and notifications. Without a mapping, no WebUntis calendar is queried.
+- Optionale WebUntis-Kalender pro Kind: Separate WebUntis-Integration einrichten, JSON-Beschreibungen und ausgefallene Stunden aktivieren und unter Konfigurieren → WebUntis-Kalender zuordnen. Ausfälle sowie Lehrer-/Raumwechsel der nächsten 14 Tage erscheinen in Sensoren, Kalender, Dashboard und Meldungen. Ohne Zuordnung erfolgt keine WebUntis-Abfrage.
+
+- Both sources keep their data separate; failures preserve the previous records. Notifications group matching time slots across sources and avoid repeated alerts after delayed arrivals/restarts. The substitution sensor is available if either source was fetched successfully; records retained from a failed source can still be displayed. Existing portal reauthentication and availability handling remain in place.
+- Quellen werden getrennt gespeichert; Fehler bewahren die letzten Daten. Meldungen gleicher Zeitfenster werden zusammengefasst und nach verzögertem Eintreffen/Neustart nicht erneut gesendet. Der Vertretungssensor ist verfügbar, wenn eine Quelle erfolgreich abgefragt wurde; gespeicherte Daten ausgefallener Quellen können weiterhin erscheinen. Portal-Wiederanmeldung und Verfügbarkeitsprüfung bleiben erhalten.
+
+- Community-test limitation: no real WebUntis account has yet been exercised. Missing teacher fields prevent detection of teacher-only changes. Normal lessons and irregular/moved lessons without original data are not imported; a move may therefore show only its cancellation. Please compare against WebUntis and report anonymized examples with HA/WebUntis versions in #17. Do not share credentials or child/teacher names.
+- Einschränkung des Community-Tests: Noch kein Test mit echtem WebUntis-Konto. Ohne Lehrerfelder sind reine Lehrerwechsel nicht erkennbar. Regulärer Unterricht und verlegte/zusätzliche Stunden ohne Originaldaten werden nicht importiert; bei Verlegungen kann nur der Ausfall erscheinen. Bitte mit WebUntis vergleichen und anonymisierte Beispiele samt HA-/WebUntis-Version in #17 melden, ohne Zugangsdaten oder Kinder-/Lehrernamen.
+
 ## 0.14.8 – 2026-11-08
 
 - Bronze/Silver self-assessment: validate live connectivity on cached restarts; retain data but mark failed portal sections unavailable; report action/delivery errors and keep failed reminders retryable; preserve distinct child identities when first names coincide. CI now enforces >95% coverage in every module, 100% for configuration flow and diagnostics, and rejects missing/excluded runtime code. The integration remains Custom.

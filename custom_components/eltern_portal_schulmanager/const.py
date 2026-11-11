@@ -43,6 +43,7 @@ CONF_APPOINTMENT_KINDS: Final = "appointment_kinds"
 CONF_OWN_CLASS_ONLY: Final = "own_class_only"
 CONF_SUMMARY_LANGUAGES: Final = "summary_languages"
 CONF_TEACHER_NAMES: Final = "teacher_names"
+CONF_WEBUNTIS_CALENDARS: Final = "webuntis_calendars"  # {child_key: calendar entity_id}
 
 DEFAULT_DIGEST_ENABLED: Final = True
 DEFAULT_DIGEST_TIME: Final = "06:45:00"

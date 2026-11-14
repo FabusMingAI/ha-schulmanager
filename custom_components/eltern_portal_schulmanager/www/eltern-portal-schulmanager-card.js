@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.14.10";
+  const VERSION = "0.14.11";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -470,7 +470,16 @@
         if (ov) root.appendChild(ov);
         c = root.getElementById("sm-c");
       }
-      c.innerHTML = html;
+      const stale = (this._data?.children || []).filter(child =>
+        (!this._config.child || this._config.child === child.key) &&
+        ["connection_failed", "auth_failed", "partial"].includes(child.portal_status));
+      const warnings = stale.map(child => {
+        const reason = child.portal_status === "auth_failed" ? "Anmeldung am Eltern-Portal erforderlich"
+          : child.portal_status === "partial" ? "Eltern-Portal nur teilweise erreichbar" : "Eltern-Portal nicht erreichbar";
+        const stamp = child.last_success ? new Date(child.last_success).toLocaleString("de-DE") : "unbekannt (älterer gespeicherter Stand)";
+        return `<div class="info" role="status">⚠️ ${esc(child.name)}: ${reason}. Gespeicherte Daten werden angezeigt und können veraltet sein. Letzte vollständige Aktualisierung: ${esc(stamp)}.</div>`;
+      }).join("");
+      c.innerHTML = html.replace(/(<ha-card[^>]*>)/, tag => tag + warnings);
       return c;
     }
 
@@ -1543,7 +1552,7 @@
       if (d) {
         const errs = d.errors || [];
         meta.push(
-          `<span title="Letzter Abruf aus dem Eltern-Portal">Stand: ${esc(this._stamp(d.last_update))}` +
+          `<span title="Letzter Abrufversuch, auch bei Fehlern">Abrufversuch: ${esc(this._stamp(d.last_update))}` +
             `<button class="rf" data-refresh aria-label="Portale jetzt abrufen" title="Portale jetzt abrufen">${this._refreshing ? "…" : "↻"}</button></span>`
         );
         if (errs.length) meta.push(`<span class="err" title="${esc(errs.join("\n"))}">⚠️ ${errs.length} Fehler beim Abruf</span>`);

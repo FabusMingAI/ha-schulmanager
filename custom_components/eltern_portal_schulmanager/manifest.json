@@ -33,5 +33,5 @@
     "pyelternportal==0.0.27",
     "pypdf>=4.0.0"
   ],
-  "version": "0.14.10"
+  "version": "0.14.11"
 }

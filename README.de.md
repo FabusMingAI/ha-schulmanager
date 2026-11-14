@@ -260,6 +260,29 @@ ihr Ziel nicht mehr erreichen. Bereits versendete Notifications behalten ihre
 alten Links; die Verbesserung gilt für neue Notifications nach Update und
 Neustart von Home Assistant. Für gelöschte Einträge erscheint ein Hinweis.
 
+### Portal-Ausfälle und gespeicherte Daten
+
+Mitteilungen, Aufgaben, Termine, Stundenpläne und Anhangs-Metadaten werden im
+lokalen Integrationsspeicher von Home Assistant persistiert; heruntergeladene
+PDFs bleiben im Medienordner. Ein Portal-Ausfall löscht diese Daten nicht. Seit
+v0.14.11 laden bereits eingerichtete Schulen mit gespeicherten Kindern auch nach
+einem Neustart/Neuladen, wenn das Portal Verbindungs- oder Zertifikatsprobleme hat.
+
+Das Dashboard zeigt die vorhandenen Inhalte mit einem deutlichen Hinweis auf
+**gespeicherte, möglicherweise veraltete Daten** und der letzten vollständig
+erfolgreichen Aktualisierung je Schule. Bei älteren Speicherständen ohne diesen
+Zeitstempel ist das Alter als unbekannt gekennzeichnet. **Abrufversuch** in der
+Statusleiste bezeichnet den letzten Versuch, auch bei Fehlern, nicht das Datenalter.
+Portalbezogene Stundenplan-, Vertretungs- und Krankmeldungs-Sensoren bleiben bis
+zur Erholung der Quelle nicht verfügbar; lokale Aufgaben und der Kalender bleiben nutzbar.
+
+Die Integration versucht den Abruf im normalen Intervall erneut. Neue Schulen
+ohne passenden initialisierten Speicherstand benötigen weiterhin eine erfolgreiche
+Erstabfrage. Die Zertifikatsprüfung bleibt aktiv. Bei einem Ausfall die Integration
+nicht löschen und neu anlegen, da dabei lokale Daten verloren gehen können.
+Bereits abgelegte Dateien sind lokal erreichbar; Links ins externe Portal können
+währenddessen ausfallen.
+
 ## Gut zu wissen
 
 - **Empfangsbestätigung:** Das Eltern-Portal zählt das Herunterladen eines Elternbriefs als „Empfang bestätigt“. Mit aktivierter automatischer Ablage bestätigt die Integration deshalb neue Briefe, sobald sie die PDF holt. Wer das nicht will, schaltet „Anhänge/PDFs automatisch ablegen“ aus. Dann entsteht je Brief die Aufgabe „Empfang im Portal bestätigen“.

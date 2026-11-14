@@ -26,7 +26,9 @@ rules:
   has-entity-name: done
   runtime-data: done
   test-before-configure: done
-  test-before-setup: done
+  test-before-setup:
+    status: done
+    comment: Every setup attempts live validation. A connection outage can load initialized schools from persisted local records, with portal sensors unavailable and dashboard warnings; new schools still retry setup and authentication failures still request reauthentication.
   unique-config-entry: done
   # Silver
   action-exceptions: done

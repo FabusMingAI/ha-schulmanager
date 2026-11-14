@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.14.11 – 2026-11-14
+
+- Fix: keep stored school content accessible after a Home Assistant restart/reload during portal connection or TLS certificate outages. Initialized schools with cached children load local messages, tasks, calendars and attachments; new schools still require live setup validation. Polling automatically retries and resumes updates when the portal recovers. TLS verification stays enabled.
+- Behoben: Gespeicherte Schuldaten bleiben nach einem Home-Assistant-Neustart/Neuladen bei Verbindungs- oder Zertifikatsproblemen des Portals erreichbar. Eingerichtete Schulen mit gespeicherten Kindern laden lokale Mitteilungen, Aufgaben, Kalender und Anhänge; neue Schulen benötigen weiterhin die erfolgreiche Erstabfrage. Automatische Abrufe nehmen die Aktualisierung nach der Erholung wieder auf. Die Zertifikatsprüfung bleibt aktiv.
+
+- Dashboard: mark retained data as possibly outdated and show the last complete successful update per school (unknown for older caches). Failed/partial fetches never advance this persisted timestamp. Label the footer timestamp as the last fetch attempt; portal-backed sensors remain unavailable during source failures.
+- Dashboard: Gespeicherte Daten als möglicherweise veraltet kennzeichnen und den letzten vollständigen Erfolg je Schule anzeigen (bei älteren Speicherständen unbekannt). Fehlerhafte/teilweise Abrufe aktualisieren diesen gespeicherten Zeitstempel nicht. Die Statusleiste zeigt den letzten Abrufversuch; portalbezogene Sensoren bleiben bei Quellenausfällen nicht verfügbar.
+
 ## 0.14.10 – 2026-11-11
 
 - Notification taps now open the referenced message or task directly in the Schule dashboard on iOS and Android, including after a cold app start. Substitution alerts open the child view; other notifications open the school overview. Portal action buttons remain available. Links are consumed after opening, so updates do not reopen closed dialogs; removed items show a clear message. Applies to newly sent notifications and generated dashboards with their standard paths.

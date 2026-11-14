@@ -256,6 +256,27 @@ reach the content. Existing notifications keep their old links; the new behavior
 applies to notifications sent after updating and restarting Home Assistant.
 Deleted items show a message instead of an empty detail dialog.
 
+### Portal outages and saved data
+
+Messages, tasks, appointments, timetables and attachment metadata are persisted
+in Home Assistant's local integration storage; downloaded PDFs stay in the media
+folder. An unavailable portal does not delete these records. From v0.14.11,
+already initialized schools with cached children also load after a Home Assistant
+restart/reload while the portal has a connection or certificate problem.
+
+The dashboard continues to show retained content with a **stored data / possibly
+outdated** warning and the last complete successful update per school. Older
+caches without that timestamp show an unknown age. The footer's **Abrufversuch**
+is the most recent attempt, including failures; it is not the data's age.
+Portal-backed timetable, substitution and sick-note sensors remain unavailable
+until their source recovers; local tasks and the calendar remain usable.
+
+The integration retries on its normal polling schedule. New schools without
+matching initialized cache still require a successful setup fetch. Certificate
+verification stays enabled. Do not remove/re-add the integration to resolve an
+outage: removing it can discard local records. Previously stored files still
+open locally, but links that lead to the external portal may not work.
+
 ## Good to know
 
 - **Receipt confirmation:** Eltern-Portal counts downloading a parent letter as *receipt confirmed*. With automatic file storage enabled, the integration therefore confirms new letters when it fetches the PDF. Turn off "Store attachments/PDFs automatically" if you do not want that – you then get a task "confirm receipt in the portal" instead.

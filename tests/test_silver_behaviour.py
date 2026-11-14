@@ -33,19 +33,25 @@ async def loaded(hass):
     await hass.config_entries.async_unload(entry.entry_id)
 
 
-@pytest.mark.parametrize("error, state", [(PortalAuthError("invalid"), config_entries.ConfigEntryState.SETUP_ERROR), (ClientConnectionError("offline"), config_entries.ConfigEntryState.SETUP_RETRY)])
-async def test_cached_start_validates_live_connection(hass, error, state):
+async def test_cached_start_validates_live_connection_but_preserves_local_access(hass):
+    error = ClientConnectionError("offline")
     entry = await setup_entry(hass)
     children = deepcopy(entry.runtime_data.children)
     assert await hass.config_entries.async_unload(entry.entry_id)
-    with patch(f"{MANAGER}._async_fetch_portal", side_effect=error):
-        assert not await hass.config_entries.async_setup(entry.entry_id)
+    with patch(f"{MANAGER}._async_fetch_portal", side_effect=error) as fetch:
+        assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-    assert entry.state is state
+    fetch.assert_awaited_once()
+    assert entry.state is config_entries.ConfigEntryState.LOADED
+    assert entry.runtime_data.children == children
+    assert entry.runtime_data.last_errors
+    assert hass.states.get("todo.schule_anna_aufgaben").state != "unavailable"
+    assert hass.states.get("sensor.schule_anna_stundenplan").state == "unavailable"
     with patch(f"{MANAGER}._async_fetch_portal", return_value=_fake_result(dt_util.now().date(), with_pdf=False)):
-        assert await hass.config_entries.async_reload(entry.entry_id)
+        await entry.runtime_data.async_refresh()
         await hass.async_block_till_done()
     assert entry.runtime_data.children == children
+    assert entry.runtime_data.last_errors == []
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

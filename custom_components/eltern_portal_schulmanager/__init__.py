@@ -257,7 +257,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: SchulConfigEntry) -> boo
     migration.async_watch_legacy_references(hass, entry)
     manager = SchulManager(hass, entry)
     await manager.async_load()
-    # Validate the live connection on every setup, including cached restarts.
+    # Attempt live validation; initialized schools can expose retained local
+    # records during an outage, with portal-backed entities unavailable.
     await manager.async_refresh(initial=True)
     entry.runtime_data = manager
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

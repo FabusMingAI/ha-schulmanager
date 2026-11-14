@@ -212,6 +212,8 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 "classname": info.get("classname"),
                 "school": info.get("school_name"),
                 "portal_url": info.get("portal_url"),
+                "portal_status": m.portal_status.get(info.get("school")),
+                "last_success": m.data.get("portal_last_success", {}).get(info.get("school")),
                 "ampel": s["ampel"],
                 "overdue": len(s["overdue"]),
                 "unread": len(s["unread"]),

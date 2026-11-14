@@ -307,6 +307,7 @@ class SchulManager:
             "archived": stored.get("archived", {}),
             # Stundenplankürzel je Schule: {school: {"updated": iso, "list": {kürzel: name}}}
             "teachers": stored.get("teachers", {}),
+            "portal_last_success": stored.get("portal_last_success", {}),
         }
         # Seed older installations from their cached imports, without notifying.
         self._remember_substitution_slots()
@@ -369,6 +370,11 @@ class SchulManager:
     async def async_refresh(self, initial: bool = False) -> None:
         """Alle Portale abrufen und neue Eingänge verarbeiten."""
         async with self._lock:
+            # Only already initialized schools with saved children can start offline.
+            # A new school still requires successful live validation.
+            cached_schools = set(self.data["initialized"]) & {
+                child.get("school") for child in self.children.values()
+            }
             errors: list[str] = []
             webuntis_errors: list[str] = []
             self._remember_substitution_slots()
@@ -391,7 +397,7 @@ class SchulManager:
                         continue
                     except PortalConnectionError as err:
                         msg = f"{school}: Portal nicht erreichbar ({err})"
-                        if initial:
+                        if initial and school not in cached_schools:
                             raise ConfigEntryNotReady(translation_domain=DOMAIN, translation_key="portal_connection_failed", translation_placeholders={"school": school}) from err
                         self._set_portal_status(school, "connection_failed")
                         errors.append(msg)
@@ -400,6 +406,8 @@ class SchulManager:
                     errors.extend(f"{school}: {e}" for e in result.errors)
                     self._store_teachers(result)
                     await self._merge(result)
+                    if not result.errors:
+                        self.data["portal_last_success"][school] = dt_util.now().isoformat()
                 await self._async_refresh_webuntis(webuntis_errors)
             finally:
                 queued, self._queued_substitutions = self._queued_substitutions or {}, None
@@ -2367,6 +2375,7 @@ class SchulManager:
     def remove_portal_data(self, school: str) -> None:
         """Daten einer entfernten Schule löschen (Dateien bleiben liegen)."""
         self.portal_status.pop(school, None)
+        self.data.get("portal_last_success", {}).pop(school, None)
         kids = [k for k, c in self.children.items() if c.get("school") == school]
         for k in kids:
             self.children.pop(k)

@@ -84,7 +84,7 @@ const path = require('node:path');
       assert.match(await plan.locator('ha-card').innerText(), /Biologie/);
       const footer = page.locator('eltern-portal-schulmanager-header');
       assert.equal(await footer.locator('.ttl, img, .sub').count(),0);
-      assert.match(await footer.locator("ha-card").innerText(),/Stand:.*12:34/);
+      assert.match(await footer.locator("ha-card").innerText(),/Abrufversuch:.*12:34/);
       assert.match(await footer.locator("ha-card").innerText(),/v0\.14\.4/);
       await footer.getByRole('button',{name:'Portale jetzt abrufen'}).click();
       assert.equal(await page.evaluate(()=>calls[0][1]),'refresh');
@@ -98,6 +98,27 @@ const path = require('node:path');
       await agenda.getByRole('button',{name:/Archiv/}).click();
       await agenda.getByRole('button',{name:'Reaktivieren',exact:true}).click();
       assert.equal(await page.evaluate(()=>calls.at(-1)[1]),'unarchive_event');
+      const savedAgendaText = await agenda.locator("ha-card").innerText();
+      // Portal outages retain the agenda/timetable, but show their actual age.
+      await page.evaluate(() => {
+        fixture.children[0].portal_status = 'connection_failed';
+        fixture.children[0].last_success = '2026-11-04T08:15:00Z';
+        document.querySelectorAll('eltern-portal-schulmanager-stundenplan, eltern-portal-schulmanager-header, eltern-portal-schulmanager-termine').forEach(card=>card._render());
+      });
+      assert.match(await footer.getByRole('status').innerText(), /Portal nicht erreichbar.*Gespeicherte Daten.*4\.11\.2026/s);
+      assert.match(await plan.getByRole('status').innerText(), /Gespeicherte Daten/);
+      assert.match(await plan.locator('ha-card').innerText(), /Biologie/);
+      assert.equal((await agenda.locator('ha-card').innerText()).endsWith(savedAgendaText),true);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth > innerWidth),false);
+      await page.screenshot({path:`/tmp/schulmanager-offline-${width}.png`,fullPage:true});
+      for (const [status, text] of [['partial',/nur teilweise erreichbar/], ['auth_failed',/Anmeldung.*erforderlich/]]) {
+        await footer.evaluate((card,status)=>{card._data.children[0].portal_status=status;card._data.children[0].last_success=null;card._render();},status);
+        assert.match(await footer.getByRole('status').innerText(), text);
+        assert.match(await footer.getByRole('status').innerText(), /unbekannt/);
+      }
+      await footer.evaluate(card=>{card._data.children[0].portal_status='ok';card._render();});
+      assert.equal(await footer.getByRole('status').count(),0);
+      await page.evaluate(()=>document.querySelectorAll("eltern-portal-schulmanager-stundenplan, eltern-portal-schulmanager-termine").forEach(card=>card._render()));
       assert.deepEqual(errors,[]);
       await page.screenshot({path:`/tmp/schulmanager-${width}.png`,fullPage:true});
       await page.close();

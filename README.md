@@ -26,7 +26,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ## Message appointments in the timetable
 
-**Correction from v0.15.1.** Archive sources use a separate store exclusively for timetable extraction. Backfilling preserves existing messages, tasks, read state and comments. Identifiable historical imports from v0.15.0 and their untouched generated open tasks are reversibly quarantined. Original records are retained, along with user comments and completed tasks. Additional appointments appear at their time inside the week grid. Select an entry to open details and editing actions.
+**Correction from v0.15.1.** Archive sources use a separate store exclusively for timetable extraction. Backfilling preserves existing messages, tasks, read state and comments. Identifiable historical imports from v0.15.0 and their untouched generated open tasks are reversibly quarantined. Original records are retained, along with user comments and completed tasks. Additional appointments appear at their time inside the week grid. From v0.15.2, compact appointments show an icon and at most two title lines, with longer titles truncated with an ellipsis. Selecting it opens the corresponding day with full details and editing actions.
 
 
 The timetable card shows appointments from messages and attachments in day and week views with source links. Clearly evidenced appointments are included automatically. Uncertain dates and elective offers appear as proposals requiring **Übernehmen**. Without AI, explicitly dated events become proposals. Weekly courses require an evidenced start and end and pause during the bundled holidays.

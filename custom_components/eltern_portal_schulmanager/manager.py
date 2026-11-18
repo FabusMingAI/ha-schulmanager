@@ -763,6 +763,7 @@ class SchulManager:
         return {
             "uid": p.uid,
             "child": child,
+            "classname": self.children.get(child, {}).get("classname") if p.sent and school_year(p.sent.date()) == school_year(dt_util.now().date()) else None,
             "school": result.school,
             "school_name": result.school_name,
             "kind": p.kind,
@@ -1090,7 +1091,7 @@ class SchulManager:
         sent = item.get("sent")
         return {
             "child": child.get("name"),
-            "classname": child.get("classname"),
+            "classname": self._item_classname(item),
             "school": item.get("school_name"),
             "kind": KIND_LABELS.get(item["kind"], item["kind"]),
             "sender": item.get("sender"),
@@ -1099,6 +1100,14 @@ class SchulManager:
             "title": item.get("title"),
             "body": body.strip(),
         }
+
+    def _item_classname(self, item: dict[str, Any]) -> str:
+        if item.get("classname"):
+            return item["classname"]
+        sent = dt_util.parse_datetime(item.get("sent") or "")
+        if sent and school_year(sent.date()) != school_year(dt_util.now().date()):
+            return ""
+        return self.children.get(item.get("child"), {}).get("classname") or ""
 
     async def _analyze(self, item: dict[str, Any]) -> None:
         content = self._schedule_content(item)
@@ -1195,7 +1204,8 @@ class SchulManager:
                 # A refresh may have replaced the message while the AI was running.
                 if content != self._schedule_content(item):
                     continue
-                self._replace_events(item, result["events"], method)
+                if not error:
+                    self._replace_events(item, result["events"], method)
                 item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
                                          "status": "failed" if error else "done", "method": method, "error": error}
             except Exception as err:  # noqa: BLE001
@@ -1249,16 +1259,26 @@ class SchulManager:
         events = self.data["events"]
         old = {identity(ev.get("title"), ev.get("date"), ev.get("time")): ev["uid"]
                for ev in events.values() if ev.get("item_uid") == uid}
-        stable_ids = {ev.get("stable"): ev["uid"] for ev in events.values() if ev.get("item_uid") == uid}
-        for eid in [e for e, ev in events.items() if ev.get("item_uid") == uid]:
-            del events[eid]
+        stable_ids = dict(item.get("schedule_event_ids") or {})
+        stable_ids.update({ev["stable"]: ev["uid"] for ev in events.values()
+                           if ev.get("item_uid") == uid and ev.get("stable")})
+        extracted = list({identity(ev.get("title"), ev.get("date"), ev.get("time"), ev.get("end"),
+                                   ev.get("weekday"), ev.get("repeat_until")): ev for ev in extracted}.values())
+        replacements = {}
         titles = [str(ev["title"]).casefold() for ev in extracted]
         for ev in extracted:
             # Title identity survives reordering, date corrections and cancellation.
             title = str(ev["title"]).casefold()
+            if not self._item_classname(item) and ev.get("status") in ("confirmed", "cancelled"):
+                ev = {**ev, "status": "proposed"}
             stable = identity(uid, title, ev.get("date") if titles.count(title) > 1 else "")
             eid = stable_ids.get(stable) or old.get(identity(ev.get("title"), ev.get("date"), ev.get("time")), f"{uid}-termin-{stable}")
-            events[eid] = {**ev, "uid": eid, "stable": stable, "item_uid": uid, "child": item["child"], "method": method}
+            stable_ids[stable] = eid
+            replacements[eid] = {**ev, "uid": eid, "stable": stable, "item_uid": uid, "child": item["child"], "method": method}
+        for eid in [e for e, ev in events.items() if ev.get("item_uid") == uid]:
+            del events[eid]
+        events.update(replacements)
+        item["schedule_event_ids"] = stable_ids
 
     # ------------------------------------------------------------------
     # Öffentliche Aktionen
@@ -1557,8 +1577,6 @@ class SchulManager:
                                  "end": None if ev.get("repeat_until") else ev.get("end")})
         for ev in expanded:
             if not self.schedule_options(child)["messages"]:
-                continue
-            if other_class(ev.get("title")):
                 continue
             item = self.items.get(ev.get("item_uid"), {})
             day = date.fromisoformat(ev["date"])
@@ -2014,17 +2032,21 @@ class SchulManager:
                  "hidden": choices.get(lesson_uid(lesson)) == "hidden"} for lesson in lessons]
 
     def schedule_entries(self, child: str) -> list[dict[str, Any]]:
-        events = [ev for ev in self.data["events"].values() if ev.get("child") == child]
+        own_only = self.opt(CONF_OWN_CLASS_ONLY, DEFAULT_OWN_CLASS_ONLY)
+        events = [{**ev, "source_classname": self._item_classname(self.items.get(ev.get("item_uid"), {})) if own_only else ""}
+                  for ev in self.data["events"].values() if ev.get("child") == child]
         classname = self.children.get(child, {}).get("classname") or ""
-        entries = message_entries(events, self.items, classname) + holiday_entries()
         choices = self.data.get("schedule_choices", {}).get(child, {})
+        events = [{**ev, "status": "cancelled" if ev.get("cancelled") else "confirmed"} if choices.get(ev["uid"]) == "confirmed"
+                  and ev.get("status") != "cancelled" else ev for ev in events]
+        entries = message_entries(events, self.items, classname) + holiday_entries()
         for entry in entries:
             aliases = entry.get("aliases") or [entry["uid"]]
             if entry.get("choice_key"):
                 aliases = [*aliases, entry["choice_key"]]
             entry["hidden"] = any(choices.get(uid) == "hidden" for uid in aliases)
             if entry.get("status") != "cancelled" and any(choices.get(uid) == "confirmed" for uid in aliases):
-                entry["status"] = "confirmed"
+                entry["status"] = "cancelled" if entry.get("cancelled") else "confirmed"
             entry.setdefault("status", "proposed")
         return entries
 

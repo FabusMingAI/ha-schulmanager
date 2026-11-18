@@ -188,7 +188,8 @@ def normalize(raw: dict[str, Any], languages: list[str] | None = None) -> dict[s
                 "location": e.get("ort") or None,
                 "time_end": schedule_clock(e.get("ende_uhrzeit")),
                 "audience": str(e.get("zielgruppe") or "")[:200],
-                "status": "cancelled" if e.get("abgesagt") is True else "confirmed" if certain else "proposed",
+                "status": ("cancelled" if e.get("abgesagt") is True else "confirmed") if certain else "proposed",
+                "cancelled": e.get("abgesagt") is True,
                 "weekday": weekday,
                 "repeat_until": repeat_until,
                 "details": str(e.get("beleg") or "")[:600],
@@ -279,7 +280,7 @@ async def async_analyze_ai(
     searchable = re.sub(r"\s+", " ", body).casefold()
     for event in normalized["events"]:
         evidence = re.sub(r"\s+", " ", event.get("details") or "").casefold()
-        if event["status"] == "confirmed" and (not evidence or evidence not in searchable):
+        if event["status"] in ("confirmed", "cancelled") and (not evidence or evidence not in searchable):
             event["status"] = "proposed"
     return normalized
 

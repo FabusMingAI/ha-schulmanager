@@ -32,7 +32,7 @@ async def manager(hass):
     await m.async_load()
     m.children["anna"] = {"name": "Anna", "classname": "8b", "school": "demo"}
     m.children["max"] = {"name": "Max", "classname": "6a", "school": "other"}
-    m.items["letter"] = {"uid": "letter", "child": "anna", "kind": "nachricht", "read": True,
+    m.items["letter"] = {"uid": "letter", "child": "anna", "classname": "8b", "kind": "nachricht", "read": True,
                          "sent": "2026-11-01T10:00:00", "title": "Robotikkurs", "version": "v1",
                          "body": "Robotikkurs am 16.11.2026 von 14:00 bis 15:30", "analysis": {"status": "archiv"}}
     m._changed = lambda: None
@@ -131,6 +131,12 @@ async def test_legacy_uids_updates_reordering_tombstones_and_optional_lessons(ma
     m.schedule_action("anna", "legacy-termin-0", "hide")
     m._replace_events(item, [], "ki")
     assert m.data["schedule_choices"]["anna"]["legacy-termin-0"] == "hidden"
+    m._replace_events(item, [event()], "ki")
+    assert next(e for e in m.schedule_entries("anna") if e["uid"] == "legacy-termin-0")["hidden"]
+    before = deepcopy(m.data["events"])
+    with pytest.raises(KeyError):
+        m._replace_events(item, [{"date": "2026-11-01"}], "ki")
+    assert m.data["events"] == before
 
 
 async def test_calendar_series_skips_holidays_and_uses_end_times(manager):
@@ -182,3 +188,42 @@ async def test_archive_attachments_and_chunking(manager):
         chunks = [call.args[2]["body"] for call in analyze.call_args_list]
     assert len(chunks) == 3 and all(len(c) <= MAX_TEXT for c in chunks)
     assert sum(len(c) for c in chunks) >= len(body)
+
+
+async def test_schedule_services_and_reload_persistence(manager):
+    from custom_components.eltern_portal_schulmanager import _register_services
+    m = manager
+    m._replace_events(m.items["letter"], [event(status="proposed")], "ki")
+    uid = next(iter(m.data["events"]))
+    _register_services(m.hass)
+    with patch("custom_components.eltern_portal_schulmanager.get_manager", return_value=m):
+        await m.hass.services.async_call(DOMAIN, "timetable_entry", {"child": "anna", "event_id": uid, "action": "confirm"}, blocking=True)
+        await m.hass.services.async_call(DOMAIN, "timetable_options", {"child": "anna", "messages": False, "holidays": True}, blocking=True)
+        with patch.object(m, "async_refresh", new_callable=AsyncMock) as refresh:
+            await m.hass.services.async_call(DOMAIN, "rescan_schedule", {}, blocking=True)
+        refresh.assert_awaited_once()
+    m.schedule_action("anna", uid, "hide")
+    await m.store.async_save(m.data)
+    reloaded = SchulManager(m.hass, m.entry)
+    await reloaded.async_load()
+    assert next(e for e in reloaded.schedule_entries("anna") if e["uid"] == uid)["hidden"]
+    assert reloaded.schedule_options("anna")["messages"] is False
+
+
+async def test_historical_class_and_explicit_rescheduling(manager):
+    m = manager
+    old = m.items["letter"]
+    old.pop("classname")
+    old["sent"] = "2020-11-01T10:00:00"
+    assert m._context(old)["classname"] == ""
+    m._replace_events(old, [event(title="Ausflug 5b", date="2020-11-16")], "ki")
+    historical = next(e for e in m.schedule_entries("anna") if e["kind"] == "message")
+    assert historical["status"] == "proposed"
+    m.schedule_action("anna", historical["uid"], "confirm")
+    assert any(e["title"] == "Ausflug 5b" for e in m.child_events("anna"))
+    old["classname"] = "8b"
+    m._replace_events(old, [event()], "ki")
+    m.items["correction"] = {**old, "uid": "correction", "sent": "2026-11-10T10:00:00"}
+    m._replace_events(m.items["correction"], [event(date="2026-11-23", replaces_date="2026-11-16")], "ki")
+    events = [e for e in m.child_events("anna") if e["category"] == "termin"]
+    assert len(events) == 1 and events[0]["start"].date() == date(2026, 11, 23)

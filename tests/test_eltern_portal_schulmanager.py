@@ -259,9 +259,10 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
         assert m.items["bspgym-7-elternbrief-100"]["analysis"]["status"] == "archiv"
         await m.async_refresh()
         await hass.async_block_till_done()
-        for _ in range(20):
-            if not m._pending():
+        for _ in range(100):
+            if not m._pending() and any(e.data["item_uid"] == "bspgym-7-elternbrief-501" for e in new_item_events):
                 break
+            await asyncio.sleep(0.01)
             await hass.async_block_till_done()
 
     letter = m.items["bspgym-7-elternbrief-501"]
@@ -287,19 +288,13 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
     assert hass.states.get("todo.schule_anna_aufgaben").state == "1"
     url = st.attributes["mitteilungen"][0]["dateien"][0]["url"]
     assert "authSig=" in url
-    # Kalender: Frist, Termin aus Brief (mit Uhrzeit), Schulaufgabe aus Portal
-    resp = await hass.services.async_call(
-        "calendar", "get_events",
-        {"entity_id": "calendar.schule_anna_kalender", "duration": {"days": 30}},
-        blocking=True, return_response=True,
-    )
     # Legacy AI responses without explicit evidence require confirmation.
     for proposed in m.schedule_entries("anna"):
         if proposed["title"] == "Abfahrt Klassenfahrt":
             m.schedule_action("anna", proposed["uid"], "confirm")
     resp = await hass.services.async_call(
-        "calendar", "get_events", {"entity_id": "calendar.schule_anna_kalender", "start_date_time": today.isoformat(),
-                                  "end_date_time": (today + timedelta(days=30)).isoformat()},
+        "calendar", "get_events",
+        {"entity_id": "calendar.schule_anna_kalender", "duration": {"days": 30}},
         blocking=True, return_response=True,
     )
     summaries = [e["summary"] for e in resp["calendar.schule_anna_kalender"]["events"]]

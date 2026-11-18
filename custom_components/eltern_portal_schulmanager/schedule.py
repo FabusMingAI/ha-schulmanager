@@ -79,7 +79,7 @@ def message_entries(events: list[dict[str, Any]], items: dict[str, Any], classna
     grouped: dict[tuple, dict[str, Any]] = {}
     for event in sorted(events, key=lambda e: items.get(e.get("item_uid"), {}).get("sent") or ""):
         item = items.get(event.get("item_uid"), {})
-        if concerns_class(event.get("audience") or event.get("title"), classname) is False:
+        if concerns_class(event.get("audience") or event.get("title"), event.get("source_classname", classname)) is False:
             continue
         key = tuple(str(event.get(k) or "").strip().casefold() for k in
                     ("title", "date", "time", "time_end", "end", "weekday", "repeat_until"))

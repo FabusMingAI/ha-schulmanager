@@ -11,7 +11,7 @@
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release-Stand:** Das neueste veröffentlichte Release ist [v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8). Die Screenshots zeigen das mit v0.14.5 eingeführte Dashboard-Layout mit erfundenen Daten.
+> Die veröffentlichte Version und ihre Release Notes stehen auf der aktuellen Release-Seite. Diese README beschreibt den Entwicklungsstand einschließlich der für v0.15.0 vorbereiteten Stundenplan-Erweiterungen. Die Screenshots zeigen das mit v0.14.5 eingeführte Dashboard-Layout mit erfundenen Daten. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
@@ -130,7 +130,9 @@ Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-s
 
 ## Releases und Updates
 
-Stand **8. November 2026** ist **[v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8)** das neueste veröffentlichte Release. Es enthält die technische Bronze-/Silber-Selbsteinschätzung: Verbindungsprüfung bei der Einrichtung, erneute Anmeldung und Zugangsdatenänderung, zuverlässige Verfügbarkeitsanzeige, erneut zustellbare Erinnerungen, datensparsame Diagnose und verbindliche Testabdeckung. Die Integration bleibt Custom; dies sind keine offiziellen Home-Assistant-Auszeichnungen.
+Die veröffentlichte Version und ihre Release Notes stehen auf der aktuellen Release-Seite. Die für v0.15.0 vorbereiteten Änderungen sind im Changelog dokumentiert. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
+
+Seit v0.14.8 enthält die Integration die technische Bronze-/Silber-Selbsteinschätzung mit Verbindungsprüfung bei der Einrichtung, erneuter Anmeldung, Zugangsdatenänderung, Verfügbarkeitsanzeige, erneut zustellbaren Erinnerungen, datensparsamer Diagnose und verbindlicher Testabdeckung. Die Integration hat weiterhin die Einstufung Custom.
 
 Updates über HACS oder Marketplace installieren und Home Assistant neu starten. Die Versionsanzeige in der Statusleiste von „Schule“ zeigt die tatsächlich laufende Integration; eine heruntergeladene Version wird erst nach dem Neustart aktiv.
 
@@ -251,6 +253,9 @@ Entity-IDs richten sich nach der Sprache von Home Assistant; die Beispiele zeige
 | `eltern_portal_schulmanager.update_item` | `status` (`offen`, `in_arbeit`, `erledigt`) einer Mitteilung (`item_id`); ohne `item_id` für alle Mitteilungen von `child` (bzw. aller Kinder), liefert `changed` |
 | `eltern_portal_schulmanager.add_task` | `child`, `title`, optional `due`, `amount`, `details`, `type` |
 | `eltern_portal_schulmanager.reanalyze` | `item_id`; Mitteilung mit dem eingestellten KI-Dienst oder Regeln neu auswerten |
+| `eltern_portal_schulmanager.rescan_schedule` | Verfügbares Archiv erneut abrufen und die Terminprüfung einschließlich fehlgeschlagener Auswertungen wiederholen |
+| `eltern_portal_schulmanager.timetable_entry` | `child`, `event_id`, `action` (`hide`, `restore`, `confirm`); zusätzlichen Stundenplaneintrag verwalten |
+| `eltern_portal_schulmanager.timetable_options` | `child`, `messages`, `holidays`; Mitteilungstermine und bayerische Ferien ein- oder ausblenden |
 | `eltern_portal_schulmanager.archive_event` / `eltern_portal_schulmanager.unarchive_event` | `child` und `event_id` (uid eines Eintrags in „Termine & Fristen“): ins Archiv schieben bzw. zurückholen |
 | `eltern_portal_schulmanager.send_digest` / `eltern_portal_schulmanager.send_reminders` | Übersicht oder Erinnerungen sofort schicken |
 | `eltern_portal_schulmanager.rebuild_dashboard` | Dashboard „Schule“ neu erzeugen |

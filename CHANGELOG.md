@@ -2,8 +2,22 @@
 
 ## Unreleased
 
-- Message appointments and confirmed weekly courses in the timetable, resumable full archive backfill, source links, proposals, persistent per-child hide/restore controls and offline Bavarian holidays (2024–2030).
-- Mitteilungstermine und bestätigte wöchentliche Kurse im Stundenplan, fortsetzbare Prüfung des vollständigen Archivs, Quellenlinks, Vorschläge, dauerhaftes Entfernen/Wiederherstellen je Kind und bayerische Ferien offline (2024–2030).
+## 0.15.0 – 2026-11-18
+
+- Show appointments from messages and attachments in day and week timetables with source links and overlap indicators. Clearly evidenced appointments are included automatically. Uncertain dates and elective courses require confirmation.
+- Termine aus Mitteilungen und Anhängen erscheinen im Tages- und Wochenstundenplan mit Quellenlinks und Überschneidungshinweisen. Eindeutig belegte Termine werden übernommen. Unsichere Angaben und Wahlkurse benötigen eine Bestätigung.
+
+- Fetch the entire available portal archive once after upgrading and backfill appointments in a resumable background pass. Read stored PDFs in full and process long texts in chunks. Progress includes pending checks, failures and attachments without readable text. The configured AI provider is also called for older messages.
+- Nach dem Update das gesamte verfügbare Portalarchiv einmalig abrufen und Termine im Hintergrund fortsetzbar nachtragen. Gespeicherte PDFs vollständig lesen und lange Texte abschnittsweise auswerten. Fortschritt, Fehler und Anhänge ohne auslesbaren Text anzeigen. Der konfigurierte KI-Dienst wird auch für ältere Mitteilungen aufgerufen.
+
+- Add persistent per-child confirmation, removal and restoration of additional entries and optional lessons. Preserve these choices across reloads, source corrections and rescans. Support bounded weekly courses, explicit cancellations and rescheduling, duplicate sources and historical class context.
+- Zusätzliche Einträge und optionale Unterrichtsstunden je Kind dauerhaft bestätigen, entfernen und wiederherstellen. Entscheidungen bleiben bei Neuladen, Quellenkorrekturen und erneuter Prüfung erhalten. Zeitlich begrenzte Wochenkurse, ausdrückliche Absagen und Verschiebungen, doppelte Quellen und historische Klassenzuordnung berücksichtigen.
+
+- Bundle official Bavarian school holidays from summer 2024 through summer 2030 for offline display and pause regular lessons during displayed holidays. Add per-child display switches and automation actions `rescan_schedule`, `timetable_entry` and `timetable_options`.
+- Amtliche bayerische Ferien von Sommer 2024 bis Sommer 2030 offline anzeigen und regulären Unterricht während eingeblendeter Ferien pausieren. Anzeige je Kind umschalten und die Aktionen `rescan_schedule`, `timetable_entry` und `timetable_options` für Automationen bereitstellen.
+
+- Validation uses synthetic/demo data. All 211 Python tests pass in CI and on the isolated ARM64 Home Assistant 2026.10.1 / Python 3.14.6 environment, alongside desktop and mobile browser checks. Overall Python line coverage is 98%.
+- Mit synthetischen Daten und Demo-Daten geprüft. Alle 211 Python-Tests bestehen in CI und in der isolierten ARM64-Testumgebung mit Home Assistant 2026.10.1 / Python 3.14.6, ebenso die Desktop- und Handy-Oberflächentests. Die gesamte Python-Zeilenabdeckung beträgt 98 %.
 
 ## 0.14.11 – 2026-11-14
 

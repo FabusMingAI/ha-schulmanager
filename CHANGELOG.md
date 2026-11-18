@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+## 0.15.2 – 2026-11-18
+
 - Compact week timetable appointments to an icon and at most two title lines, with overflow truncated and a full accessible label. Selecting an appointment opens its date in the day view with details and editing actions.
-- Termine im Wochenraster auf ein Symbol und höchstens zehn Titelzeichen in einer Zeile verkleinern. Der vollständige Titel bleibt als Tooltip und für Screenreader verfügbar. Ein Klick öffnet den betreffenden Tag mit Details und Bearbeitung.
+- Termine im Wochenraster auf ein Symbol und höchstens zwei Titelzeilen mit Auslassungspunkten bei Überlänge verkleinern. Der vollständige Titel bleibt als Tooltip und für Screenreader verfügbar. Ein Klick öffnet den betreffenden Tag mit Details und Bearbeitung.
 
 ## 0.15.1 – 2026-11-18
 

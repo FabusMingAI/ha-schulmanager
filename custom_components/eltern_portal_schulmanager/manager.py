@@ -319,6 +319,8 @@ class SchulManager:
             "archive_fetched": stored.get("archive_fetched", []),
             "schedule_sources": stored.get("schedule_sources", {}),
             "schedule_recovery": stored.get("schedule_recovery", {"items": {}, "tasks": {}}),
+            "schedule_scans": stored.get("schedule_scans", {}),
+            "schedule_event_ids": stored.get("schedule_event_ids", {}),
         }
         recovered = quarantine_archive_imports(self.data, int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)))
         if recovered:
@@ -1170,7 +1172,7 @@ class SchulManager:
             "error": error,
             "at": dt_util.now().isoformat(),
         }
-        item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+        self.data.setdefault("schedule_scans", {})[item["uid"]] = {"version": SCHEDULE_VERSION, "content": content,
                                  "status": "done", "method": method, "error": error}
 
     def _schedule_content(self, item: dict[str, Any]) -> str:
@@ -1178,6 +1180,9 @@ class SchulManager:
 
     def schedule_sources(self) -> dict[str, dict[str, Any]]:
         return {**self.data.get("schedule_sources", {}), **self.items}
+
+    def _schedule_scan(self, item: dict[str, Any]) -> dict[str, Any]:
+        return self.data.get("schedule_scans", {}).get(item["uid"], item.get("schedule_scan", {}))
 
     def _schedule_attachments(self, item: dict[str, Any]) -> list[dict[str, str]] | None:
         return [{"media_content_id": self.media_content_id(f["path"]),
@@ -1198,12 +1203,12 @@ class SchulManager:
 
     def _schedule_pending(self) -> list[dict[str, Any]]:
         return [item for item in self.schedule_sources().values()
-                if item.get("schedule_scan", {}).get("version") != SCHEDULE_VERSION
-                or item.get("schedule_scan", {}).get("content") != self._schedule_content(item)]
+                if self._schedule_scan(item).get("version") != SCHEDULE_VERSION
+                or self._schedule_scan(item).get("content") != self._schedule_content(item)]
 
     @property
     def schedule_progress(self) -> dict[str, int]:
-        scans = [i.get("schedule_scan", {}) for i in self.schedule_sources().values()]
+        scans = [self._schedule_scan(i) for i in self.schedule_sources().values()]
         return {"total": len(scans), "pending": len(self._schedule_pending()),
                 "failed": sum(s.get("status") == "failed" for s in scans),
                 "unreadable": sum(bool(i.get("files") and not i.get("text")) for i in self.schedule_sources().values())}
@@ -1214,8 +1219,8 @@ class SchulManager:
             if self._pending():
                 await self._work_queue()
             content = self._schedule_content(item)
-            if (item.get("schedule_scan", {}).get("content") == content
-                    and item.get("schedule_scan", {}).get("version") == SCHEDULE_VERSION):
+            if (self._schedule_scan(item).get("content") == content
+                    and self._schedule_scan(item).get("version") == SCHEDULE_VERSION):
                 continue
             try:
                 ctx = await self._schedule_context(item)
@@ -1235,11 +1240,11 @@ class SchulManager:
                     continue
                 if not error:
                     self._replace_events(item, result["events"], method)
-                item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                self.data.setdefault("schedule_scans", {})[item["uid"]] = {"version": SCHEDULE_VERSION, "content": content,
                                          "status": "failed" if error else "done", "method": method, "error": error}
             except Exception as err:  # noqa: BLE001
                 LOGGER.exception("Archiv-Termine aus %s konnten nicht gelesen werden", item["uid"])
-                item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                self.data.setdefault("schedule_scans", {})[item["uid"]] = {"version": SCHEDULE_VERSION, "content": content,
                                          "status": "failed", "error": str(err)}
             self._changed()
             await asyncio.sleep(0)
@@ -1247,7 +1252,7 @@ class SchulManager:
     def rescan_schedule(self) -> None:
         self.data["archive_fetched"] = []
         for item in self.schedule_sources().values():
-            item.pop("schedule_scan", None)
+            self.data.setdefault("schedule_scans", {})[item["uid"]] = {}
         self._queue_event.set()
         self._changed()
 
@@ -1288,7 +1293,7 @@ class SchulManager:
         events = self.data["events"]
         old = {identity(ev.get("title"), ev.get("date"), ev.get("time")): ev["uid"]
                for ev in events.values() if ev.get("item_uid") == uid}
-        stable_ids = dict(item.get("schedule_event_ids") or {})
+        stable_ids = dict(self.data.get("schedule_event_ids", {}).get(uid, item.get("schedule_event_ids")) or {})
         stable_ids.update({ev["stable"]: ev["uid"] for ev in events.values()
                            if ev.get("item_uid") == uid and ev.get("stable")})
         extracted = list({identity(ev.get("title"), ev.get("date"), ev.get("time"), ev.get("end"),
@@ -1307,7 +1312,7 @@ class SchulManager:
         for eid in [e for e, ev in events.items() if ev.get("item_uid") == uid]:
             del events[eid]
         events.update(replacements)
-        item["schedule_event_ids"] = stable_ids
+        self.data.setdefault("schedule_event_ids", {})[uid] = stable_ids
 
     # ------------------------------------------------------------------
     # Öffentliche Aktionen

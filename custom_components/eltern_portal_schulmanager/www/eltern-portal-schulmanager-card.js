@@ -1274,9 +1274,9 @@
         .schedule-settings {margin:8px 0;display:flex;gap:6px;flex-wrap:wrap}
         .schedule-source {font-size:.85em;color:var(--secondary-text-color)}
         .holiday-cell {background:var(--secondary-background-color)}
-        .week-appointment {display:flex;align-items:center;gap:3px;width:100%;max-width:100%;min-width:0;min-height:28px;padding:3px;margin:2px 0;border:0;border-left:2px solid var(--primary-color);border-radius:3px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;line-height:18px;text-align:left;cursor:pointer;overflow:hidden}
+        .week-appointment {display:flex;align-items:flex-start;gap:3px;width:100%;max-width:100%;min-width:0;min-height:28px;padding:3px;margin:2px 0;border:0;border-left:2px solid var(--primary-color);border-radius:3px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;line-height:18px;text-align:left;cursor:pointer;overflow:hidden}
         .week-appointment .appointment-icon {flex:none}
-        .week-appointment .appointment-title {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .week-appointment .appointment-title {display:-webkit-box;min-width:0;max-height:36px;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal;overflow-wrap:anywhere}
         .week-appointment.proposed {border-left-color:#db9b21}
         .week-appointment.holiday {border-left-color:#44966b}
       </style>`;
@@ -1504,11 +1504,9 @@
     }
 
     _weekAppointment(c, e, iso) {
-      const letters = [...e.title];
-      const shortTitle = letters.length > 10 ? letters.slice(0,9).join("") + "…" : e.title;
       const icon = e.kind === "holiday" ? "🌴" : "📅";
       const label = `${e.title}${e.time ? " · " + e.time : ""} · Tagesansicht öffnen`;
-      return `<button class="week-appointment ${esc(e.kind)} ${e.status === "proposed" ? "proposed" : ""}" data-child="${esc(c.key)}" data-uid="${esc(e.uid)}" data-schedule-day="${esc(iso)}" title="${esc(label)}" aria-label="${esc(label)}"><span class="appointment-icon" aria-hidden="true">${icon}</span><span class="appointment-title" aria-hidden="true">${esc(shortTitle)}</span></button>`;
+      return `<button class="week-appointment ${esc(e.kind)} ${e.status === "proposed" ? "proposed" : ""}" data-child="${esc(c.key)}" data-uid="${esc(e.uid)}" data-schedule-day="${esc(iso)}" title="${esc(label)}" aria-label="${esc(label)}"><span class="appointment-icon" aria-hidden="true">${icon}</span><span class="appointment-title" aria-hidden="true">${esc(e.title)}</span></button>`;
     }
 
     _teacherSource(l) {

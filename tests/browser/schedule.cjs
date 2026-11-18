@@ -59,12 +59,15 @@ const path = require('node:path');
       assert.equal(await card.locator('table').getByRole('button',{name:/Robotikkurs.*Tagesansicht öffnen/}).count(),1);
       assert.equal(await card.locator('table').locator('[data-schedule-action]').count(),0);
       await card.evaluate(element => {
-        element._data.children[0].schedule[0].title='Robotikkurs für mathematische und naturwissenschaftliche Wettbewerbe';
+        element._data.children[0].schedule[0].title='Robotikkurs für mathematische und naturwissenschaftliche Wettbewerbe mit anschließender Projektvorstellung für alle interessierten Eltern und Schüler';
         element._render();
       });
       const compact = card.getByRole('button',{name:/Robotikkurs für mathematische.*Tagesansicht öffnen/});
-      assert.ok((await compact.locator('.appointment-title').innerText()).length <= 10);
-      assert.ok((await compact.boundingBox()).height <= 32);
+      const titleLayout = await compact.locator('.appointment-title').evaluate(el => ({height:el.getBoundingClientRect().height, scrollHeight:el.scrollHeight, clamp:getComputedStyle(el).webkitLineClamp}));
+      assert.equal(titleLayout.clamp,'2');
+      assert.ok(titleLayout.height <= 36);
+      assert.ok(titleLayout.scrollHeight > titleLayout.height);
+      assert.ok((await compact.boundingBox()).height <= 42);
       await compact.focus();
       await page.keyboard.press('Enter');
       assert.equal(await card.locator('.wk table').count(),0);

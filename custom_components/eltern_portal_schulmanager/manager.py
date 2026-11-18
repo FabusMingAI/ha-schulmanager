@@ -44,6 +44,7 @@ from .analyzer import (
     summary_languages,
 )
 from .timetable import enrich_timetable
+from .recovery import quarantine_archive_imports
 from .schedule import (
     SCHEDULE_VERSION, holiday_entries, identity, in_holidays, lesson_uid,
     message_entries, occurrences,
@@ -316,7 +317,15 @@ class SchulManager:
             "schedule_choices": stored.get("schedule_choices", {}),
             "schedule_options": stored.get("schedule_options", {}),
             "archive_fetched": stored.get("archive_fetched", []),
+            "schedule_sources": stored.get("schedule_sources", {}),
+            "schedule_recovery": stored.get("schedule_recovery", {"items": {}, "tasks": {}}),
+            "schedule_scans": stored.get("schedule_scans", {}),
+            "schedule_event_ids": stored.get("schedule_event_ids", {}),
         }
+        recovered = quarantine_archive_imports(self.data, int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)))
+        if recovered:
+            LOGGER.warning("%d historische v0.15.0-Importe aus dem Postfach in die gesicherte Terminablage verschoben", recovered)
+            await self.store.async_save(self.data)
         # Seed older installations from their cached imports, without notifying.
         self._remember_substitution_slots()
 
@@ -385,6 +394,7 @@ class SchulManager:
             }
             errors: list[str] = []
             webuntis_errors: list[str] = []
+            archive_scan = False
             self._remember_substitution_slots()
             # Collect substitution notifications of both sources during this refresh
             # and send one combined message per child afterwards. Both sources use
@@ -393,6 +403,8 @@ class SchulManager:
             try:
                 for portal in self.entry.data.get(CONF_PORTALS, []):
                     school = portal[CONF_SCHOOL]
+                    archive_import = school not in self.data["archive_fetched"]
+                    archive_scan = archive_scan or archive_import
                     try:
                         result = await self._async_fetch_portal(portal)
                     except PortalAuthError as err:
@@ -413,7 +425,7 @@ class SchulManager:
                     self._set_portal_status(school, "partial" if result.errors else "ok")
                     errors.extend(f"{school}: {e}" for e in result.errors)
                     self._store_teachers(result)
-                    await self._merge(result)
+                    await self._merge(result, archive_import=archive_import)
                     if not result.errors:
                         self.data["portal_last_success"][school] = dt_util.now().isoformat()
                         if school not in self.data["archive_fetched"]:
@@ -425,7 +437,7 @@ class SchulManager:
                 await self._send_substitutions(key, fresh)
             self.last_errors = errors + webuntis_errors
             self.last_update = dt_util.now()
-            if not errors:
+            if not errors and not archive_scan:
                 # only portal errors matter here; the optional WebUntis source must
                 # not block cleaning up the portal archive
                 self._prune_archived()
@@ -561,7 +573,7 @@ class SchulManager:
     def _need_download(self, item: PortalItem) -> bool:
         if not self.opt(CONF_AUTO_DOWNLOAD, DEFAULT_AUTO_DOWNLOAD):
             return False
-        stored = self.items.get(item.uid)
+        stored = self.schedule_sources().get(item.uid)
         if stored is None or not stored.get("files"):
             return True
         return stored.get("version") != item.version
@@ -581,7 +593,7 @@ class SchulManager:
             number += 1
         return key
 
-    async def _merge(self, result: PortalResult) -> None:
+    async def _merge(self, result: PortalResult, *, archive_import: bool = False) -> None:
         first_import = result.school not in self.data["initialized"]
         today = dt_util.now().date()
         analyze_from = today - timedelta(
@@ -674,6 +686,21 @@ class SchulManager:
                 if fresh := self._merge_substitutions(key, pchild.substitutions):
                     fresh_subs[key] = fresh
             for pitem in pchild.items:
+                old_archive_item = archive_import and pitem.sent and pitem.sent.date() < today - timedelta(days=int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)))
+                if (archive_import and (not first_import or old_archive_item)) or pitem.uid in self.data.get("schedule_sources", {}):
+                    # An archive scan may only extend the timetable source cache.
+                    # Existing inbox records, tasks and read state are untouched.
+                    if pitem.uid not in self.items:
+                        archive_sources = self.data.setdefault("schedule_sources", {})
+                        source = archive_sources.get(pitem.uid)
+                        if source is None:
+                            source = self._new_item(key, result, pitem)
+                            source.update(read=True, notify=False, schedule_only=True, analysis={"status": "archiv"})
+                            archive_sources[pitem.uid] = source
+                        elif source.get("version") != pitem.version:
+                            source.update(title=pitem.title, body=pitem.body, version=pitem.version)
+                        await self._store_files(source, pitem.files)
+                    continue
                 stored = self.items.get(pitem.uid)
                 if stored is None:
                     if pitem.kind == KIND_POLL:
@@ -1145,11 +1172,17 @@ class SchulManager:
             "error": error,
             "at": dt_util.now().isoformat(),
         }
-        item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+        self.data.setdefault("schedule_scans", {})[item["uid"]] = {"version": SCHEDULE_VERSION, "content": content,
                                  "status": "done", "method": method, "error": error}
 
     def _schedule_content(self, item: dict[str, Any]) -> str:
         return identity(item.get("version"), item.get("body"), item.get("text"), item.get("files"))
+
+    def schedule_sources(self) -> dict[str, dict[str, Any]]:
+        return {**self.data.get("schedule_sources", {}), **self.items}
+
+    def _schedule_scan(self, item: dict[str, Any]) -> dict[str, Any]:
+        return self.data.get("schedule_scans", {}).get(item["uid"], item.get("schedule_scan", {}))
 
     def _schedule_attachments(self, item: dict[str, Any]) -> list[dict[str, str]] | None:
         return [{"media_content_id": self.media_content_id(f["path"]),
@@ -1169,16 +1202,16 @@ class SchulManager:
         return ctx
 
     def _schedule_pending(self) -> list[dict[str, Any]]:
-        return [item for item in self.items.values()
-                if item.get("schedule_scan", {}).get("version") != SCHEDULE_VERSION
-                or item.get("schedule_scan", {}).get("content") != self._schedule_content(item)]
+        return [item for item in self.schedule_sources().values()
+                if self._schedule_scan(item).get("version") != SCHEDULE_VERSION
+                or self._schedule_scan(item).get("content") != self._schedule_content(item)]
 
     @property
     def schedule_progress(self) -> dict[str, int]:
-        scans = [i.get("schedule_scan", {}) for i in self.items.values()]
+        scans = [self._schedule_scan(i) for i in self.schedule_sources().values()]
         return {"total": len(scans), "pending": len(self._schedule_pending()),
                 "failed": sum(s.get("status") == "failed" for s in scans),
-                "unreadable": sum(bool(i.get("files") and not i.get("text")) for i in self.items.values())}
+                "unreadable": sum(bool(i.get("files") and not i.get("text")) for i in self.schedule_sources().values())}
 
     async def _schedule_backfill(self) -> None:
         """Resume the entire archive, without generating old tasks or notifications."""
@@ -1186,8 +1219,8 @@ class SchulManager:
             if self._pending():
                 await self._work_queue()
             content = self._schedule_content(item)
-            if (item.get("schedule_scan", {}).get("content") == content
-                    and item.get("schedule_scan", {}).get("version") == SCHEDULE_VERSION):
+            if (self._schedule_scan(item).get("content") == content
+                    and self._schedule_scan(item).get("version") == SCHEDULE_VERSION):
                 continue
             try:
                 ctx = await self._schedule_context(item)
@@ -1203,23 +1236,23 @@ class SchulManager:
                 if result is None:
                     result = analyze_rules(ctx)
                 # A refresh may have replaced the message while the AI was running.
-                if self.items.get(item["uid"]) is not item or content != self._schedule_content(item):
+                if self.schedule_sources().get(item["uid"]) is not item or content != self._schedule_content(item):
                     continue
                 if not error:
                     self._replace_events(item, result["events"], method)
-                item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                self.data.setdefault("schedule_scans", {})[item["uid"]] = {"version": SCHEDULE_VERSION, "content": content,
                                          "status": "failed" if error else "done", "method": method, "error": error}
             except Exception as err:  # noqa: BLE001
                 LOGGER.exception("Archiv-Termine aus %s konnten nicht gelesen werden", item["uid"])
-                item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                self.data.setdefault("schedule_scans", {})[item["uid"]] = {"version": SCHEDULE_VERSION, "content": content,
                                          "status": "failed", "error": str(err)}
             self._changed()
             await asyncio.sleep(0)
 
     def rescan_schedule(self) -> None:
         self.data["archive_fetched"] = []
-        for item in self.items.values():
-            item.pop("schedule_scan", None)
+        for item in self.schedule_sources().values():
+            self.data.setdefault("schedule_scans", {})[item["uid"]] = {}
         self._queue_event.set()
         self._changed()
 
@@ -1260,7 +1293,7 @@ class SchulManager:
         events = self.data["events"]
         old = {identity(ev.get("title"), ev.get("date"), ev.get("time")): ev["uid"]
                for ev in events.values() if ev.get("item_uid") == uid}
-        stable_ids = dict(item.get("schedule_event_ids") or {})
+        stable_ids = dict(self.data.get("schedule_event_ids", {}).get(uid, item.get("schedule_event_ids")) or {})
         stable_ids.update({ev["stable"]: ev["uid"] for ev in events.values()
                            if ev.get("item_uid") == uid and ev.get("stable")})
         extracted = list({identity(ev.get("title"), ev.get("date"), ev.get("time"), ev.get("end"),
@@ -1279,7 +1312,7 @@ class SchulManager:
         for eid in [e for e, ev in events.items() if ev.get("item_uid") == uid]:
             del events[eid]
         events.update(replacements)
-        item["schedule_event_ids"] = stable_ids
+        self.data.setdefault("schedule_event_ids", {})[uid] = stable_ids
 
     # ------------------------------------------------------------------
     # Öffentliche Aktionen
@@ -1502,7 +1535,7 @@ class SchulManager:
 
     def event_portal_url(self, ev: dict[str, Any]) -> str | None:
         """Link ins Eltern-Portal zur Mitteilung eines Eintrags, sonst None."""
-        item = self.items.get(ev.get("item_uid") or "")
+        item = self.schedule_sources().get(ev.get("item_uid") or "")
         return item.get("url") if item else None
 
     def child_events(self, child: str, subst_from: date | None = None) -> list[dict[str, Any]]:
@@ -1579,7 +1612,7 @@ class SchulManager:
         for ev in expanded:
             if not self.schedule_options(child)["messages"]:
                 continue
-            item = self.items.get(ev.get("item_uid"), {})
+            item = self.schedule_sources().get(ev.get("item_uid"), {})
             day = date.fromisoformat(ev["date"])
             desc = f"Aus: {item.get('title', '')}"
             if ev.get("time"):
@@ -2034,13 +2067,13 @@ class SchulManager:
 
     def schedule_entries(self, child: str) -> list[dict[str, Any]]:
         own_only = self.opt(CONF_OWN_CLASS_ONLY, DEFAULT_OWN_CLASS_ONLY)
-        events = [{**ev, "source_classname": self._item_classname(self.items.get(ev.get("item_uid"), {})) if own_only else ""}
+        events = [{**ev, "source_classname": self._item_classname(self.schedule_sources().get(ev.get("item_uid"), {})) if own_only else ""}
                   for ev in self.data["events"].values() if ev.get("child") == child]
         classname = self.children.get(child, {}).get("classname") or ""
         choices = self.data.get("schedule_choices", {}).get(child, {})
         events = [{**ev, "status": "cancelled" if ev.get("cancelled") else "confirmed"} if choices.get(ev["uid"]) == "confirmed"
                   and ev.get("status") != "cancelled" else ev for ev in events]
-        entries = message_entries(events, self.items, classname) + holiday_entries()
+        entries = message_entries(events, self.schedule_sources(), classname) + holiday_entries()
         for entry in entries:
             aliases = entry.get("aliases") or [entry["uid"]]
             if entry.get("choice_key"):
@@ -2566,6 +2599,13 @@ class SchulManager:
             self.data["archive_fetched"].remove(school)
         for uid in [u for u, i in self.items.items() if i.get("school") == school]:
             self.items.pop(uid)
+        for uid in [u for u, i in self.data.get("schedule_sources", {}).items() if i.get("school") == school]:
+            self.data["schedule_sources"].pop(uid)
+        recovery = self.data.get("schedule_recovery", {})
+        for uid in [u for u, i in recovery.get("items", {}).items() if i.get("school") == school]:
+            recovery["items"].pop(uid)
+        for tid in [t for t, task in recovery.get("tasks", {}).items() if task.get("child") in kids]:
+            recovery["tasks"].pop(tid)
         for tid in [t for t, v in self.tasks.items() if v.get("child") in kids]:
             self.tasks.pop(tid)
         for eid in [e for e, v in self.data["events"].items() if v.get("child") in kids]:

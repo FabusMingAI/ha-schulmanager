@@ -221,7 +221,7 @@ def test_install_payload_versions(tmp_path) -> None:
     assert json.loads((target / "manifest.json").read_text())["version"] == VERSION
     assert not mod.install_payload(str(config))  # same version: nothing to do
     manifest = json.loads((target / "manifest.json").read_text())
-    manifest["version"] = "0.15.0"
+    manifest["version"] = "99.0.0"
     (target / "manifest.json").write_text(json.dumps(manifest))
     assert not mod.install_payload(str(config))  # newer one installed: keep it
     manifest["version"] = "0.13.9"

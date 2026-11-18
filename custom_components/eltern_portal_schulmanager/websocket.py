@@ -106,7 +106,7 @@ def _manager(hass: HomeAssistant):
 
 def _task_light(m, t: dict[str, Any]) -> dict[str, Any]:
     today = dt_util.now().date()
-    item = m.items.get(t.get("item_uid") or "")
+    item = m.schedule_sources().get(t.get("item_uid") or "")
     return {
         "id": t["id"],
         "title": t["title"],
@@ -272,7 +272,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
 @callback
 def ws_item(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     m = _manager(hass)
-    item = m.items.get(msg["item_id"]) if m else None
+    item = m.schedule_sources().get(msg["item_id"]) if m else None
     if item is None:
         connection.send_error(msg["id"], "not_found", "Mitteilung nicht gefunden")
         return
@@ -300,7 +300,7 @@ def ws_task(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
         child=task.get("child"),
         child_name=m.children.get(task.get("child") or "", {}).get("name"),
     )
-    item = m.items.get(task.get("item_uid") or "")
+    item = m.schedule_sources().get(task.get("item_uid") or "")
     out["item"] = _item_full(hass, m, item) if item else None
     if task.get("due") and task.get("child"):
         from . import event_links

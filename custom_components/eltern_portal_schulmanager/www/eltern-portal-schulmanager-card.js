@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.15.0";
+  const VERSION = "0.15.1";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -1282,6 +1282,14 @@
       else for (const c of this._data.children) html += this._planHtml(c);
       html += `</ha-card>`;
       const root = this._setContent(html);
+      root.querySelectorAll("[data-schedule-open]").forEach(el => el.addEventListener("click", () => {
+        this._scheduleOpen = this._scheduleOpen === el.dataset.scheduleOpen ? null : el.dataset.scheduleOpen;
+        this._render();
+      }));
+      root.querySelectorAll("[data-daylesson]").forEach(el => el.addEventListener("click", () => {
+        this._selectedLesson = {child:el.dataset.child,lesson:el.dataset.daylesson};
+        this._render();
+      }));
       root.querySelectorAll("[data-schedule-action]").forEach(el => el.addEventListener("click", async () => {
         el.disabled = true;
         try {
@@ -1463,10 +1471,22 @@
     }
 
     _scheduleEntry(c, e, iso) {
+      const key = `${c.key}:${e.uid}:${iso || "manage"}`;
+      const open = this._scheduleOpen === key;
       const proposed = e.status === "proposed";
       const sources = (e.sources || []).map(s => /^https?:\/\//.test(s.url || "") ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "Mitteilung")}</a>` : esc(s.title || "Mitteilung")).join(" · ");
-      const overlaps = iso && !proposed && e.time && c.timetable.some(l => !l.hidden && l.weekday === (parseDay(iso).getDay() || 7) && l.start && l.end && e.time < l.end && (!e.time_end || e.time_end > l.start));
-      return `<div class="schedule-entry ${esc(e.kind)} ${proposed ? "proposed" : ""}"><b>${e.kind === "holiday" ? "🌴 " : "📅 "}${esc(e.title)}</b>${e.time ? ` · ${esc(e.time)}${e.time_end ? "–" + esc(e.time_end) : ""}` : " · ganztägig"}${e.location ? ` · ${esc(e.location)}` : ""}${proposed ? (e.cancelled ? " · Absage – bitte bestätigen" : " · Vorschlag – bitte bestätigen") : ""}${overlaps ? " · Überschneidung mit Unterricht" : ""}<div class="schedule-source">${sources || (e.kind === "holiday" ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">Amtliche Ferienordnung Bayern</a>` : "")}${e.details ? `<br>${esc(e.details)}` : ""}${!iso ? `<br>${esc(fmtDate(e.date))}${e.repeat_until || e.end ? "–" + esc(fmtDate(e.repeat_until || e.end)) : ""}` : ""}</div>${e.hidden ? this._scheduleButton(c,e.uid,"restore","Wiederherstellen") : `${proposed ? this._scheduleButton(c,e.uid,"confirm","Übernehmen") : ""}${this._scheduleButton(c,e.uid,"hide",e.weekday && e.repeat_until ? "Serie entfernen" : "Entfernen")}`}</div>`;
+      const title = `${e.kind === "holiday" ? "🌴" : "📅"} ${e.title}${proposed ? " · Vorschlag" : ""}`;
+      let html = `<div class="schedule-entry ${esc(e.kind)} ${proposed ? "proposed" : ""}"><button class="lesson-pick" data-schedule-open="${esc(key)}" aria-expanded="${open}"><b>${esc(title)}</b><div class="r">${e.time ? esc(e.time) + (e.time_end ? "–" + esc(e.time_end) : "") : "ganztägig"}</div></button>`;
+      if (open) {
+        if (iso && !proposed && e.time && c.timetable.some(l => !l.hidden && l.weekday === (parseDay(iso).getDay() || 7) && l.start && l.end && e.time < l.end && (!e.time_end || e.time_end > l.start))) html += `<div class="info">Überschneidung mit Unterricht</div>`;
+        html += `<div class="schedule-source">${sources || (e.kind === "holiday" ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">Amtliche Ferienordnung Bayern</a>` : "")}${e.location ? `<br>${esc(e.location)}` : ""}${e.details ? `<br>${esc(e.details)}` : ""}${!iso ? `<br>${esc(fmtDate(e.date))}` : ""}</div>`;
+        if (e.hidden) html += this._scheduleButton(c,e.uid,"restore","Wiederherstellen");
+        else {
+          if (proposed) html += this._scheduleButton(c,e.uid,"confirm",e.cancelled ? "Absage übernehmen" : "Übernehmen");
+          html += this._scheduleButton(c,e.uid,"hide",e.weekday && e.repeat_until ? "Serie entfernen" : "Entfernen");
+        }
+      }
+      return html + "</div>";
     }
 
     _teacherSource(l) {
@@ -1493,7 +1513,8 @@
       const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       let html = `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
       html += `<div class="bar"><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,-1)}" aria-label="Tag zurück">‹</button><button class="pill" data-child="${esc(c.key)}" data-day="${today}">Heute</button><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,1)}" aria-label="Tag vor">›</button></div>`;
-      for (const e of schedule) html += this._scheduleEntry(c, e, iso);
+      const additions = schedule.filter(e => e.time).sort((a,b) => a.time.localeCompare(b.time));
+      for (const e of schedule.filter(e => !e.time)) html += this._scheduleEntry(c,e,iso);
       const dayExams = (this._exams || {})[iso] || [];
       for (const e of dayExams) {
         const [icon, label] = EXAM_LABEL[e.category];
@@ -1503,6 +1524,7 @@
       if (!c.timetable.length) html += `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
       else if (!lessons.length) html += `<div class="empty">${holiday ? "Ferien · regulärer Unterricht pausiert." : "Kein Unterricht laut Stundenplan."}</div>`;
       for (const l of lessons) {
+        while (additions.length && l.start && additions[0].time <= l.start) html += this._scheduleEntry(c,additions.shift(),iso);
         const ch = changes(l.lesson);
         const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
         const isNow = iso === today && l.start && l.end && hhmm >= l.start && hhmm < l.end;
@@ -1510,17 +1532,18 @@
         const ex = examFor(l.subject);
         const exCls = ex ? (ex.category === "test" ? "has-test" : "has-exam") : "";
         const exBadge = ex ? `<span class="badge ${EXAM_LABEL[ex.category][2]}">${EXAM_LABEL[ex.category][0]} ${EXAM_LABEL[ex.category][1]}</span>` : "";
-        html += `<div tabindex="0" class="les ${kind} ${exCls} ${isNow ? "now" : ""} ${this._selectedLesson?.child === c.key && String(this._selectedLesson.lesson) === String(l.lesson) ? "lesson-selected" : ""}">
+        html += `<div tabindex="0" data-child="${esc(c.key)}" data-daylesson="${esc(l.lesson)}" class="les ${kind} ${exCls} ${isNow ? "now" : ""} ${this._selectedLesson?.child === c.key && String(this._selectedLesson.lesson) === String(l.lesson) ? "lesson-selected" : ""}">
             <span class="nr">${esc(l.lesson)}.</span>
             <span class="tm">${l.start ? esc(l.start) + "–" + esc(l.end || "") : ""}</span>
             <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}${exBadge}</div>
               <div class="lesson-details">Reguläre Lehrkraft: ${esc(l.teacher_label || l.teacher || "nicht angegeben")}${this._teacherSource(l)}${l.optional ? `<br>${esc(this._participation(l))}` : ""}<br>
               ${ch.map((e) => `Status: ${esc(KIND_LABEL[e.kind] || e.kind || "Änderung")}${e.teacher_label || e.teacher ? `<br>Ursprüngliche Lehrkraft: ${esc(e.teacher_label || e.teacher)}` : ""}${e.substitute_label || e.substitute ? `<br>Vertretungslehrkraft: ${esc(e.substitute_label || e.substitute)}` : ""}${e.room ? `<br>Raumänderung: ${esc(room(l.room))} → ${esc(room(e.room))}` : ""}${e.info ? `<br>Hinweis: ${esc(e.info)}` : ""}`).join("<br>") || (l.optional && l.participation !== "registered" ? "Status: optionales Klassenangebot" : "Status: regulärer Unterricht")}
-              ${l.info ? `<br>Hinweis: ${esc(l.info)}` : ""}${l.optional && l.schedule_uid ? this._scheduleButton(c,l.schedule_uid,"hide","Optionalen Eintrag entfernen") : ""}</div>
+              ${l.info ? `<br>Hinweis: ${esc(l.info)}` : ""}${l.optional && l.schedule_uid && this._selectedLesson?.child === c.key && String(this._selectedLesson.lesson) === String(l.lesson) ? this._scheduleButton(c,l.schedule_uid,"hide","Optionalen Eintrag entfernen") : ""}</div>
               ${ch.map((e) => this._chgHtml(c, e)).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
           </div>`;
       }
+      for (const e of additions) html += this._scheduleEntry(c,e,iso);
       const rest = entries.filter((e, i) => !used.has(i));
       if (rest.length) {
         html += `<div class="day">Weitere Änderungen</div>`;
@@ -1530,50 +1553,52 @@
     }
 
     _weekHtml(c, today, byDate) {
-      const nums = [...new Set(c.timetable.map((l) => l.lesson))].sort((a, b) => Number(a) - Number(b));
-      const times = {};
-      for (const l of c.timetable) if (l.start && !times[l.lesson]) times[l.lesson] = l.start;
-      const off = (this._wkOff || {})[c.key] || 0;
-      const mon = weekMonday(today, off);
-      const dates = [0, 1, 2, 3, 4].map((i) => addDays(mon, i));
+      const off = this._wkOff?.[c.key] || 0;
+      const mon = weekMonday(today,off);
+      const dates = [0,1,2,3,4].map(i => addDays(mon,i));
+      const additions = dates.map(iso => this._scheduleOn(c,iso));
+      const nums = [...new Set(c.timetable.map(l => l.lesson))].sort((a,b) => Number(a)-Number(b));
+      const rows = nums.map(nr => {
+        const sample = c.timetable.find(l => l.lesson === nr);
+        return {lesson:nr,start:sample?.start || "",end:sample?.end || ""};
+      });
+      for (const event of additions.flat().filter(e => e.time)) {
+        if (!rows.some(r => r.start && event.time >= r.start && event.time < r.end)) {
+          if (!rows.some(r => r.start === event.time)) rows.push({start:event.time,end:event.time_end || ""});
+        }
+      }
+      rows.sort((a,b) => (a.start || "99:"+a.lesson).localeCompare(b.start || "99:"+b.lesson));
+      const eventRow = e => rows.findIndex(r => e.time && r.start && e.time >= r.start && (e.time < r.end || e.time === r.start));
       const k = esc(c.key);
-      const rel = off === 0 ? "diese Woche" : off === 1 ? "nächste Woche" : off === -1 ? "letzte Woche" : off > 0 ? `in ${off} Wochen` : `vor ${-off} Wochen`;
-      let html = c.timetable.length ? "" : `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
-      html += `<div class="wkn">
-          <button class="pill" data-child="${k}" data-wkoff="-1" title="Woche zurück" aria-label="Woche zurück">‹</button>
-          <span class="lbl"><b>KW ${isoWeek(mon)}</b> · ${fmtShort(dates[0])}–${fmtShort(dates[4])} · ${rel}</span>
-          ${off !== 0 ? `<button class="pill" data-child="${k}" data-wkoff="0" title="Zur aktuellen Woche">Heute</button>` : ""}
-          <button class="pill" data-child="${k}" data-wkoff="1" title="Woche vor" aria-label="Woche vor">›</button>
-        </div>`;
-      html += `<div class="wk"><table lang="de"><tr><th></th>`;
-      dates.forEach((iso, i) => (html += `<th class="${iso === today ? "today" : ""}">${WD[i + 1]} <span class="dt">${fmtShort(iso)}</span></th>`));
-      html += `</tr>`;
-      for (const nr of nums) {
-        html += `<tr><th>${esc(nr)}.<div class="r">${esc(times[nr] || "")}</div></th>`;
-        dates.forEach((iso, i) => {
-          const holiday = this._scheduleOn(c, iso).some(e => e.kind === "holiday");
-          const l = !holiday && c.timetable.find((x) => !x.hidden && x.weekday === i + 1 && x.lesson === nr);
-          const ch = (byDate[iso] || []).filter((e) => lessonNums(e.lesson).includes(String(nr)));
-          const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
-          const ex = l && ((this._exams || {})[iso] || []).find((e) => e.subject && sameSubject(e.subject, l.subject));
-          const exCls = ex ? " " + EXAM_LABEL[ex.category][2] : "";
-          html += `<td class="${kind ? "chg-" + kind : ""}${exCls}" title="${esc(ch.map(changeText).join("\n") || l?.subject || "")}">${l ? `<button class="lesson-pick" data-child="${k}" data-lesson="${esc(nr)}" data-date="${iso}" aria-label="${esc(dayLabel(iso, today) + ", Stunde " + nr + ": " + fullName(l.subject))}"><span class="lg">${esc(fullName(l.subject))}</span><span class="sh">${esc(shortName(l.subject))}</span>` + `<div class="r">${esc(room(l.room))}</div>${l.optional ? `<div class="r">${esc(this._participation(l))}</div>` : ""}</button>` : ""}${kind ? `<div class="r"><span class="lg">${KIND_LABEL[kind]}</span><span class="sh">${KIND_SHORT[kind] || KIND_LABEL[kind]}</span></div>` : ""}${ex ? `<div class="r">${EXAM_LABEL[ex.category][0]} <span class="lg">${EXAM_LABEL[ex.category][1]}</span><span class="sh">${EXAM_SHORT[ex.category]}</span></div>` : ""}</td>`;
+      let html = `<div class="wkn"><button class="pill" data-child="${k}" data-wkoff="-1" aria-label="Woche zurück">‹</button><span class="lbl"><b>KW ${isoWeek(mon)}</b> · ${fmtShort(dates[0])}–${fmtShort(dates[4])}</span>${off ? `<button class="pill" data-child="${k}" data-wkoff="0">Heute</button>` : ""}<button class="pill" data-child="${k}" data-wkoff="1" aria-label="Woche vor">›</button></div>`;
+      html += `<div class="wk"><table lang="de"><tr><th>Stunde / Zeit</th>`;
+      html += dates.map((iso,i) => `<th class="${iso === today ? "today" : ""}">${WD[i+1]} <span class="dt">${fmtShort(iso)}</span></th>`).join("") + "</tr>";
+      if (additions.some(events => events.some(e => !e.time))) {
+        html += `<tr class="schedule-all-day"><th>Ganztägig</th>` + additions.map((events,i) => `<td>${events.filter(e => !e.time).map(e => this._scheduleEntry(c,e,dates[i])).join("")}</td>`).join("") + "</tr>";
+      }
+      rows.forEach((row,index) => {
+        html += `<tr><th>${row.lesson ? esc(row.lesson)+"." : ""}<div class="r">${esc(row.start)}</div></th>`;
+        dates.forEach((iso,i) => {
+          const holiday = additions[i].some(e => e.kind === "holiday");
+          const lesson = !holiday && row.lesson && c.timetable.find(l => !l.hidden && l.weekday === i+1 && l.lesson === row.lesson);
+          const changes = (byDate[iso] || []).filter(e => row.lesson && lessonNums(e.lesson).includes(String(row.lesson)));
+          const kind = changes.some(e => e.kind === "entfall") ? "entfall" : changes[0]?.kind || "";
+          const exam = lesson && (this._exams?.[iso] || []).find(e => e.subject && sameSubject(e.subject,lesson.subject));
+          html += `<td class="${kind ? "chg-"+kind : ""} ${exam ? EXAM_LABEL[exam.category][2] : ""}">`;
+          if (lesson) html += `<button class="lesson-pick" data-child="${k}" data-lesson="${esc(row.lesson)}" data-date="${iso}"><span class="lg">${esc(fullName(lesson.subject))}</span><span class="sh">${esc(shortName(lesson.subject))}</span><div class="r">${esc(room(lesson.room))}</div>${lesson.optional ? `<div class="r">${esc(this._participation(lesson))}</div>` : ""}</button>`;
+          if (kind) html += `<div class="r">${esc(KIND_LABEL[kind] || kind)}</div>`;
+          if (exam) html += `<div class="r">${EXAM_LABEL[exam.category][0]} ${EXAM_LABEL[exam.category][1]}</div>`;
+          html += additions[i].filter(e => e.time && eventRow(e) === index).map(e => this._scheduleEntry(c,e,iso)).join("");
+          html += "</td>";
         });
-        html += `</tr>`;
-      }
-      html += `</table></div>`;
-      for (const iso of dates) {
-        const schedule = this._scheduleOn(c, iso);
-        if (schedule.length) html += `<div class="day">${esc(dayLabel(iso,today))}</div>` + schedule.map(e => this._scheduleEntry(c,e,iso)).join("");
-      }
-      const unmatched = dates.flatMap((iso) => (byDate[iso] || [])
-        .filter((e) => !lessonNums(e.lesson).some((nr) => nums.includes(String(nr))))
-        .map((e) => `<div class="info">${esc(dayLabel(iso, today))} · ${esc(e.text || changeText(e))}</div>`));
+        html += "</tr>";
+      });
+      html += "</table></div>";
+      const unmatched = dates.flatMap(iso => (byDate[iso] || []).filter(e => !lessonNums(e.lesson).some(nr => nums.includes(String(nr)))).map(e => `<div class="info">${esc(dayLabel(iso,today))} · ${esc(e.text || changeText(e))}</div>`));
       if (unmatched.length) html += `<div class="day">Weitere Änderungen</div>${unmatched.join("")}`;
-      if (dates[4] < today) html += `<div class="info">Vergangene Woche: Vertretungen werden nur ab heute angezeigt.</div>`;
-      else if (dates[0] > addDays(today, 7)) html += `<div class="info">Vertretungen stehen meist erst kurzfristig im Portal.</div>`;
-      return html + this._legendHtml("woche", `<div>Farbig: Änderung laut Vertretungsplan (rot = entfällt, orange = Vertretung/Raum). Umrandet: 📝 Schulaufgabe (lila), ✏️ Test (blau).</div>`);
+      return html + this._legendHtml("woche", `<div>Farbig: Änderungen laut Vertretungsplan. Zusätzliche Termine stehen an ihrer Uhrzeit im Raster. Antippen öffnet Details und Bearbeitung.</div>`);
     }
+
   }
 
 

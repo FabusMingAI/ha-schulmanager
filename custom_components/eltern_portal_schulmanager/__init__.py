@@ -137,7 +137,7 @@ class SchulFileView(HomeAssistantView):
         hass: HomeAssistant = request.app["hass"]
         try:
             manager = get_manager(hass)
-            item = manager.items[uid]
+            item = manager.schedule_sources()[uid]
             meta = item["files"][int(index)]
         except (HomeAssistantError, KeyError, IndexError, ValueError):
             return web.Response(status=404)

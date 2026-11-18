@@ -24,6 +24,9 @@
 
 ## Termine aus Mitteilungen im Stundenplan
 
+**Korrektur ab v0.15.1.** Archivquellen werden ausschließlich für den Stundenplan in einer eigenen Ablage verarbeitet. Der Nachtrag verändert vorhandene Mitteilungen, Aufgaben, Lesestatus und Kommentare nicht. Eindeutig zuordenbare historische Fehlimporte aus v0.15.0 werden mit ihren unberührten erzeugten offenen Aufgaben reversibel aus dem Postfach genommen. Die Originale bleiben gesichert, Benutzerkommentare und erledigte Aufgaben bleiben erhalten. Zusätzliche Termine stehen im Wochenraster an ihrer Uhrzeit. Erst ein Klick auf einen Eintrag öffnet Details und Bearbeitung.
+
+
 Die Stundenplankarte zeigt Termine aus Mitteilungen und Anhängen in der Tages- und Wochenansicht mit Quellenangabe. Eindeutig belegte Termine werden übernommen. Unsichere Angaben und Wahlangebote erscheinen als Vorschläge mit **Übernehmen**. Ohne KI werden ausdrücklich datierte Veranstaltungen als Vorschläge erkannt. Wöchentliche Kurse benötigen einen belegten Beginn und ein Ende und pausieren in den hinterlegten Ferien.
 
 Beim ersten Start nach dem Update wird das gesamte verfügbare Portalarchiv unabhängig vom normalen Abrufzeitraum geladen. Die Terminprüfung läuft im Hintergrund und setzt nach einem Neustart fort. Der Nachtrag erzeugt keine alten Aufgaben oder Benachrichtigungen und erhält den Lesestatus. Anschließend gilt wieder der normale Abrufzeitraum. Das Portal kann nur dort noch verfügbare Inhalte liefern.

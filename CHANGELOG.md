@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.15.1 – 2026-11-18
+
+- Emergency fix for v0.15.0. The initial full archive fetch incorrectly sent previously unseen historical messages through normal inbox processing, generating unwanted tasks and notifications. Archive sources now have a separate persistent store and cannot enter the inbox, task analysis or notification queue, including on subsequent regular fetches and rescans.
+- Sofortkorrektur für v0.15.0. Der erste vollständige Archivabruf verarbeitete bisher unbekannte historische Mitteilungen als normale Posteingänge und erzeugte unerwünschte Aufgaben und Benachrichtigungen. Archivquellen haben jetzt eine getrennte dauerhafte Ablage und gelangen auch bei späteren regulären Abrufen und erneuten Prüfungen ausschließlich in die Terminverarbeitung.
+
+- Reversibly quarantine identifiable historical messages first imported by v0.15.0 outside the configured normal lookback and their untouched generated open tasks. Keep the original records in a recovery journal. Pre-existing messages, completed tasks, manual tasks and tasks with user comments are preserved. Recovery runs once and is safe to repeat.
+- Eindeutig zuordenbare historische Mitteilungen, die v0.15.0 erstmals außerhalb des normalen Abrufzeitraums importiert hat, und ihre unberührten automatisch erzeugten offenen Aufgaben reversibel aus dem Postfach nehmen. Die Originale bleiben in einer Wiederherstellungsablage erhalten. Vorhandene Mitteilungen, erledigte Aufgaben, manuelle Aufgaben und Aufgaben mit Benutzerkommentaren bleiben erhalten. Die Wiederherstellung erfolgt einmalig und ist bei Wiederholung sicher.
+
+- Place additional appointments directly into the week timetable at their time, including extra rows outside regular lessons and an all-day row for holidays. Open details and editing actions only after selecting an entry. The day view places appointments in time order among lessons.
+- Zusätzliche Termine direkt an ihrer Uhrzeit in das Wochenraster einordnen, einschließlich weiterer Zeitzeilen außerhalb der Unterrichtsstunden und einer Ganztagszeile für Ferien. Details und Bearbeitungsaktionen öffnen sich erst nach Auswahl eines Eintrags. Die Tagesansicht ordnet Termine zeitlich zwischen die Unterrichtsstunden ein.
+
 ## 0.15.0 – 2026-11-18
 
 - Show appointments from messages and attachments in day and week timetables with source links and overlap indicators. Clearly evidenced appointments are included automatically. Uncertain dates and elective courses require confirmation.

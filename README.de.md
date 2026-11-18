@@ -22,6 +22,20 @@
 
 [Qualitätsarbeit (Bronze → Gold), Diagnose, Fehlerbehebung und Entfernen](docs/QUALITY_SCALE.md)
 
+## Termine aus Mitteilungen im Stundenplan
+
+Die Stundenplankarte zeigt Termine aus Mitteilungen und Anhängen in der Tages- und Wochenansicht mit Quellenangabe. Eindeutig belegte Termine werden übernommen. Unsichere Angaben und Wahlangebote erscheinen als Vorschläge mit **Übernehmen**. Ohne KI werden ausdrücklich datierte Veranstaltungen als Vorschläge erkannt. Wöchentliche Kurse benötigen einen belegten Beginn und ein Ende und pausieren in den hinterlegten Ferien.
+
+Beim ersten Start nach dem Update wird das gesamte verfügbare Portalarchiv unabhängig vom normalen Abrufzeitraum geladen. Die Terminprüfung läuft im Hintergrund und setzt nach einem Neustart fort. Der Nachtrag erzeugt keine alten Aufgaben oder Benachrichtigungen und erhält den Lesestatus. Anschließend gilt wieder der normale Abrufzeitraum. Das Portal kann nur dort noch verfügbare Inhalte liefern.
+
+**Einträge verwalten** zeigt Vorschläge und entfernte Einträge. **Entfernen**, **Serie entfernen** und **Wiederherstellen** gelten je Kind und bleiben über Neustarts und erneute Prüfungen erhalten. Auch optionale Unterrichtseinträge lassen sich entfernen. Mitteilungstermine und Ferien lassen sich je Kind ausschalten. Tages- und Wochenwechsel machen vergangene Termine erreichbar. Zeitliche Überschneidungen werden angezeigt.
+
+Die bayerischen Ferien von Sommer 2024 bis Sommer 2030 sind offline anhand der amtlichen Ferienordnung hinterlegt. Regulärer Unterricht pausiert während eingeblendeter Ferien. Schulbezogene Abweichungen können durch Ausblenden angepasst werden. Außerhalb dieses Zeitraums ist ein Update erforderlich. [Amtliche Ferienordnung](https://www.gesetze-bayern.de/Content/Document/BayVV_2230_1_1_0_K_13479/true)
+
+Der Fortschritt zeigt ausstehende Prüfungen, Fehler und Mitteilungen mit Anhängen ohne auslesbaren Text. Gespeicherte PDFs werden vollständig gelesen, lange Texte abschnittsweise ausgewertet. Bildanhänge benötigen einen geeigneten KI-Dienst. Bei ausgeschaltetem automatischem Download werden vorhandene Texte und Dateien geprüft. **Archiv erneut prüfen** lädt das verfügbare Archiv erneut und wiederholt auch fehlgeschlagene Auswertungen. Der konfigurierte KI-Dienst wird hierfür auch für ältere Mitteilungen aufgerufen.
+
+Aktionen für Automationen sind `eltern_portal_schulmanager.rescan_schedule`, `timetable_entry` mit `child`, `event_id`, `action` (`hide`, `restore`, `confirm`) und `timetable_options` mit `child`, `messages`, `holidays`.
+
 ## Was passiert automatisch
 
 | Schritt | Was die Integration tut |

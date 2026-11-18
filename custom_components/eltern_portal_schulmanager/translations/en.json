@@ -428,6 +428,43 @@
           "description": "uid of the entry, e.g. frist-… or vertretung-…"
         }
       }
+    },
+    "rescan_schedule": {
+      "name": "Scan archive for appointments",
+      "description": "Recheck all available messages. Hidden entries stay hidden."
+    },
+    "timetable_entry": {
+      "name": "Manage timetable entry",
+      "description": "Hide, restore or confirm an additional entry.",
+      "fields": {
+        "child": {
+          "name": "Child",
+          "description": "Child key, for example anna."
+        },
+        "event_id": {
+          "name": "Entry ID"
+        },
+        "action": {
+          "name": "Action",
+          "description": "hide, restore, confirm"
+        }
+      }
+    },
+    "timetable_options": {
+      "name": "Set timetable display",
+      "description": "Show or hide message appointments and Bavarian holidays per child.",
+      "fields": {
+        "child": {
+          "name": "Child",
+          "description": "Child key, for example anna."
+        },
+        "messages": {
+          "name": "Message appointments"
+        },
+        "holidays": {
+          "name": "Bavarian holidays"
+        }
+      }
     }
   },
   "selector": {

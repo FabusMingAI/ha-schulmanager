@@ -38,11 +38,16 @@ from .analyzer import (
     AnalyzeError,
     analyze_rules,
     async_analyze_ai,
+    async_extract_schedule,
     async_translate_summary,
     fmt_eur,
     summary_languages,
 )
 from .timetable import enrich_timetable
+from .schedule import (
+    SCHEDULE_VERSION, holiday_entries, identity, in_holidays, lesson_uid,
+    message_entries, occurrences,
+)
 from .classes import concerns_class
 from .const import (
     ACTION_DONE,
@@ -308,6 +313,9 @@ class SchulManager:
             # Stundenplankürzel je Schule: {school: {"updated": iso, "list": {kürzel: name}}}
             "teachers": stored.get("teachers", {}),
             "portal_last_success": stored.get("portal_last_success", {}),
+            "schedule_choices": stored.get("schedule_choices", {}),
+            "schedule_options": stored.get("schedule_options", {}),
+            "archive_fetched": stored.get("archive_fetched", []),
         }
         # Seed older installations from their cached imports, without notifying.
         self._remember_substitution_slots()
@@ -344,7 +352,7 @@ class SchulManager:
         self._worker = self.entry.async_create_background_task(
             self.hass, self._analysis_worker(), f"{DOMAIN}_analyse"
         )
-        if self._pending() or self._missing_translations():
+        if self._pending() or self._missing_translations() or self._schedule_pending():
             self._queue_event.set()
 
     async def async_stop(self) -> None:
@@ -408,6 +416,8 @@ class SchulManager:
                     await self._merge(result)
                     if not result.errors:
                         self.data["portal_last_success"][school] = dt_util.now().isoformat()
+                        if school not in self.data["archive_fetched"]:
+                            self.data["archive_fetched"].append(school)
                 await self._async_refresh_webuntis(webuntis_errors)
             finally:
                 queued, self._queued_substitutions = self._queued_substitutions or {}, None
@@ -420,7 +430,7 @@ class SchulManager:
                 # not block cleaning up the portal archive
                 self._prune_archived()
             self._changed()
-            if self._pending() or self._missing_translations():
+            if self._pending() or self._missing_translations() or self._schedule_pending():
                 self._queue_event.set()
 
     @callback
@@ -470,6 +480,7 @@ class SchulManager:
                     portal["username"],
                     portal["password"],
                     int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)),
+                    full_archive=school not in self.data.get("archive_fetched", []),
                 )
                 try:
                     return await api.async_fetch(
@@ -752,6 +763,7 @@ class SchulManager:
         return {
             "uid": p.uid,
             "child": child,
+            "classname": self.children.get(child, {}).get("classname") if p.sent and school_year(p.sent.date()) == school_year(dt_util.now().date()) else None,
             "school": result.school,
             "school_name": result.school_name,
             "kind": p.kind,
@@ -1047,6 +1059,7 @@ class SchulManager:
             await self._queue_event.wait()
             self._queue_event.clear()
             await self._work_queue()
+            await self._schedule_backfill()
             # danach fehlende Sprachen der Zusammenfassung nachtragen (neue Mitteilungen haben Vorrang)
             await self._translate_missing()
             await self._work_queue()
@@ -1061,6 +1074,8 @@ class SchulManager:
             except Exception as err:  # noqa: BLE001
                 LOGGER.exception("Auswertung von %s fehlgeschlagen", item["uid"])
                 item["analysis"] = {"status": "fehler", "error": str(err)}
+            if item.get("analysis", {}).get("status") == "pending":
+                continue  # Content changed during the request; process its new version first.
             self._changed()
             if item.pop("notify", False):
                 # Ein Fehler bei Push/Event/Ansage darf den Auswerte-Worker nicht beenden
@@ -1078,7 +1093,7 @@ class SchulManager:
         sent = item.get("sent")
         return {
             "child": child.get("name"),
-            "classname": child.get("classname"),
+            "classname": self._item_classname(item),
             "school": item.get("school_name"),
             "kind": KIND_LABELS.get(item["kind"], item["kind"]),
             "sender": item.get("sender"),
@@ -1088,22 +1103,23 @@ class SchulManager:
             "body": body.strip(),
         }
 
+    def _item_classname(self, item: dict[str, Any]) -> str:
+        if item.get("classname"):
+            return item["classname"]
+        sent = dt_util.parse_datetime(item.get("sent") or "")
+        if sent and school_year(sent.date()) != school_year(dt_util.now().date()):
+            return ""
+        return self.children.get(item.get("child"), {}).get("classname") or ""
+
     async def _analyze(self, item: dict[str, Any]) -> None:
-        ctx = self._context(item)
+        content = self._schedule_content(item)
+        ctx = await self._schedule_context(item)
         ai_entity = self.opt(CONF_AI_ENTITY)
         method = "regeln"
         error = None
         result = None
         if ai_entity:
-            attachments = None
-            if not item.get("text") and item.get("files"):
-                attachments = [
-                    {
-                        "media_content_id": self.media_content_id(f["path"]),
-                        "media_content_type": f.get("content_type") or "application/pdf",
-                    }
-                    for f in item["files"]
-                ]
+            attachments = self._schedule_attachments(item)
             try:
                 result = await async_analyze_ai(
                     self.hass, ai_entity, ctx, attachments, self.summary_languages
@@ -1114,6 +1130,10 @@ class SchulManager:
                 LOGGER.warning("KI-Auswertung fehlgeschlagen, nutze Regeln: %s", err)
         if result is None:
             result = analyze_rules(ctx)
+        if ai_entity and method == "ki" and len(ctx.get("body") or "") > 14000:
+            result["events"] = await async_extract_schedule(self.hass, ai_entity, ctx, attachments, self.summary_languages)
+        if self.items.get(item["uid"]) is not item or content != self._schedule_content(item):
+            return
         self._apply_analysis(item, result, method)
         item["analysis"] = {
             "status": "fertig",
@@ -1125,6 +1145,83 @@ class SchulManager:
             "error": error,
             "at": dt_util.now().isoformat(),
         }
+        item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                                 "status": "done", "method": method, "error": error}
+
+    def _schedule_content(self, item: dict[str, Any]) -> str:
+        return identity(item.get("version"), item.get("body"), item.get("text"), item.get("files"))
+
+    def _schedule_attachments(self, item: dict[str, Any]) -> list[dict[str, str]] | None:
+        return [{"media_content_id": self.media_content_id(f["path"]),
+                 "media_content_type": f.get("content_type") or "application/pdf"}
+                for f in item.get("files", [])
+                if not item.get("text") or (f.get("content_type") or "").startswith("image/")] or None
+
+    async def _schedule_context(self, item: dict[str, Any]) -> dict[str, Any]:
+        ctx = self._context(item)
+        pdfs = [f for f in item.get("files", []) if f.get("content_type") == "application/pdf"
+                or str(f.get("path", "")).lower().endswith(".pdf")]
+        if pdfs:
+            texts = await self.hass.async_add_executor_job(
+                lambda: [_pdf_text(self.file_abspath(f["path"]), max_pages=None) for f in pdfs])
+            if any(texts):
+                ctx["body"] = (item.get("body") or "") + "\n\n" + "\n\n".join(texts)
+        return ctx
+
+    def _schedule_pending(self) -> list[dict[str, Any]]:
+        return [item for item in self.items.values()
+                if item.get("schedule_scan", {}).get("version") != SCHEDULE_VERSION
+                or item.get("schedule_scan", {}).get("content") != self._schedule_content(item)]
+
+    @property
+    def schedule_progress(self) -> dict[str, int]:
+        scans = [i.get("schedule_scan", {}) for i in self.items.values()]
+        return {"total": len(scans), "pending": len(self._schedule_pending()),
+                "failed": sum(s.get("status") == "failed" for s in scans),
+                "unreadable": sum(bool(i.get("files") and not i.get("text")) for i in self.items.values())}
+
+    async def _schedule_backfill(self) -> None:
+        """Resume the entire archive, without generating old tasks or notifications."""
+        for item in self._schedule_pending():
+            if self._pending():
+                await self._work_queue()
+            content = self._schedule_content(item)
+            if (item.get("schedule_scan", {}).get("content") == content
+                    and item.get("schedule_scan", {}).get("version") == SCHEDULE_VERSION):
+                continue
+            try:
+                ctx = await self._schedule_context(item)
+                method, error = "regeln", None
+                result = None
+                if ai := self.opt(CONF_AI_ENTITY):
+                    try:
+                        attachments = self._schedule_attachments(item)
+                        result = {"events": await async_extract_schedule(self.hass, ai, ctx, attachments, self.summary_languages)}
+                        method = "ki"
+                    except AnalyzeError as err:
+                        error = str(err)
+                if result is None:
+                    result = analyze_rules(ctx)
+                # A refresh may have replaced the message while the AI was running.
+                if self.items.get(item["uid"]) is not item or content != self._schedule_content(item):
+                    continue
+                if not error:
+                    self._replace_events(item, result["events"], method)
+                item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                                         "status": "failed" if error else "done", "method": method, "error": error}
+            except Exception as err:  # noqa: BLE001
+                LOGGER.exception("Archiv-Termine aus %s konnten nicht gelesen werden", item["uid"])
+                item["schedule_scan"] = {"version": SCHEDULE_VERSION, "content": content,
+                                         "status": "failed", "error": str(err)}
+            self._changed()
+            await asyncio.sleep(0)
+
+    def rescan_schedule(self) -> None:
+        self.data["archive_fetched"] = []
+        for item in self.items.values():
+            item.pop("schedule_scan", None)
+        self._queue_event.set()
+        self._changed()
 
     def _apply_analysis(self, item: dict[str, Any], result: dict[str, Any], method: str) -> None:
         uid = item["uid"]
@@ -1156,12 +1253,33 @@ class SchulManager:
                 and tid not in keep
             ):
                 del self.tasks[tid]
+        self._replace_events(item, result["events"], method)
+
+    def _replace_events(self, item: dict[str, Any], extracted: list[dict[str, Any]], method: str) -> None:
+        uid = item["uid"]
         events = self.data["events"]
+        old = {identity(ev.get("title"), ev.get("date"), ev.get("time")): ev["uid"]
+               for ev in events.values() if ev.get("item_uid") == uid}
+        stable_ids = dict(item.get("schedule_event_ids") or {})
+        stable_ids.update({ev["stable"]: ev["uid"] for ev in events.values()
+                           if ev.get("item_uid") == uid and ev.get("stable")})
+        extracted = list({identity(ev.get("title"), ev.get("date"), ev.get("time"), ev.get("end"),
+                                   ev.get("weekday"), ev.get("repeat_until")): ev for ev in extracted}.values())
+        replacements = {}
+        titles = [str(ev["title"]).casefold() for ev in extracted]
+        for ev in extracted:
+            # Title identity survives reordering, date corrections and cancellation.
+            title = str(ev["title"]).casefold()
+            if not self._item_classname(item) and ev.get("status") in ("confirmed", "cancelled"):
+                ev = {**ev, "status": "proposed"}
+            stable = identity(uid, title, ev.get("date") if titles.count(title) > 1 else "")
+            eid = stable_ids.get(stable) or old.get(identity(ev.get("title"), ev.get("date"), ev.get("time")), f"{uid}-termin-{stable}")
+            stable_ids[stable] = eid
+            replacements[eid] = {**ev, "uid": eid, "stable": stable, "item_uid": uid, "child": item["child"], "method": method}
         for eid in [e for e, ev in events.items() if ev.get("item_uid") == uid]:
             del events[eid]
-        for n, ev in enumerate(result["events"]):
-            eid = f"{uid}-termin-{n}"
-            events[eid] = {**ev, "uid": eid, "item_uid": uid, "child": item["child"]}
+        events.update(replacements)
+        item["schedule_event_ids"] = stable_ids
 
     # ------------------------------------------------------------------
     # Öffentliche Aktionen
@@ -1447,17 +1565,28 @@ class SchulManager:
                     "subject": appointment_subject(a.get("detail") or a["title"]),
                 }
             )
-        for ev in self.data["events"].values():
-            if ev.get("child") != child:
+        schedule = self.schedule_entries(child)
+        expanded = []
+        for ev in schedule:
+            if ev["kind"] != "message" or ev["hidden"] or ev.get("status") != "confirmed":
                 continue
-            if other_class(ev.get("title")):
+            for day in occurrences(ev):
+                if ev.get("weekday") and ev.get("repeat_until") and in_holidays(day):
+                    continue
+                expanded.append({**ev, "date": day.isoformat(),
+                                 "uid": f"{ev['uid']}-{day.isoformat()}" if ev.get("repeat_until") else ev["uid"],
+                                 "end": None if ev.get("repeat_until") else ev.get("end")})
+        for ev in expanded:
+            if not self.schedule_options(child)["messages"]:
                 continue
             item = self.items.get(ev.get("item_uid"), {})
             day = date.fromisoformat(ev["date"])
             desc = f"Aus: {item.get('title', '')}"
             if ev.get("time"):
                 start = datetime.combine(day, time.fromisoformat(ev["time"]), tz)
-                entry = {"start": start, "end": start + timedelta(hours=1)}
+                end_day = date.fromisoformat(ev["end"]) if ev.get("end") else day
+                finish = datetime.combine(end_day, time.fromisoformat(ev["time_end"]), tz) if ev.get("time_end") else start + timedelta(hours=1)
+                entry = {"start": start, "end": finish if finish > start else start + timedelta(hours=1)}
             else:
                 end_day = date.fromisoformat(ev["end"]) if ev.get("end") else day
                 entry = {"start": day, "end": max(end_day, day) + timedelta(days=1)}
@@ -1894,11 +2023,56 @@ class SchulManager:
         plan = self.data["timetable"].get(child, {})
         today = dt_util.now().date()
         registrations = plan.get("course_registrations") if plan.get("registrations_year") == school_year(today) else None
-        return enrich_timetable(
+        lessons = enrich_timetable(
             plan.get("lessons", []), self.child_items(child),
             self.children.get(child, {}).get("classname") or "",
             self.teacher_names(child), today, registrations,
         )
+        choices = self.data.get("schedule_choices", {}).get(child, {})
+        return [{**lesson, "schedule_uid": lesson_uid(lesson),
+                 "hidden": choices.get(lesson_uid(lesson)) == "hidden"} for lesson in lessons]
+
+    def schedule_entries(self, child: str) -> list[dict[str, Any]]:
+        own_only = self.opt(CONF_OWN_CLASS_ONLY, DEFAULT_OWN_CLASS_ONLY)
+        events = [{**ev, "source_classname": self._item_classname(self.items.get(ev.get("item_uid"), {})) if own_only else ""}
+                  for ev in self.data["events"].values() if ev.get("child") == child]
+        classname = self.children.get(child, {}).get("classname") or ""
+        choices = self.data.get("schedule_choices", {}).get(child, {})
+        events = [{**ev, "status": "cancelled" if ev.get("cancelled") else "confirmed"} if choices.get(ev["uid"]) == "confirmed"
+                  and ev.get("status") != "cancelled" else ev for ev in events]
+        entries = message_entries(events, self.items, classname) + holiday_entries()
+        for entry in entries:
+            aliases = entry.get("aliases") or [entry["uid"]]
+            if entry.get("choice_key"):
+                aliases = [*aliases, entry["choice_key"]]
+            entry["hidden"] = any(choices.get(uid) == "hidden" for uid in aliases)
+            if entry.get("status") != "cancelled" and any(choices.get(uid) == "confirmed" for uid in aliases):
+                entry["status"] = "cancelled" if entry.get("cancelled") else "confirmed"
+            entry.setdefault("status", "proposed")
+        return entries
+
+    def schedule_action(self, child: str, uid: str, action: str) -> None:
+        self.validate_child(child)
+        entry = next((e for e in self.schedule_entries(child) if e["uid"] == uid), None)
+        lesson = next((l for l in self.child_timetable(child) if l["schedule_uid"] == uid and l.get("optional")), None)
+        if entry is None and lesson is None:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_event")
+        choices = self.data.setdefault("schedule_choices", {}).setdefault(child, {})
+        keys = entry.get("aliases", [uid]) + ([entry["choice_key"]] if entry.get("choice_key") else []) if entry else [uid]
+        for key in keys:
+            if action == "restore":
+                choices.pop(key, None)
+            else:
+                choices[key] = "confirmed" if action == "confirm" else "hidden"
+        self._changed()
+
+    def schedule_options(self, child: str) -> dict[str, bool]:
+        return {"messages": True, "holidays": True, **self.data.get("schedule_options", {}).get(child, {})}
+
+    def set_schedule_options(self, child: str, messages: bool, holidays: bool) -> None:
+        self.validate_child(child)
+        self.data.setdefault("schedule_options", {})[child] = {"messages": messages, "holidays": holidays}
+        self._changed()
 
     def lesson_times(self, child: str, day: date, lesson: str) -> tuple[str | None, str | None]:
         """Beginn und Ende einer Stunde (z. B. '3' oder '3-4') laut Stundenplan."""
@@ -2386,6 +2560,10 @@ class SchulManager:
             self.data.get("webuntis", {}).pop(k, None)
             self.data["subs_seen"].pop(k, None)
             self.data["sicknotes"].pop(k, None)
+            self.data.get("schedule_choices", {}).pop(k, None)
+            self.data.get("schedule_options", {}).pop(k, None)
+        if school in self.data.get("archive_fetched", []):
+            self.data["archive_fetched"].remove(school)
         for uid in [u for u, i in self.items.items() if i.get("school") == school]:
             self.items.pop(uid)
         for tid in [t for t, v in self.tasks.items() if v.get("child") in kids]:
@@ -2396,7 +2574,7 @@ class SchulManager:
             self.data["initialized"].remove(school)
 
 
-def _pdf_text(path: str, max_pages: int = 15) -> str:
+def _pdf_text(path: str, max_pages: int | None = 15) -> str:
     """Text aus einem PDF lesen (läuft im Executor)."""
     try:
         from pypdf import PdfReader

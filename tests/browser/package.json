@@ -1,6 +1,6 @@
 {
   "name": "schulmanager-browser-tests",
   "private": true,
-  "scripts": { "test": "node dashboard.cjs && node notifications.cjs" },
+  "scripts": { "test": "node dashboard.cjs && node notifications.cjs && node schedule.cjs" },
   "devDependencies": { "playwright": "1.62.1" }
 }

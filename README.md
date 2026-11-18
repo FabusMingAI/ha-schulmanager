@@ -24,6 +24,20 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 [Quality work (Bronze → Gold), diagnostics, troubleshooting and removal](docs/QUALITY_SCALE.md)
 
+## Message appointments in the timetable
+
+The timetable card shows appointments from messages and attachments in day and week views with source links. Clearly evidenced appointments are included automatically. Uncertain dates and elective offers appear as proposals requiring **Übernehmen**. Without AI, explicitly dated events become proposals. Weekly courses require an evidenced start and end and pause during the bundled holidays.
+
+The first start after upgrading fetches the entire available portal archive independently of the normal lookback setting. Appointment extraction runs in the background and resumes after restarts. Backfilling preserves tasks and read state and does not send old notifications. Normal lookback resumes afterwards. Only content still available from the portal can be fetched.
+
+**Einträge verwalten** lists proposals and hidden entries. **Entfernen**, **Serie entfernen** and **Wiederherstellen** apply per child and survive restarts and rescans. Optional timetable lessons can also be hidden. Message appointments and holidays can be switched off per child. Day and week navigation provide access to past dates. Time overlaps are indicated.
+
+Bavarian school holidays from summer 2024 through summer 2030 are bundled offline from the official holiday order. Regular lessons pause during displayed holidays. School-specific exceptions can be accommodated by hiding entries. Dates outside this range require an update. [Official holiday order](https://www.gesetze-bayern.de/Content/Document/BayVV_2230_1_1_0_K_13479/true)
+
+Progress includes pending checks, failures and messages with attachments lacking readable text. Stored PDFs are read in full and long texts in chunks. Image attachments require a suitable AI provider. If automatic downloads are disabled, existing text and files are checked. **Archiv erneut prüfen** fetches the available archive again and repeats extraction, including failed checks. The configured AI provider is also invoked for older messages.
+
+Automation actions are `eltern_portal_schulmanager.rescan_schedule`, `timetable_entry` with `child`, `event_id`, `action` (`hide`, `restore`, `confirm`), and `timetable_options` with `child`, `messages`, `holidays`.
+
 ## Features
 
 - **Reads the portal directly** – parent letters (*Elternbriefe*), messages from teachers, notice board, surveys, **exams and tests** (*Schulaufgaben, Stegreifaufgaben* …), **timetable**, **substitution plan** (*Vertretungsplan*) and **sick notes** (*Krankmeldungen*). Several schools and children with one installation.

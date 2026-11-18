@@ -304,7 +304,8 @@ class TimetableSensor(SchulPortalEntity, SensorEntity):
         super().__init__(manager, child, "stundenplan")
 
     def _lessons(self) -> list[dict[str, Any]]:
-        return [l for l in self.manager.child_timetable(self.child) if l.get("participation") != "not_registered"]
+        return [l for l in self.manager.child_timetable(self.child)
+                if l.get("participation") != "not_registered" and not l.get("hidden")]
 
     @property
     def available(self) -> bool:

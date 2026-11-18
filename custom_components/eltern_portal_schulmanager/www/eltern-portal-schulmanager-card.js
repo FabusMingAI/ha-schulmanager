@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.14.11";
+  const VERSION = "0.15.0";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -1266,7 +1266,15 @@
     }
 
     _render() {
-      let html = `<ha-card>`;
+      let html = `<ha-card><style>
+        .schedule-entry {padding:10px;margin:6px 0;border-left:4px solid var(--primary-color);background:var(--secondary-background-color);overflow-wrap:anywhere}
+        .schedule-entry.holiday {border-color:#44966b}
+        .schedule-entry.proposed {border-color:#db9b21}
+        .schedule-entry button,.schedule-settings button {min-height:44px;max-width:100%;white-space:normal}
+        .schedule-settings {margin:8px 0;display:flex;gap:6px;flex-wrap:wrap}
+        .schedule-source {font-size:.85em;color:var(--secondary-text-color)}
+        .holiday-cell {background:var(--secondary-background-color)}
+      </style>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
       if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Eltern Portal Manager startet noch …</div>` : `<div class="empty">${NAME}: ${esc(this._error)}</div>`;
       else if (!this._data) html += `<div class="empty">Lade …</div>`;
@@ -1274,6 +1282,32 @@
       else for (const c of this._data.children) html += this._planHtml(c);
       html += `</ha-card>`;
       const root = this._setContent(html);
+      root.querySelectorAll("[data-schedule-action]").forEach(el => el.addEventListener("click", async () => {
+        el.disabled = true;
+        try {
+          await this._call("timetable_entry", {child:el.dataset.child,event_id:el.dataset.uid,action:el.dataset.scheduleAction});
+          await this._load();
+        } catch (err) { this._error = err.message || String(err); }
+        this._render();
+      }));
+      root.querySelectorAll("[data-schedule-option]").forEach(el => el.addEventListener("click", async () => {
+        const c = this._data.children.find(c => c.key === el.dataset.child);
+        const options = {messages:true,holidays:true,...c.schedule_options};
+        options[el.dataset.scheduleOption] = !options[el.dataset.scheduleOption];
+        try { await this._call("timetable_options", {child:c.key,...options}); await this._load(); }
+        catch (err) { this._error = err.message || String(err); }
+        this._render();
+      }));
+      root.querySelectorAll("[data-schedule-manage]").forEach(el => el.addEventListener("click", () => {
+        this._manageSchedule = {...this._manageSchedule,[el.dataset.scheduleManage]:!this._manageSchedule?.[el.dataset.scheduleManage]};
+        this._render();
+      }));
+      root.querySelectorAll("[data-schedule-rescan]").forEach(el => el.addEventListener("click", async () => {
+        el.disabled = true;
+        try { await this._call("rescan_schedule", {}); await this._load(); }
+        catch (err) { this._error = err.message || String(err); }
+        this._render();
+      }));
       root.querySelectorAll("[data-day]").forEach((el) =>
         el.addEventListener("click", () => {
           this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.day };
@@ -1369,6 +1403,15 @@
       for (const e of c.events || []) if (EXAM_LABEL[e.category]) (exams[e.date] = exams[e.date] || []).push(e);
       this._exams = exams;
       let html = `<div class="child">`;
+      const options = {messages:true,holidays:true,...c.schedule_options};
+      html += `<div class="schedule-settings"><button class="pill" data-child="${esc(c.key)}" data-schedule-option="messages" aria-pressed="${options.messages}">Mitteilungstermine ${options.messages ? "an" : "aus"}</button><button class="pill" data-child="${esc(c.key)}" data-schedule-option="holidays" aria-pressed="${options.holidays}">Ferien ${options.holidays ? "an" : "aus"}</button><button class="pill" data-schedule-manage="${esc(c.key)}">Einträge verwalten</button></div>`;
+      const progress = this._data.schedule_progress;
+      if (progress) html += `<div class="info">Archivprüfung: ${progress.total - progress.pending} / ${progress.total} Mitteilungen · ${progress.failed} fehlgeschlagen · ${progress.unreadable} Anhänge ohne auslesbaren Text <button class="pill" data-schedule-rescan>Archiv erneut prüfen</button></div>`;
+      if (options.holidays && (today < "2024-07-29" || today > "2030-09-09")) html += `<div class="info">Ferien außerhalb Juli 2024 bis September 2030 sind noch nicht hinterlegt.</div>`;
+      if (this._manageSchedule?.[c.key]) {
+        for (const e of c.schedule || []) if (e.hidden || e.status === "proposed") html += this._scheduleEntry(c, e, null);
+        for (const l of c.timetable || []) if (l.hidden) html += `<div class="schedule-entry">${esc(fullName(l.subject))} · ${esc(WD[l.weekday])} · Stunde ${esc(l.lesson)} ${this._scheduleButton(c, l.schedule_uid, "restore", "Wiederherstellen")}</div>`;
+      }
       if (multi || this._config.show_name) html += `<div class="head"><div class="name">${esc(c.name)}</div>${c.classname ? `<div class="sub">Klasse ${esc(c.classname)}</div>` : ""}</div>`;
       // Tagesauswahl Mo–Fr (+ Tage aus dem Vertretungsplan)
       html += `<div class="bar">`;
@@ -1405,6 +1448,27 @@
       return {registered: "Optional · angemeldet", not_registered: "Optional · nicht angemeldet"}[l.participation] || "Optional · Teilnahme ungeklärt";
     }
 
+    _scheduleButton(c, uid, action, label) {
+      return `<button class="pill" data-child="${esc(c.key)}" data-uid="${esc(uid)}" data-schedule-action="${action}">${label}</button>`;
+    }
+
+    _scheduleOn(c, iso) {
+      const options = {messages:true,holidays:true,...c.schedule_options};
+      return (c.schedule || []).filter(e => {
+        if (e.hidden || e.status === "cancelled" || (e.kind === "holiday" ? !options.holidays : !options.messages)) return false;
+        if (iso < e.date || iso > (e.repeat_until || e.end || e.date)) return false;
+        if (e.weekday && e.repeat_until && (c.schedule || []).some(h => h.kind === "holiday" && h.date <= iso && h.end >= iso)) return false;
+        return !e.weekday || !e.repeat_until || (parseDay(iso).getDay() || 7) === e.weekday;
+      });
+    }
+
+    _scheduleEntry(c, e, iso) {
+      const proposed = e.status === "proposed";
+      const sources = (e.sources || []).map(s => /^https?:\/\//.test(s.url || "") ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "Mitteilung")}</a>` : esc(s.title || "Mitteilung")).join(" · ");
+      const overlaps = iso && !proposed && e.time && c.timetable.some(l => !l.hidden && l.weekday === (parseDay(iso).getDay() || 7) && l.start && l.end && e.time < l.end && (!e.time_end || e.time_end > l.start));
+      return `<div class="schedule-entry ${esc(e.kind)} ${proposed ? "proposed" : ""}"><b>${e.kind === "holiday" ? "🌴 " : "📅 "}${esc(e.title)}</b>${e.time ? ` · ${esc(e.time)}${e.time_end ? "–" + esc(e.time_end) : ""}` : " · ganztägig"}${e.location ? ` · ${esc(e.location)}` : ""}${proposed ? " · Vorschlag – bitte bestätigen" : ""}${overlaps ? " · Überschneidung mit Unterricht" : ""}<div class="schedule-source">${sources || (e.kind === "holiday" ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">Amtliche Ferienordnung Bayern</a>` : "")}${e.details ? `<br>${esc(e.details)}` : ""}${!iso ? `<br>${esc(fmtDate(e.date))}${e.repeat_until || e.end ? "–" + esc(fmtDate(e.repeat_until || e.end)) : ""}` : ""}</div>${e.hidden ? this._scheduleButton(c,e.uid,"restore","Wiederherstellen") : `${proposed ? this._scheduleButton(c,e.uid,"confirm","Übernehmen") : ""}${this._scheduleButton(c,e.uid,"hide",e.weekday && e.repeat_until ? "Serie entfernen" : "Entfernen")}`}</div>`;
+    }
+
     _teacherSource(l) {
       const source = l.teacher_source;
       if (!source) return "";
@@ -1415,7 +1479,9 @@
 
     _dayHtml(c, iso, today, entries, known) {
       const wd = parseDay(iso).getDay();
-      const lessons = c.timetable.filter((l) => l.weekday === wd);
+      const schedule = this._scheduleOn(c, iso);
+      const holiday = schedule.some(e => e.kind === "holiday");
+      const lessons = c.timetable.filter((l) => l.weekday === wd && !l.hidden && !holiday);
       const used = new Set();
       const changes = (nr) =>
         entries.filter((e, i) => {
@@ -1426,6 +1492,8 @@
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       let html = `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
+      html += `<div class="bar"><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,-1)}" aria-label="Tag zurück">‹</button><button class="pill" data-child="${esc(c.key)}" data-day="${today}">Heute</button><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,1)}" aria-label="Tag vor">›</button></div>`;
+      for (const e of schedule) html += this._scheduleEntry(c, e, iso);
       const dayExams = (this._exams || {})[iso] || [];
       for (const e of dayExams) {
         const [icon, label] = EXAM_LABEL[e.category];
@@ -1433,7 +1501,7 @@
       }
       const examFor = (subject) => dayExams.find((e) => e.subject && sameSubject(e.subject, subject));
       if (!c.timetable.length) html += `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
-      else if (!lessons.length) html += `<div class="empty">Kein Unterricht laut Stundenplan.</div>`;
+      else if (!lessons.length) html += `<div class="empty">${holiday ? "Ferien · regulärer Unterricht pausiert." : "Kein Unterricht laut Stundenplan."}</div>`;
       for (const l of lessons) {
         const ch = changes(l.lesson);
         const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
@@ -1448,7 +1516,7 @@
             <div class="main"><div class="sj" title="${esc(l.subject)}">${esc(long)}${kind ? `<span class="badge ${kind}">${KIND_LABEL[kind] || kind}</span>` : ""}${exBadge}</div>
               <div class="lesson-details">Reguläre Lehrkraft: ${esc(l.teacher_label || l.teacher || "nicht angegeben")}${this._teacherSource(l)}${l.optional ? `<br>${esc(this._participation(l))}` : ""}<br>
               ${ch.map((e) => `Status: ${esc(KIND_LABEL[e.kind] || e.kind || "Änderung")}${e.teacher_label || e.teacher ? `<br>Ursprüngliche Lehrkraft: ${esc(e.teacher_label || e.teacher)}` : ""}${e.substitute_label || e.substitute ? `<br>Vertretungslehrkraft: ${esc(e.substitute_label || e.substitute)}` : ""}${e.room ? `<br>Raumänderung: ${esc(room(l.room))} → ${esc(room(e.room))}` : ""}${e.info ? `<br>Hinweis: ${esc(e.info)}` : ""}`).join("<br>") || (l.optional && l.participation !== "registered" ? "Status: optionales Klassenangebot" : "Status: regulärer Unterricht")}
-              ${l.info ? `<br>Hinweis: ${esc(l.info)}` : ""}</div>
+              ${l.info ? `<br>Hinweis: ${esc(l.info)}` : ""}${l.optional && l.schedule_uid ? this._scheduleButton(c,l.schedule_uid,"hide","Optionalen Eintrag entfernen") : ""}</div>
               ${ch.map((e) => this._chgHtml(c, e)).join("")}</div>
             <span class="rm">${esc(room(l.room))}</span>
           </div>`;
@@ -1483,7 +1551,8 @@
       for (const nr of nums) {
         html += `<tr><th>${esc(nr)}.<div class="r">${esc(times[nr] || "")}</div></th>`;
         dates.forEach((iso, i) => {
-          const l = c.timetable.find((x) => x.weekday === i + 1 && x.lesson === nr);
+          const holiday = this._scheduleOn(c, iso).some(e => e.kind === "holiday");
+          const l = !holiday && c.timetable.find((x) => !x.hidden && x.weekday === i + 1 && x.lesson === nr);
           const ch = (byDate[iso] || []).filter((e) => lessonNums(e.lesson).includes(String(nr)));
           const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
           const ex = l && ((this._exams || {})[iso] || []).find((e) => e.subject && sameSubject(e.subject, l.subject));
@@ -1493,6 +1562,10 @@
         html += `</tr>`;
       }
       html += `</table></div>`;
+      for (const iso of dates) {
+        const schedule = this._scheduleOn(c, iso);
+        if (schedule.length) html += `<div class="day">${esc(dayLabel(iso,today))}</div>` + schedule.map(e => this._scheduleEntry(c,e,iso)).join("");
+      }
       const unmatched = dates.flatMap((iso) => (byDate[iso] || [])
         .filter((e) => !lessonNums(e.lesson).some((nr) => nums.includes(String(nr))))
         .map((e) => `<div class="info">${esc(dayLabel(iso, today))} · ${esc(e.text || changeText(e))}</div>`));

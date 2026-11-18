@@ -168,6 +168,7 @@ class SchulPortal(ElternPortalAPI):
         username: str,
         password: str,
         lookback_days: int = 120,
+        full_archive: bool = False,
     ) -> None:
         super().__init__(session)
         self.set_config(school, username, password)
@@ -181,7 +182,7 @@ class SchulPortal(ElternPortalAPI):
             substitution=True,
             sicknote=True,
         )
-        neg = -abs(int(lookback_days))
+        neg = -(date.today() - date.min).days if full_archive else -abs(int(lookback_days))
         self.set_option_threshold(
             blackboard_threshold=neg,
             letter_threshold=neg,

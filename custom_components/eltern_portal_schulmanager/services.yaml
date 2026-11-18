@@ -97,6 +97,36 @@ reanalyze:
       required: true
       selector:
         text:
+rescan_schedule:
+timetable_entry:
+  fields:
+    child:
+      required: true
+      selector:
+        text:
+    event_id:
+      required: true
+      selector:
+        text:
+    action:
+      required: true
+      selector:
+        select:
+          options: [hide, restore, confirm]
+timetable_options:
+  fields:
+    child:
+      required: true
+      selector:
+        text:
+    messages:
+      required: true
+      selector:
+        boolean:
+    holidays:
+      required: true
+      selector:
+        boolean:
 archive_event:
   fields:
     child:

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Message appointments and confirmed weekly courses in the timetable, resumable full archive backfill, source links, proposals, persistent per-child hide/restore controls and offline Bavarian holidays (2024–2030).
+- Mitteilungstermine und bestätigte wöchentliche Kurse im Stundenplan, fortsetzbare Prüfung des vollständigen Archivs, Quellenlinks, Vorschläge, dauerhaftes Entfernen/Wiederherstellen je Kind und bayerische Ferien offline (2024–2030).
+
 ## 0.14.11 – 2026-11-14
 
 - Fix: keep stored school content accessible after a Home Assistant restart/reload during portal connection or TLS certificate outages. Initialized schools with cached children load local messages, tasks, calendars and attachments; new schools still require live setup validation. Polling automatically retries and resumes updates when the portal recovers. TLS verification stays enabled.

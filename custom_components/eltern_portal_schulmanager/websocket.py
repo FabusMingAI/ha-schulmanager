@@ -222,6 +222,8 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
                 "tasks": tasks,
                 "items": [_item_light(m, i) for i in m.child_items(key)[:60]],
                 "events": _agenda(m, key),
+                "schedule": m.schedule_entries(key),
+                "schedule_options": m.schedule_options(key),
                 "timetable": [{**lesson, "teacher_label": m.teacher_label(key, lesson.get("teacher"))}
                               for lesson in m.child_timetable(key)],
                 "sicknotes": m.child_sicknotes(key)[:30],
@@ -256,6 +258,7 @@ def ws_data(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg
             "legend": _legend(),
             "languages": [[code, LANGUAGE_NAMES[code]] for code in m.summary_languages],
             "translation": m.translation_progress,
+            "schedule_progress": m.schedule_progress,
             "today": today.isoformat(),
             "version": VERSION,
             "repo_url": REPO_URL,

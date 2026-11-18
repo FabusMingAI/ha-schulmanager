@@ -352,6 +352,17 @@ def _register_services(hass: HomeAssistant) -> None:
     async def reanalyze(call: ServiceCall) -> None:
         await get_manager(hass).async_reanalyze(call.data[ATTR_ITEM])
 
+    async def rescan_schedule(call: ServiceCall) -> None:
+        manager = get_manager(hass)
+        manager.rescan_schedule()
+        await manager.async_refresh()
+
+    async def timetable_entry(call: ServiceCall) -> None:
+        get_manager(hass).schedule_action(call.data[ATTR_CHILD], call.data["event_id"], call.data["action"])
+
+    async def timetable_options(call: ServiceCall) -> None:
+        get_manager(hass).set_schedule_options(call.data[ATTR_CHILD], call.data["messages"], call.data["holidays"])
+
     async def archive_event(call: ServiceCall) -> None:
         try:
             get_manager(hass).set_event_archived(call.data[ATTR_CHILD], call.data["event_id"], True)
@@ -486,6 +497,15 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     event_schema = vol.Schema({vol.Required(ATTR_CHILD): cv.string, vol.Required("event_id"): cv.string})
     hass.services.async_register(DOMAIN, "archive_event", archive_event, schema=event_schema)
+    hass.services.async_register(DOMAIN, "rescan_schedule", rescan_schedule, schema=vol.Schema({}))
+    hass.services.async_register(DOMAIN, "timetable_entry", timetable_entry, schema=vol.Schema({
+        vol.Required(ATTR_CHILD): cv.string, vol.Required("event_id"): cv.string,
+        vol.Required("action"): vol.In(["hide", "restore", "confirm"]),
+    }))
+    hass.services.async_register(DOMAIN, "timetable_options", timetable_options, schema=vol.Schema({
+        vol.Required(ATTR_CHILD): cv.string, vol.Required("messages"): cv.boolean,
+        vol.Required("holidays"): cv.boolean,
+    }))
     hass.services.async_register(DOMAIN, "unarchive_event", unarchive_event, schema=event_schema)
     hass.services.async_register(DOMAIN, "send_digest", send_digest)
     hass.services.async_register(DOMAIN, "rebuild_dashboard", rebuild_dashboard)

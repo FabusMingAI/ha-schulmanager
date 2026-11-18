@@ -428,6 +428,43 @@
           "description": "uid des Eintrags, z. B. frist-… oder vertretung-…"
         }
       }
+    },
+    "rescan_schedule": {
+      "name": "Archiv auf Termine prüfen",
+      "description": "Alle verfügbaren Mitteilungen erneut prüfen. Entfernte Einträge bleiben ausgeblendet."
+    },
+    "timetable_entry": {
+      "name": "Stundenplaneintrag verwalten",
+      "description": "Zusätzlichen Eintrag entfernen, wiederherstellen oder bestätigen.",
+      "fields": {
+        "child": {
+          "name": "Kind",
+          "description": "Kennung des Kindes, z. B. anna."
+        },
+        "event_id": {
+          "name": "Eintrag-ID"
+        },
+        "action": {
+          "name": "Aktion",
+          "description": "hide, restore, confirm"
+        }
+      }
+    },
+    "timetable_options": {
+      "name": "Stundenplananzeige einstellen",
+      "description": "Mitteilungstermine und bayerische Ferien pro Kind ein- oder ausblenden.",
+      "fields": {
+        "child": {
+          "name": "Kind",
+          "description": "Kennung des Kindes, z. B. anna."
+        },
+        "messages": {
+          "name": "Mitteilungstermine"
+        },
+        "holidays": {
+          "name": "Bayerische Ferien"
+        }
+      }
     }
   },
   "selector": {

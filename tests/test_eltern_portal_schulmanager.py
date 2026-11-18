@@ -293,6 +293,15 @@ async def test_full_flow_ai_files_reminders(hass: HomeAssistant, media_dir) -> N
         {"entity_id": "calendar.schule_anna_kalender", "duration": {"days": 30}},
         blocking=True, return_response=True,
     )
+    # Legacy AI responses without explicit evidence require confirmation.
+    for proposed in m.schedule_entries("anna"):
+        if proposed["title"] == "Abfahrt Klassenfahrt":
+            m.schedule_action("anna", proposed["uid"], "confirm")
+    resp = await hass.services.async_call(
+        "calendar", "get_events", {"entity_id": "calendar.schule_anna_kalender", "start_date_time": today.isoformat(),
+                                  "end_date_time": (today + timedelta(days=30)).isoformat()},
+        blocking=True, return_response=True,
+    )
     summaries = [e["summary"] for e in resp["calendar.schule_anna_kalender"]["events"]]
     assert any("Frist: Klassenfahrt bezahlen" in s for s in summaries), summaries
     assert any("Abfahrt Klassenfahrt" in s for s in summaries)
@@ -1201,6 +1210,10 @@ async def test_item_status_languages_class_filter(hass: HomeAssistant, media_dir
             "de": "Hausaufgaben fehlen.", "en": "Homework missing.", "ca": "Falten deures."
         }
 
+        # An uncertain AI appointment is confirmed before calendar inclusion.
+        for proposed in m.schedule_entries("anna"):
+            if proposed["title"] == "Elternabend 8b":
+                m.schedule_action("anna", proposed["uid"], "confirm")
         # Termine anderer Klassen ausgeblendet (Portal und KI)
         ev = {e["uid"]: e for e in m.child_events("anna")}
         assert "a1" in ev and "a2" in ev

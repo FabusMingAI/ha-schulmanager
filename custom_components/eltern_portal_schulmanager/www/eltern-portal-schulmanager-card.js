@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.15.1";
+  const VERSION = "0.15.2";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -1274,6 +1274,11 @@
         .schedule-settings {margin:8px 0;display:flex;gap:6px;flex-wrap:wrap}
         .schedule-source {font-size:.85em;color:var(--secondary-text-color)}
         .holiday-cell {background:var(--secondary-background-color)}
+        .week-appointment {display:flex;align-items:center;gap:3px;width:100%;max-width:100%;min-width:0;min-height:28px;padding:3px;margin:2px 0;border:0;border-left:2px solid var(--primary-color);border-radius:3px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;line-height:18px;text-align:left;cursor:pointer;overflow:hidden}
+        .week-appointment .appointment-icon {flex:none}
+        .week-appointment .appointment-title {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .week-appointment.proposed {border-left-color:#db9b21}
+        .week-appointment.holiday {border-left-color:#44966b}
       </style>`;
       if (this._config.title) html += `<h1 class="card-header" style="margin:0;padding:0 16px 8px">${esc(this._config.title)}</h1>`;
       if (this._error) html += /unknown command|not.*(loaded|set ?up)|nicht eingerichtet/i.test(this._error) ? `<div class="empty">Eltern Portal Manager startet noch …</div>` : `<div class="empty">${NAME}: ${esc(this._error)}</div>`;
@@ -1282,6 +1287,15 @@
       else for (const c of this._data.children) html += this._planHtml(c);
       html += `</ha-card>`;
       const root = this._setContent(html);
+      root.querySelectorAll("[data-schedule-day]").forEach(el => el.addEventListener("click", () => {
+        const child = el.dataset.child;
+        this._sel = {...this._sel,[child]:el.dataset.scheduleDay};
+        this._week = {...this._week,[child]:false};
+        this._scheduleOpen = `${child}:${el.dataset.uid}:${el.dataset.scheduleDay}`;
+        this._render();
+        const selected = [...this.shadowRoot.querySelectorAll("[data-schedule-open]")].find(button => button.dataset.scheduleOpen === this._scheduleOpen);
+        selected?.scrollIntoView({block:"nearest"});
+      }));
       root.querySelectorAll("[data-schedule-open]").forEach(el => el.addEventListener("click", () => {
         this._scheduleOpen = this._scheduleOpen === el.dataset.scheduleOpen ? null : el.dataset.scheduleOpen;
         this._render();
@@ -1489,6 +1503,14 @@
       return html + "</div>";
     }
 
+    _weekAppointment(c, e, iso) {
+      const letters = [...e.title];
+      const shortTitle = letters.length > 10 ? letters.slice(0,9).join("") + "…" : e.title;
+      const icon = e.kind === "holiday" ? "🌴" : "📅";
+      const label = `${e.title}${e.time ? " · " + e.time : ""} · Tagesansicht öffnen`;
+      return `<button class="week-appointment ${esc(e.kind)} ${e.status === "proposed" ? "proposed" : ""}" data-child="${esc(c.key)}" data-uid="${esc(e.uid)}" data-schedule-day="${esc(iso)}" title="${esc(label)}" aria-label="${esc(label)}"><span class="appointment-icon" aria-hidden="true">${icon}</span><span class="appointment-title" aria-hidden="true">${esc(shortTitle)}</span></button>`;
+    }
+
     _teacherSource(l) {
       const source = l.teacher_source;
       if (!source) return "";
@@ -1574,7 +1596,7 @@
       html += `<div class="wk"><table lang="de"><tr><th>Stunde / Zeit</th>`;
       html += dates.map((iso,i) => `<th class="${iso === today ? "today" : ""}">${WD[i+1]} <span class="dt">${fmtShort(iso)}</span></th>`).join("") + "</tr>";
       if (additions.some(events => events.some(e => !e.time))) {
-        html += `<tr class="schedule-all-day"><th>Ganztägig</th>` + additions.map((events,i) => `<td>${events.filter(e => !e.time).map(e => this._scheduleEntry(c,e,dates[i])).join("")}</td>`).join("") + "</tr>";
+        html += `<tr class="schedule-all-day"><th>Ganztägig</th>` + additions.map((events,i) => `<td>${events.filter(e => !e.time).map(e => this._weekAppointment(c,e,dates[i])).join("")}</td>`).join("") + "</tr>";
       }
       rows.forEach((row,index) => {
         html += `<tr><th>${row.lesson ? esc(row.lesson)+"." : ""}<div class="r">${esc(row.start)}</div></th>`;
@@ -1588,7 +1610,7 @@
           if (lesson) html += `<button class="lesson-pick" data-child="${k}" data-lesson="${esc(row.lesson)}" data-date="${iso}"><span class="lg">${esc(fullName(lesson.subject))}</span><span class="sh">${esc(shortName(lesson.subject))}</span><div class="r">${esc(room(lesson.room))}</div>${lesson.optional ? `<div class="r">${esc(this._participation(lesson))}</div>` : ""}</button>`;
           if (kind) html += `<div class="r">${esc(KIND_LABEL[kind] || kind)}</div>`;
           if (exam) html += `<div class="r">${EXAM_LABEL[exam.category][0]} ${EXAM_LABEL[exam.category][1]}</div>`;
-          html += additions[i].filter(e => e.time && eventRow(e) === index).map(e => this._scheduleEntry(c,e,iso)).join("");
+          html += additions[i].filter(e => e.time && eventRow(e) === index).map(e => this._weekAppointment(c,e,iso)).join("");
           html += "</td>";
         });
         html += "</tr>";

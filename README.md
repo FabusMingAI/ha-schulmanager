@@ -13,7 +13,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
-> **Release status:** The latest published release is [v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8). Screenshots use fictional data and show the dashboard layout introduced in v0.14.5.
+> The published version and its release notes are available on the latest release page. This README describes the development branch, including the timetable additions prepared for v0.15.0. Screenshots use fictional data and show the dashboard layout introduced in v0.14.5. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
@@ -134,7 +134,9 @@ Download the source archive of the [latest release](https://github.com/FabusMing
 
 ## Releases and updates
 
-As of **8 November 2026**, the latest published release is **[v0.14.8](https://github.com/FabusMingAI/ha-schulmanager/releases/tag/v0.14.8)**. It includes the Bronze/Silver technical self-assessment: live setup validation, reauthentication and credential changes, reliable availability reporting, retryable reminders, privacy-preserving diagnostics and enforced test coverage. The integration remains Custom; these are not official Home Assistant medals.
+See the latest release page for the published version and release notes. Changes prepared for v0.15.0 are documented in the changelog. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
+
+Since v0.14.8, the integration includes the Bronze/Silver technical self-assessment with live setup validation, reauthentication, credential changes, availability reporting, retryable reminders, privacy-preserving diagnostics and enforced test coverage. The integration retains its Custom classification.
 
 Install updates through HACS or Marketplace and restart Home Assistant. The version displayed in the "Schule" status bar is the running integration’s version; the downloaded version only becomes active after a restart.
 
@@ -247,6 +249,9 @@ Entity IDs follow your Home Assistant language (shown here for German).
 | `eltern_portal_schulmanager.update_item` | `status` (`offen`, `in_arbeit`, `erledigt`) of a message (`item_id`); without `item_id` for all messages of `child` (or of all children), returns `changed` |
 | `eltern_portal_schulmanager.add_task` | `child`, `title`; optional `due`, `amount`, `details`, `type` |
 | `eltern_portal_schulmanager.reanalyze` | `item_id`; analyse a message again using the configured AI service or rules |
+| `eltern_portal_schulmanager.rescan_schedule` | Fetch the available archive again and repeat appointment extraction, including failed checks |
+| `eltern_portal_schulmanager.timetable_entry` | `child`, `event_id`, `action` (`hide`, `restore`, `confirm`); manage an additional timetable entry |
+| `eltern_portal_schulmanager.timetable_options` | `child`, `messages`, `holidays`; show or hide message appointments and Bavarian holidays |
 | `eltern_portal_schulmanager.archive_event` / `eltern_portal_schulmanager.unarchive_event` | `child` and `event_id` (uid of an entry in "Termine & Fristen"): move it to the archive or bring it back |
 | `eltern_portal_schulmanager.send_digest` / `eltern_portal_schulmanager.send_reminders` | Send summary or reminders now |
 | `eltern_portal_schulmanager.rebuild_dashboard` | Regenerate the "Schule" dashboard |

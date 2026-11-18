@@ -1119,15 +1119,7 @@ class SchulManager:
         error = None
         result = None
         if ai_entity:
-            attachments = None
-            if not item.get("text") and item.get("files"):
-                attachments = [
-                    {
-                        "media_content_id": self.media_content_id(f["path"]),
-                        "media_content_type": f.get("content_type") or "application/pdf",
-                    }
-                    for f in item["files"]
-                ]
+            attachments = self._schedule_attachments(item)
             try:
                 result = await async_analyze_ai(
                     self.hass, ai_entity, ctx, attachments, self.summary_languages
@@ -1139,7 +1131,7 @@ class SchulManager:
         if result is None:
             result = analyze_rules(ctx)
         if ai_entity and method == "ki" and len(ctx.get("body") or "") > 14000:
-            result["events"] = await async_extract_schedule(self.hass, ai_entity, ctx, languages=self.summary_languages)
+            result["events"] = await async_extract_schedule(self.hass, ai_entity, ctx, attachments, self.summary_languages)
         if self.items.get(item["uid"]) is not item or content != self._schedule_content(item):
             return
         self._apply_analysis(item, result, method)
@@ -1158,6 +1150,12 @@ class SchulManager:
 
     def _schedule_content(self, item: dict[str, Any]) -> str:
         return identity(item.get("version"), item.get("body"), item.get("text"), item.get("files"))
+
+    def _schedule_attachments(self, item: dict[str, Any]) -> list[dict[str, str]] | None:
+        return [{"media_content_id": self.media_content_id(f["path"]),
+                 "media_content_type": f.get("content_type") or "application/pdf"}
+                for f in item.get("files", [])
+                if not item.get("text") or (f.get("content_type") or "").startswith("image/")] or None
 
     async def _schedule_context(self, item: dict[str, Any]) -> dict[str, Any]:
         ctx = self._context(item)
@@ -1197,9 +1195,7 @@ class SchulManager:
                 result = None
                 if ai := self.opt(CONF_AI_ENTITY):
                     try:
-                        attachments = [{"media_content_id": self.media_content_id(f["path"]),
-                                        "media_content_type": f.get("content_type") or "application/pdf"}
-                                       for f in item.get("files", [])] if not item.get("text") else None
+                        attachments = self._schedule_attachments(item)
                         result = {"events": await async_extract_schedule(self.hass, ai, ctx, attachments, self.summary_languages)}
                         method = "ki"
                     except AnalyzeError as err:

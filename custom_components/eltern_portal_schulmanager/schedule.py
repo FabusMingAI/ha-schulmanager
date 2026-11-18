@@ -137,5 +137,6 @@ def rule_events(ctx: dict[str, Any]) -> list[dict[str, Any]]:
             out.append({"title": (ctx.get("title") or line)[:200], "date": day.isoformat(),
                         "time": clock(times[0]) if times else None,
                         "time_end": clock(times[1]) if len(times) > 1 else None,
-                        "end": None, "location": None, "status": "proposed", "details": line[:600]})
+                        "end": None, "location": None, "status": "proposed", "details": line[:600],
+                        "cancelled": bool(re.search(r"abgesagt|entfällt|fällt\b.*\baus", line, re.I))})
     return out

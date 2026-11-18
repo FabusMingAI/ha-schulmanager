@@ -1074,6 +1074,8 @@ class SchulManager:
             except Exception as err:  # noqa: BLE001
                 LOGGER.exception("Auswertung von %s fehlgeschlagen", item["uid"])
                 item["analysis"] = {"status": "fehler", "error": str(err)}
+            if item.get("analysis", {}).get("status") == "pending":
+                continue  # Content changed during the request; process its new version first.
             self._changed()
             if item.pop("notify", False):
                 # Ein Fehler bei Push/Event/Ansage darf den Auswerte-Worker nicht beenden
@@ -1138,7 +1140,7 @@ class SchulManager:
             result = analyze_rules(ctx)
         if ai_entity and method == "ki" and len(ctx.get("body") or "") > 14000:
             result["events"] = await async_extract_schedule(self.hass, ai_entity, ctx, languages=self.summary_languages)
-        if content != self._schedule_content(item):
+        if self.items.get(item["uid"]) is not item or content != self._schedule_content(item):
             return
         self._apply_analysis(item, result, method)
         item["analysis"] = {
@@ -1186,6 +1188,9 @@ class SchulManager:
             if self._pending():
                 await self._work_queue()
             content = self._schedule_content(item)
+            if (item.get("schedule_scan", {}).get("content") == content
+                    and item.get("schedule_scan", {}).get("version") == SCHEDULE_VERSION):
+                continue
             try:
                 ctx = await self._schedule_context(item)
                 method, error = "regeln", None
@@ -1202,7 +1207,7 @@ class SchulManager:
                 if result is None:
                     result = analyze_rules(ctx)
                 # A refresh may have replaced the message while the AI was running.
-                if content != self._schedule_content(item):
+                if self.items.get(item["uid"]) is not item or content != self._schedule_content(item):
                     continue
                 if not error:
                     self._replace_events(item, result["events"], method)

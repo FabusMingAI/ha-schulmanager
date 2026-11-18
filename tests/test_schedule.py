@@ -125,6 +125,8 @@ async def test_legacy_uids_updates_reordering_tombstones_and_optional_lessons(ma
     uid = lesson_uid(lesson)
     m.schedule_action("anna", uid, "hide")
     assert m.child_timetable("anna")[0]["hidden"]
+    from custom_components.eltern_portal_schulmanager.sensor import TimetableSensor
+    assert not TimetableSensor(m, "anna")._lessons()
     m.schedule_action("anna", uid, "restore")
     assert not m.child_timetable("anna")[0]["hidden"]
     # User choices are persisted independently of disappearing source content.
@@ -227,3 +229,29 @@ async def test_historical_class_and_explicit_rescheduling(manager):
     m._replace_events(m.items["correction"], [event(date="2026-11-23", replaces_date="2026-11-16")], "ki")
     events = [e for e in m.child_events("anna") if e["category"] == "termin"]
     assert len(events) == 1 and events[0]["start"].date() == date(2026, 11, 23)
+
+
+async def test_cancellation_proposal_and_interrupted_analysis(manager):
+    m = manager
+    proposed = rule_events({"title": "Robotikkurs 8b", "body": "Robotikkurs am 16.11.2026 fällt aus."})[0]
+    assert proposed["cancelled"]
+    m._replace_events(m.items["letter"], [proposed], "regeln")
+    uid = next(iter(m.data["events"]))
+    m.schedule_action("anna", uid, "confirm")
+    assert next(e for e in m.schedule_entries("anna") if e["uid"] == uid)["status"] == "cancelled"
+    assert not m.child_events("anna")
+    m.rescan_schedule()
+    m.items["letter"]["analysis"] = {"status": "pending"}
+    async def analyze_pending():
+        await m._analyze(m.items["letter"])
+    with patch.object(m, "_work_queue", side_effect=analyze_pending):
+        await m._schedule_backfill()
+    assert not m._schedule_pending()
+    m.items["letter"]["analysis"] = {"status": "pending"}
+    async def edited_context(item):
+        ctx = m._context(item)
+        item["body"] = "Changed during extraction"
+        return ctx
+    with patch.object(m, "_schedule_context", side_effect=edited_context):
+        await m._work_queue()
+    assert m.items["letter"]["analysis"]["status"] == "fertig"

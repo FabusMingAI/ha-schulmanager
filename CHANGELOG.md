@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.15.3 – 2026-11-23
+
 - Display gaps between lessons as subtle, theme-aware green break rows with time ranges and durations in minutes in day and week views. Longer breaks get more space. Keep additional appointments visible during breaks and omit break labels on holidays or days without adjacent lessons.
 - Pausen zwischen Unterrichtsstunden als dezente grüne Zwischenzeilen mit Zeitraum und Minuten in Tages- und Wochenansicht darstellen, längere Pausen mit mehr Abstand. Die Farben passen sich dem Theme an. Zusatztermine in Pausen bleiben sichtbar; an Ferientagen und ohne angrenzende Stunden erscheinen keine Pausenbeschriftungen.
 

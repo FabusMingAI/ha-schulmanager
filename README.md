@@ -103,7 +103,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="left"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, [regeneration instructions](docs/screenshots/README.md)).</sub></p>
 
-- Day view with times and rooms, switchable to the whole **week**. The week grid shows both start and end times. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
+- Day view with times and rooms, switchable to the whole **week**. The week grid shows both start and end times. Gaps between lessons appear as subtle green break rows with their time range and duration in minutes, in both day and week views. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
 - **Week navigation:** use ‹ / › to go back or forward one week and **Heute** to return to the starting week. The heading shows the calendar week and Monday–Friday dates; at weekends the starting week is the following week. The week-view legend can be expanded or collapsed.
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.

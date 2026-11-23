@@ -11,3 +11,5 @@ Requires system Chromium (`/usr/bin/chromium`, or set `CHROMIUM_PATH`). Covers d
 Notification-link checks additionally cover delayed cold loads, child selection, warm navigation to tasks, missing items, duplicate cards and preserving unrelated URL parameters.
 
 Outage checks retain timetable/agenda content while showing connection, partial-response and authentication warnings, known/unknown data age, and recovery.
+
+Timetable navigation checks cover start/end times and missing end times, returning from lessons and appointments in a different week, restored keyboard focus and scroll position, sticky return-button visibility, and no horizontal overflow at desktop/mobile widths. Scroll restoration is checked for both document scrolling and a simulated Home Assistant dashboard scroll container inside a shadow root.

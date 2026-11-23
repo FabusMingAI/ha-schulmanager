@@ -103,12 +103,12 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="left"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, [regeneration instructions](docs/screenshots/README.md)).</sub></p>
 
-- Day view with times and rooms, switchable to the whole **week**. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
+- Day view with times and rooms, switchable to the whole **week**. The week grid shows both start and end times. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
 - **Week navigation:** use ‹ / › to go back or forward one week and **Heute** to return to the starting week. The heading shows the calendar week and Monday–Friday dates; at weekends the starting week is the following week. The week-view legend can be expanded or collapsed.
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
 - Changes from the substitution plan are highlighted: red = cancelled, orange = substitution or room change. The number on a weekday shows how many changes are coming up.
-- Click or tap a lesson in the timetable week view to open its date and focus that lesson. The day view shows available regular and substitute teachers, rooms, status and notes; use **Woche** to return.
+- Click or tap a lesson in the timetable week view to open its date and focus that lesson. The day view shows available regular and substitute teachers, rooms, status and notes; use the sticky **← Zur Wochenansicht** button to return to the previous week and scroll position, with keyboard focus restored to the selected lesson or appointment.
 - Tap an exam/test box or a substitution in the day view for **📅 In Kalender eintragen** / **Google Kalender**.
 - **Exams and tests** are marked: 📝 / ✏️ on the weekday buttons, a box above the lessons of that day and a badge on the matching subject (purple = exam, blue = test). Upcoming ones for the next two weeks are listed above the timetable.
 

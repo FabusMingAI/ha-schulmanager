@@ -1267,6 +1267,11 @@
 
     _render() {
       let html = `<ha-card><style>
+        ha-card {overflow:clip}
+        .week-return {position:sticky;top:var(--header-height,56px);z-index:2;padding:8px 16px;background:var(--ha-card-background,var(--card-background-color,#fff))}
+        .week-return button {min-height:44px;padding:0 14px;border:1px solid var(--primary-color);color:var(--primary-color);font-weight:600}
+        .wk th:first-child {width:6.4em}
+        .wk th .r {white-space:nowrap}
         .schedule-entry {padding:10px;margin:6px 0;border-left:4px solid var(--primary-color);background:var(--secondary-background-color);overflow-wrap:anywhere}
         .schedule-entry.holiday {border-color:#44966b}
         .schedule-entry.proposed {border-color:#db9b21}
@@ -1289,6 +1294,7 @@
       const root = this._setContent(html);
       root.querySelectorAll("[data-schedule-day]").forEach(el => el.addEventListener("click", () => {
         const child = el.dataset.child;
+        this._rememberWeek(child, el);
         this._sel = {...this._sel,[child]:el.dataset.scheduleDay};
         this._week = {...this._week,[child]:false};
         this._scheduleOpen = `${child}:${el.dataset.uid}:${el.dataset.scheduleDay}`;
@@ -1332,6 +1338,7 @@
       }));
       root.querySelectorAll("[data-day]").forEach((el) =>
         el.addEventListener("click", () => {
+          this._rememberWeek(el.dataset.child, el);
           this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.day };
           this._week = { ...(this._week || {}), [el.dataset.child]: false };
           this._render();
@@ -1339,9 +1346,15 @@
       );
       root.querySelectorAll("[data-week]").forEach((el) =>
         el.addEventListener("click", () => {
-          this._week = { ...(this._week || {}), [el.dataset.week]: !this._isWeek(el.dataset.week) };
-          this._render();
+          if (!this._isWeek(el.dataset.week)) this._returnToWeek(el.dataset.week);
+          else {
+            this._week = { ...(this._week || {}), [el.dataset.week]: false };
+            this._render();
+          }
         })
+      );
+      root.querySelectorAll("[data-week-return]").forEach(el =>
+        el.addEventListener("click", () => this._returnToWeek(el.dataset.weekReturn))
       );
       root.querySelectorAll("[data-wkoff]").forEach((el) =>
         el.addEventListener("click", () => {
@@ -1361,6 +1374,7 @@
         })
       );
       root.querySelectorAll("[data-lesson]").forEach((el) => el.addEventListener("click", () => {
+        this._rememberWeek(el.dataset.child, el);
         this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.date };
         this._week = { ...(this._week || {}), [el.dataset.child]: false };
         this._selectedLesson = { child: el.dataset.child, lesson: el.dataset.lesson };
@@ -1370,6 +1384,39 @@
         chosen?.focus({ preventScroll: true });
       }));
       this._bindLegends(root);
+    }
+
+    // Remember the dashboard's scrolling containers across the day-view rerender,
+    // including Home Assistant containers outside this card's shadow root.
+    _rememberWeek(key, trigger) {
+      if (!this._isWeek(key)) return;
+      const scroll = [];
+      for (let el = this; el; el = el.parentElement || el.getRootNode()?.host) {
+        if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth)
+          scroll.push({el, top:el.scrollTop, left:el.scrollLeft});
+      }
+      this._weekReturn = {...this._weekReturn, [key]: {
+        offset:this._wkOff?.[key] || 0, trigger:{...trigger.dataset}, scroll,
+      }};
+    }
+
+    _returnToWeek(key) {
+      const saved = this._weekReturn?.[key];
+      this._week = {...this._week, [key]:true};
+      if (saved) this._wkOff = {...this._wkOff, [key]:saved.offset};
+      this._render();
+      const candidates = this.shadowRoot.querySelectorAll("[data-lesson], [data-schedule-day], [data-day], [data-week]");
+      const target = saved && [...candidates].find(el =>
+        Object.entries(saved.trigger).every(([name,value]) => el.dataset[name] === value));
+      (target || [...candidates].find(el => el.dataset.week === key))?.focus({preventScroll:true});
+      if (saved) {
+        delete this._weekReturn[key];
+        requestAnimationFrame(() => {
+          if (!this._isWeek(key) || !this.isConnected) return;
+          for (const {el,top,left} of saved.scroll) if (el.isConnected)
+            el.scrollTo({top,left,behavior:"instant"});
+        });
+      }
     }
 
     // Änderung aus dem Vertretungsplan; antippen zeigt „In Kalender eintragen“ (#12)
@@ -1531,7 +1578,8 @@
         });
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      let html = `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
+      let html = `<div class="week-return"><button class="pill" data-week-return="${esc(c.key)}"><span aria-hidden="true">← </span>Zur Wochenansicht</button></div>`;
+      html += `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
       html += `<div class="bar"><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,-1)}" aria-label="Tag zurück">‹</button><button class="pill" data-child="${esc(c.key)}" data-day="${today}">Heute</button><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,1)}" aria-label="Tag vor">›</button></div>`;
       const additions = schedule.filter(e => e.time).sort((a,b) => a.time.localeCompare(b.time));
       for (const e of schedule.filter(e => !e.time)) html += this._scheduleEntry(c,e,iso);
@@ -1597,7 +1645,7 @@
         html += `<tr class="schedule-all-day"><th>Ganztägig</th>` + additions.map((events,i) => `<td>${events.filter(e => !e.time).map(e => this._weekAppointment(c,e,dates[i])).join("")}</td>`).join("") + "</tr>";
       }
       rows.forEach((row,index) => {
-        html += `<tr><th>${row.lesson ? esc(row.lesson)+"." : ""}<div class="r">${esc(row.start)}</div></th>`;
+        html += `<tr><th>${row.lesson ? esc(row.lesson)+"." : ""}<div class="r">${esc(row.start)}${row.start && row.end ? "–" : ""}${esc(row.end)}</div></th>`;
         dates.forEach((iso,i) => {
           const holiday = additions[i].some(e => e.kind === "holiday");
           const lesson = !holiday && row.lesson && c.timetable.find(l => !l.hidden && l.weekday === i+1 && l.lesson === row.lesson);

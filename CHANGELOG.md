@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Display gaps between lessons as subtle, theme-aware green break rows with time ranges and durations in minutes in day and week views. Longer breaks get more space. Keep additional appointments visible during breaks and omit break labels on holidays or days without adjacent lessons.
+- Pausen zwischen Unterrichtsstunden als dezente grüne Zwischenzeilen mit Zeitraum und Minuten in Tages- und Wochenansicht darstellen, längere Pausen mit mehr Abstand. Die Farben passen sich dem Theme an. Zusatztermine in Pausen bleiben sichtbar; an Ferientagen und ohne angrenzende Stunden erscheinen keine Pausenbeschriftungen.
+
+- Show start and end times in the timetable week grid. Add a sticky “Zur Wochenansicht” button to day details; returning restores the previous week, dashboard scroll position and keyboard focus for lessons and appointments.
+- Anfangs- und Endzeiten im Wochenraster anzeigen. Ein beim Scrollen sichtbarer Button „Zur Wochenansicht“ führt aus Tagesdetails zur zuvor geöffneten Woche zurück und stellt Scrollposition und Tastaturfokus für Stunden und Termine wieder her.
+
 ## 0.15.2 – 2026-11-18
 
 - Compact week timetable appointments to an icon and at most two title lines, with overflow truncated and a full accessible label. Selecting an appointment opens its date in the day view with details and editing actions.

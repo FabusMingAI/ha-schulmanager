@@ -1267,6 +1267,22 @@
 
     _render() {
       let html = `<ha-card><style>
+        ha-card {overflow:clip}
+        .week-return {position:sticky;top:var(--header-height,56px);z-index:2;padding:8px 16px;background:var(--ha-card-background,var(--card-background-color,#fff))}
+        .week-return button {min-height:44px;padding:0 14px;border:1px solid var(--primary-color);color:var(--primary-color);font-weight:600}
+        .wk th:first-child {width:6.4em}
+        .wk th .r {white-space:nowrap}
+        .pause-row th,.pause-row td,.day-pause {background:color-mix(in srgb,var(--card-background-color,#fff) 92%,#44966b);color:var(--secondary-text-color)}
+        .pause-row th,.pause-row td {vertical-align:middle}
+        .pause-row th .r {font-size:.88em}
+        .pause-label {display:flex;align-items:center;justify-content:center;gap:12px;min-height:22px;font-size:11px;font-weight:500;letter-spacing:.02em}
+        .pause-label::before,.pause-label::after {content:"";height:1px;background:color-mix(in srgb,var(--divider-color) 70%,#44966b);flex:1;max-width:110px}
+        .pause-long .pause-label {min-height:34px}
+        .pause-mark {font-size:12px;font-weight:700}
+        .day-pause {display:flex;align-items:center;gap:16px;border-block:1px solid var(--divider-color);padding:5px 16px}
+        .day-pause .pause-time {font-size:11px;white-space:nowrap;width:124px;flex:none}
+        .day-pause .pause-label {flex:1}
+        .pause-row .pause-label {gap:6px;flex-wrap:wrap}
         .schedule-entry {padding:10px;margin:6px 0;border-left:4px solid var(--primary-color);background:var(--secondary-background-color);overflow-wrap:anywhere}
         .schedule-entry.holiday {border-color:#44966b}
         .schedule-entry.proposed {border-color:#db9b21}
@@ -1289,6 +1305,7 @@
       const root = this._setContent(html);
       root.querySelectorAll("[data-schedule-day]").forEach(el => el.addEventListener("click", () => {
         const child = el.dataset.child;
+        this._rememberWeek(child, el);
         this._sel = {...this._sel,[child]:el.dataset.scheduleDay};
         this._week = {...this._week,[child]:false};
         this._scheduleOpen = `${child}:${el.dataset.uid}:${el.dataset.scheduleDay}`;
@@ -1332,6 +1349,7 @@
       }));
       root.querySelectorAll("[data-day]").forEach((el) =>
         el.addEventListener("click", () => {
+          this._rememberWeek(el.dataset.child, el);
           this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.day };
           this._week = { ...(this._week || {}), [el.dataset.child]: false };
           this._render();
@@ -1339,9 +1357,15 @@
       );
       root.querySelectorAll("[data-week]").forEach((el) =>
         el.addEventListener("click", () => {
-          this._week = { ...(this._week || {}), [el.dataset.week]: !this._isWeek(el.dataset.week) };
-          this._render();
+          if (!this._isWeek(el.dataset.week)) this._returnToWeek(el.dataset.week);
+          else {
+            this._week = { ...(this._week || {}), [el.dataset.week]: false };
+            this._render();
+          }
         })
+      );
+      root.querySelectorAll("[data-week-return]").forEach(el =>
+        el.addEventListener("click", () => this._returnToWeek(el.dataset.weekReturn))
       );
       root.querySelectorAll("[data-wkoff]").forEach((el) =>
         el.addEventListener("click", () => {
@@ -1361,6 +1385,7 @@
         })
       );
       root.querySelectorAll("[data-lesson]").forEach((el) => el.addEventListener("click", () => {
+        this._rememberWeek(el.dataset.child, el);
         this._sel = { ...(this._sel || {}), [el.dataset.child]: el.dataset.date };
         this._week = { ...(this._week || {}), [el.dataset.child]: false };
         this._selectedLesson = { child: el.dataset.child, lesson: el.dataset.lesson };
@@ -1370,6 +1395,39 @@
         chosen?.focus({ preventScroll: true });
       }));
       this._bindLegends(root);
+    }
+
+    // Remember the dashboard's scrolling containers across the day-view rerender,
+    // including Home Assistant containers outside this card's shadow root.
+    _rememberWeek(key, trigger) {
+      if (!this._isWeek(key)) return;
+      const scroll = [];
+      for (let el = this; el; el = el.parentElement || el.getRootNode()?.host) {
+        if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth)
+          scroll.push({el, top:el.scrollTop, left:el.scrollLeft});
+      }
+      this._weekReturn = {...this._weekReturn, [key]: {
+        offset:this._wkOff?.[key] || 0, trigger:{...trigger.dataset}, scroll,
+      }};
+    }
+
+    _returnToWeek(key) {
+      const saved = this._weekReturn?.[key];
+      this._week = {...this._week, [key]:true};
+      if (saved) this._wkOff = {...this._wkOff, [key]:saved.offset};
+      this._render();
+      const candidates = this.shadowRoot.querySelectorAll("[data-lesson], [data-schedule-day], [data-day], [data-week]");
+      const target = saved && [...candidates].find(el =>
+        Object.entries(saved.trigger).every(([name,value]) => el.dataset[name] === value));
+      (target || [...candidates].find(el => el.dataset.week === key))?.focus({preventScroll:true});
+      if (saved) {
+        delete this._weekReturn[key];
+        requestAnimationFrame(() => {
+          if (!this._isWeek(key) || !this.isConnected) return;
+          for (const {el,top,left} of saved.scroll) if (el.isConnected)
+            el.scrollTo({top,left,behavior:"instant"});
+        });
+      }
     }
 
     // Änderung aus dem Vertretungsplan; antippen zeigt „In Kalender eintragen“ (#12)
@@ -1517,6 +1575,18 @@
       return `<br>Lehrkraft laut: ${label}${source.sent ? ` (${esc(fmtDate(source.sent.slice(0, 10)))})` : ""}`;
     }
 
+    _lessonBreak(previous, next) {
+      const valid = value => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value || "");
+      if (!previous || !next || !valid(previous.end) || !valid(next.start)) return null;
+      const minutes = time => Number(time.slice(0,2))*60 + Number(time.slice(3,5));
+      const duration = minutes(next.start) - minutes(previous.end);
+      return duration > 0 ? {start:previous.end,end:next.start,duration} : null;
+    }
+
+    _pauseLabel(pause) {
+      return `<span class="pause-label"><span class="pause-mark" aria-hidden="true">Ⅱ</span><span>Pause · ${pause.duration} Min.</span></span>`;
+    }
+
     _dayHtml(c, iso, today, entries, known) {
       const wd = parseDay(iso).getDay();
       const schedule = this._scheduleOn(c, iso);
@@ -1531,7 +1601,8 @@
         });
       const now = new Date();
       const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      let html = `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
+      let html = `<div class="week-return"><button class="pill" data-week-return="${esc(c.key)}"><span aria-hidden="true">← </span>Zur Wochenansicht</button></div>`;
+      html += `<div class="day ${iso === today ? "today" : ""}">${esc(dayLabel(iso, today))}${known && !entries.length ? " · keine Vertretungen" : ""}</div>`;
       html += `<div class="bar"><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,-1)}" aria-label="Tag zurück">‹</button><button class="pill" data-child="${esc(c.key)}" data-day="${today}">Heute</button><button class="pill" data-child="${esc(c.key)}" data-day="${addDays(iso,1)}" aria-label="Tag vor">›</button></div>`;
       const additions = schedule.filter(e => e.time).sort((a,b) => a.time.localeCompare(b.time));
       for (const e of schedule.filter(e => !e.time)) html += this._scheduleEntry(c,e,iso);
@@ -1543,7 +1614,14 @@
       const examFor = (subject) => dayExams.find((e) => e.subject && sameSubject(e.subject, subject));
       if (!c.timetable.length) html += `<div class="empty">Noch kein Stundenplan abgerufen.</div>`;
       else if (!lessons.length) html += `<div class="empty">${holiday ? "Ferien · regulärer Unterricht pausiert." : "Kein Unterricht laut Stundenplan."}</div>`;
+      let previousLesson = null;
       for (const l of lessons) {
+        const pause = this._lessonBreak(previousLesson, l);
+        if (pause) {
+          while (additions.length && additions[0].time <= pause.start) html += this._scheduleEntry(c,additions.shift(),iso);
+          html += `<div class="day-pause ${pause.duration >= 30 ? "pause-long" : ""}"><span class="pause-time">${esc(pause.start)}–${esc(pause.end)}</span>${this._pauseLabel(pause)}</div>`;
+        }
+        previousLesson = l;
         while (additions.length && l.start && additions[0].time <= l.start) html += this._scheduleEntry(c,additions.shift(),iso);
         const ch = changes(l.lesson);
         const kind = ch.some((e) => e.kind === "entfall") ? "entfall" : ch.length ? ch[0].kind : "";
@@ -1578,9 +1656,26 @@
       const dates = [0,1,2,3,4].map(i => addDays(mon,i));
       const additions = dates.map(iso => this._scheduleOn(c,iso));
       const nums = [...new Set(c.timetable.map(l => l.lesson))].sort((a,b) => Number(a)-Number(b));
-      const rows = nums.map(nr => {
+      const lessonRows = nums.map(nr => {
         const sample = c.timetable.find(l => l.lesson === nr);
         return {lesson:nr,start:sample?.start || "",end:sample?.end || ""};
+      });
+      // Only gaps between regular lessons are breaks; an evening appointment
+      // must not create a break lasting several hours after school.
+      lessonRows.sort((a,b) => (a.start || "99:"+a.lesson).localeCompare(b.start || "99:"+b.lesson));
+      const rows = [];
+      lessonRows.forEach((row,index) => {
+        const previous = lessonRows[index-1];
+        const pause = this._lessonBreak(previous,row);
+        if (pause) {
+          const pauses = dates.map((iso,i) => {
+            if (additions[i].some(e => e.kind === "holiday")) return null;
+            const dayLessons = c.timetable.filter(l => !l.hidden && l.weekday === i+1);
+            return this._lessonBreak(dayLessons.find(l => l.lesson === previous.lesson),dayLessons.find(l => l.lesson === row.lesson));
+          });
+          if (pauses.some(Boolean)) rows.push({...pause,pause:true,pauses});
+        }
+        rows.push(row);
       });
       for (const event of additions.flat().filter(e => e.time)) {
         if (!rows.some(r => r.start && event.time >= r.start && event.time < r.end)) {
@@ -1597,7 +1692,16 @@
         html += `<tr class="schedule-all-day"><th>Ganztägig</th>` + additions.map((events,i) => `<td>${events.filter(e => !e.time).map(e => this._weekAppointment(c,e,dates[i])).join("")}</td>`).join("") + "</tr>";
       }
       rows.forEach((row,index) => {
-        html += `<tr><th>${row.lesson ? esc(row.lesson)+"." : ""}<div class="r">${esc(row.start)}</div></th>`;
+        if (row.pause) {
+          const events = additions.map(day => day.filter(e => e.time && eventRow(e) === index));
+          const shared = row.pauses.every(p => p && p.start === row.start && p.end === row.end);
+          html += `<tr class="pause-row ${row.duration >= 30 ? "pause-long" : ""}"><th><div class="r">${esc(row.start)}–${esc(row.end)}</div></th>`;
+          if (shared && events.every(day => !day.length)) html += `<td colspan="5">${this._pauseLabel(row)}</td>`;
+          else html += dates.map((iso,i) => `<td>${row.pauses[i] ? (row.pauses[i].start !== row.start || row.pauses[i].end !== row.end ? `<div class="r">${esc(row.pauses[i].start)}–${esc(row.pauses[i].end)}</div>` : "") + this._pauseLabel(row.pauses[i]) : ""}${events[i].map(e => this._weekAppointment(c,e,iso)).join("")}</td>`).join("");
+          html += "</tr>";
+          return;
+        }
+        html += `<tr><th>${row.lesson ? esc(row.lesson)+"." : ""}<div class="r">${esc(row.start)}${row.start && row.end ? "–" : ""}${esc(row.end)}</div></th>`;
         dates.forEach((iso,i) => {
           const holiday = additions[i].some(e => e.kind === "holiday");
           const lesson = !holiday && row.lesson && c.timetable.find(l => !l.hidden && l.weekday === i+1 && l.lesson === row.lesson);

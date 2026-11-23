@@ -237,6 +237,7 @@ See [compatibility notes and open decisions](docs/WEBUNTIS_COMPATIBILITY.md).
 | `sensor.schule_<child>_stundenplan` | Timetable: lessons today; day and week plan as attributes |
 | `sensor.schule_<child>_vertretungen` | Substitution plan: changes from today (cancelled lessons, substitutes, room changes); new entries are pushed and shown in calendar and morning summary. Each entry also carries `lehrkraft_name` and `vertretung_name` when the teacher abbreviation is known |
 | `sensor.schule_<child>_krankmeldungen` | Sick notes: school days off sick in the current school year; list of sick notes (from, to, days, comment) and the latest one as attributes |
+| `sensor.schule_<child>_hausaufgaben` | Homework from the class register (Klassenbuch): number of open assignments; list (subject, teacher, assignment, given, due, substitute) and the ones due tomorrow as attributes. Also in the calendar on the due date. |
 | `sensor.eltern_portal_manager_bavaria_letzter_abruf` (taken over from 0.13: `sensor.schulmanager_letzter_abruf`) | Diagnostics: last update, errors, pending analyses (`auswertung_ausstehend`) and pending translations (`uebersetzung_ausstehend`) |
 
 Entity IDs follow your Home Assistant language (shown here for German).
@@ -260,7 +261,7 @@ Entity IDs follow your Home Assistant language (shown here for German).
 | `eltern_portal_schulmanager.rebuild_dashboard` | Regenerate the "Schule" dashboard |
 | `eltern_portal_schulmanager.get_overview` | Returns everything as a response – e.g. for an Assist script "What's up at school?" |
 
-Events for your own automations: `eltern_portal_schulmanager_new_item` (with `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` and `eltern_portal_schulmanager_substitution` (new substitution plan entries, with `child` and `entries`).
+Events for your own automations: `eltern_portal_schulmanager_new_item` (with `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder`, `eltern_portal_schulmanager_substitution` (new substitution plan entries, with `child` and `entries`) and `eltern_portal_schulmanager_new_homework` (new homework in the class register, with `child`, `uid`, `subject`, `teacher`, `text`, `given`, `due`).
 
 ### Opening notifications
 
@@ -310,7 +311,8 @@ open locally, but links that lead to the external portal may not work.
 - **Changed messages:** if a teacher edits a message in the portal, it is analysed again and shown as unread. Pure formatting differences (spaces, line breaks) are ignored, and if most known messages look different at once (e.g. after a portal or integration update), they are updated quietly instead of all becoming unread again.
 - **Connection:** every fetch uses its own fresh connection per school. If the portal drops it ("Server disconnected"), the integration tries once more after a few seconds before keeping the last known data.
 - **Sick notes** are only read, never submitted – report sickness in the portal as usual.
-- **Not yet included:** communication with the class teacher (only subject teachers) and the class register.
+- **Class register (Klassenbuch):** only the homework is read: the next 7 days (teachers sometimes enter homework ahead), today, and the past week, on the first fetch the past 30 days. Days older than yesterday are read once.
+- **Not yet included:** communication with the class teacher (only subject teachers).
 - If you also use the HACS integration `elternportal`, keep both on the same `pyelternportal` version (here 0.0.27).
 - This project is not affiliated with Eltern-Portal or its operator.
 

@@ -1,4 +1,4 @@
-"""Sensoren: Ampel, offene Aufgaben, Fristen, Zahlungen, ungelesene Mitteilungen."""
+"""Sensoren: Ampel, offene Aufgaben, Fristen, Zahlungen, ungelesene Mitteilungen, Hausaufgaben."""
 
 from __future__ import annotations
 
@@ -51,6 +51,7 @@ async def async_setup_entry(
             SubstitutionSensor(manager, child),
             TimetableSensor(manager, child),
             SicknoteSensor(manager, child),
+            HomeworkSensor(manager, child),
         ]
     async_add_entities(entities)
 
@@ -369,6 +370,46 @@ class SicknoteSensor(SchulPortalEntity, SensorEntity):
             "anzahl_schuljahr": len(year),
             "letzte": rows[0] if rows else None,
             "krankmeldungen": rows[:30],
+        }
+
+
+class HomeworkSensor(SchulPortalEntity, SensorEntity):
+    _portal_section = "homework"
+    """Hausaufgaben aus dem Klassenbuch: Zahl der offenen, Liste als Attribut (#53)."""
+
+    _attr_icon = "mdi:book-open-page-variant"
+    _attr_native_unit_of_measurement = "Hausaufgaben"
+    _unrecorded_attributes = frozenset({"hausaufgaben"})
+
+    def __init__(self, manager: SchulManager, child: str) -> None:
+        super().__init__(manager, child, "hausaufgaben")
+
+    @property
+    def native_value(self) -> int:
+        return len(self.manager.child_homework(self.child))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        tomorrow = (dt_util.now().date() + timedelta(days=1)).isoformat()
+        rows = [
+            {
+                "fach": h["subject"],
+                "lehrkraft": h["teacher"],
+                "aufgabe": h["text"],
+                "aufgegeben": h["given"],
+                "faellig": h["due"],
+                "vertretung": h["substitute"],
+            }
+            for h in self.manager.child_homework(self.child)
+        ]
+        return {
+            "morgen": [
+                f"{r['fach']}: {r['aufgabe']}" if r["fach"] else r["aufgabe"]
+                for r in rows
+                if r["faellig"] == tomorrow
+            ],
+            "hausaufgaben": rows,
+            "abgerufen": self.manager.data["homework"].get(self.child, {}).get("updated"),
         }
 
 

@@ -143,6 +143,7 @@ EVENT_CATEGORIES: Final = {
     "vertretung": ("🔁", "Vertretung / Änderung"),
     "raum": ("🚪", "Raumänderung"),
     "krank": ("🤒", "Krankmeldung"),
+    "hausaufgabe": ("📚", "Hausaufgabe"),
 }
 SUBSTITUTION_KINDS: Final = ("entfall", "vertretung", "raum")
 
@@ -160,6 +161,9 @@ AMPEL_RED: Final = "rot"
 EVENT_NEW_ITEM: Final = f"{DOMAIN}_new_item"
 EVENT_TASK_REMINDER: Final = f"{DOMAIN}_task_reminder"
 EVENT_SUBSTITUTION: Final = f"{DOMAIN}_substitution"
+EVENT_NEW_HOMEWORK: Final = f"{DOMAIN}_new_homework"
+# Klassenbuch-Tage werden so lange gespeichert
+HOMEWORK_KEEP_DAYS: Final = 30
 SIGNAL_UPDATED: Final = f"{DOMAIN}_updated"
 
 # Aktionen der Companion-App-Benachrichtigungen

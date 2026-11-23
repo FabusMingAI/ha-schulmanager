@@ -100,8 +100,10 @@ from .const import (
     DEFAULT_TTS_START,
     DOMAIN,
     EVENT_CATEGORIES,
+    EVENT_NEW_HOMEWORK,
     EVENT_NEW_ITEM,
     EVENT_SUBSTITUTION,
+    HOMEWORK_KEEP_DAYS,
     EVENT_TASK_REMINDER,
     FETCH_ATTEMPTS,
     FETCH_RETRY_DELAY,
@@ -310,6 +312,9 @@ class SchulManager:
             "subs_seen": stored.get("subs_seen", {}),
             "substitution_notifications": stored.get("substitution_notifications", {}),
             "sicknotes": stored.get("sicknotes", {}),
+            # Klassenbuch: {child: {"days": {ISO: [Einträge]}, "updated": iso}}
+            "homework": stored.get("homework", {}),
+            "homework_seen": stored.get("homework_seen", {}),
             "archived": stored.get("archived", {}),
             # Stundenplankürzel je Schule: {school: {"updated": iso, "list": {kürzel: name}}}
             "teachers": stored.get("teachers", {}),
@@ -494,6 +499,7 @@ class SchulManager:
                     int(self.opt(CONF_LOOKBACK_DAYS, DEFAULT_LOOKBACK_DAYS)),
                     full_archive=school not in self.data.get("archive_fetched", []),
                 )
+                api.homework_known = self._homework_known(school)
                 try:
                     return await api.async_fetch(
                         self._need_download, teachers=self._teachers_due(school)
@@ -601,6 +607,7 @@ class SchulManager:
         )
         new_count = 0
         fresh_subs: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+        fresh_homework: list[tuple[str, dict[str, Any]]] = []
         known = [
             (p, self.items[p.uid])
             for c in result.children
@@ -630,6 +637,7 @@ class SchulManager:
                 "lesson": bool(pchild.timetable),
                 "substitution": pchild.substitutions is not None and bool(pchild.substitutions.get("available")),
                 "sicknote": pchild.sicknotes is not None and (bool(pchild.sicknotes) or not self.data["sicknotes"].get(key)),
+                "homework": pchild.homework is not None,
             }
             for section, available in current.items():
                 if previous.get(section) is False and available:
@@ -679,6 +687,8 @@ class SchulManager:
                 self.data["sicknotes"][key] = sorted(
                     pchild.sicknotes, key=lambda n: (n["start"], n["end"])
                 )
+            if pchild.homework is not None:
+                fresh_homework += [(key, h) for h in self._merge_homework(key, pchild.homework)]
             if pchild.substitutions is not None and (
                 pchild.substitutions.get("available")
                 or key not in self.data["substitutions"]
@@ -776,6 +786,8 @@ class SchulManager:
                 self._sync_portal_tasks(stored, today)
         for key, fresh in fresh_subs.items():
             await self._notify_substitutions(key, fresh)
+        for key, homework in fresh_homework:
+            self.hass.bus.async_fire(EVENT_NEW_HOMEWORK, {"child": key, **homework})
         if first_import:
             self.data["initialized"].append(result.school)
             if new_count:
@@ -1730,6 +1742,27 @@ class SchulManager:
                         **entry,
                     }
                 )
+        icon, label = EVENT_CATEGORIES["hausaufgabe"]
+        for h in self.child_homework(child, include_done=True):
+            if h["overdue"] and date.fromisoformat(h["due"] or h["given"]) < since:
+                continue
+            day = date.fromisoformat(h["due"] or h["given"])
+            title = f"{h['subject']}: {h['text'].splitlines()[0]}" if h["subject"] else h["text"].splitlines()[0]
+            out.append(
+                {
+                    "uid": f"hausaufgabe-{h['uid']}",
+                    "summary": f"{icon} {title}",
+                    "description": f"{h['text']}\n\n{label} (Klassenbuch, {h['given']})",
+                    "location": None,
+                    "category": "hausaufgabe",
+                    "icon": icon,
+                    "title": title,
+                    "hover": f"{h['text']} – {label}",
+                    "subject": h["subject"],
+                    "start": day,
+                    "end": day + timedelta(days=1),
+                }
+            )
         return out
 
     def published(self, t_or_item: dict[str, Any]) -> date | None:
@@ -2136,6 +2169,73 @@ class SchulManager:
             if x["weekday"] == day.isoweekday() and x["lesson"] == nums[0] and x.get("subject")
         }
         return subjects.pop() if len(subjects) == 1 else None
+
+    # ------------------------------------------------------------------
+    # Klassenbuch: Hausaufgaben (#53)
+    # ------------------------------------------------------------------
+    def _homework_known(self, school: str) -> dict[str, set[str]]:
+        """Gespeicherte Klassenbuch-Tage je Schüler-ID einer Schule (für SchulPortal)."""
+        return {
+            str(c["student_id"]): set(self.data["homework"].get(key, {}).get("days", {}))
+            for key, c in self.children.items()
+            if c.get("school") == school and c.get("student_id") is not None
+        }
+
+    @staticmethod
+    def _homework_uid(child: str, day: str, e: dict[str, Any]) -> str:
+        raw = "|".join([child, day, e.get("subject") or "", e.get("teacher") or "", e.get("homework") or ""])
+        return hashlib.sha1(raw.encode()).hexdigest()[:12]
+
+    def _merge_homework(self, key: str, days: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+        """Gelesene Klassenbuch-Tage speichern; liefert neue, noch offene Hausaufgaben.
+
+        Beim ersten Abruf eines Kindes gilt nichts als neu (keine Ereignisflut).
+        """
+        today = dt_util.now().date()
+        known = key in self.data["homework"]
+        plan = self.data["homework"].setdefault(key, {"days": {}})
+        plan["days"].update(days)
+        oldest = (today - timedelta(days=HOMEWORK_KEEP_DAYS)).isoformat()
+        plan["days"] = {d: e for d, e in sorted(plan["days"].items()) if d >= oldest}
+        plan["updated"] = dt_util.now().isoformat()
+        seen = set(self.data["homework_seen"].get(key, []))
+        current = self.child_homework(key, include_done=True)
+        fresh = [h for h in current if h["uid"] not in seen and not h["overdue"]]
+        uids = [h["uid"] for h in current]
+        self.data["homework_seen"][key] = (uids + [u for u in seen if u not in uids])[:300]
+        return fresh if known else []
+
+    def child_homework(self, child: str, include_done: bool = False) -> list[dict[str, Any]]:
+        """Hausaufgaben aus dem Klassenbuch, nach Fälligkeit sortiert.
+
+        Offen ist eine Hausaufgabe bis zu ihrem Fälligkeitstag; ohne Datum
+        bis zum nächsten Schultag nach dem Eintrag.
+        """
+        today = dt_util.now().date()
+        out = []
+        for day, entries in self.data["homework"].get(child, {}).get("days", {}).items():
+            given = date.fromisoformat(day)
+            for e in entries:
+                if not e.get("homework"):
+                    continue
+                due = e.get("due")
+                last = date.fromisoformat(due) if due else given + timedelta(days=3 if given.isoweekday() >= 5 else 1)
+                overdue = last < today
+                if overdue and not include_done:
+                    continue
+                out.append(
+                    {
+                        "uid": self._homework_uid(child, day, e),
+                        "given": day,
+                        "due": due,
+                        "subject": e.get("subject"),
+                        "teacher": e.get("teacher"),
+                        "text": e["homework"],
+                        "substitute": bool(e.get("substitute")),
+                        "overdue": overdue,
+                    }
+                )
+        return sorted(out, key=lambda h: (h["due"] or h["given"], h["subject"] or ""))
 
     def child_sicknotes(self, child: str, school_year_only: bool = False) -> list[dict[str, Any]]:
         """Krankmeldungen eines Kindes, neueste zuerst, mit Zahl der Schultage."""

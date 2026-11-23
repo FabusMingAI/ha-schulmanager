@@ -241,6 +241,9 @@
       },
       "krankmeldungen": {
         "name": "Sick notes"
+      },
+      "hausaufgaben": {
+        "name": "Homework"
       }
     },
     "todo": {

@@ -241,6 +241,7 @@ Siehe [Kompatibilitätsprüfung und offene Entscheidungen](docs/WEBUNTIS_COMPATI
 - `sensor.schule_<kind>_stundenplan`: Zahl der Stunden heute; Tages-, Folgetags- und Wochenplan als Attribute
 - `sensor.schule_<kind>_vertretungen`: Zahl der Änderungen ab heute; Attribute `heute`, `morgen` und alle Einträge (Stunde, Fach, Vertretung, Raum, Info, Art: `entfall`/`vertretung`/`raum`, dazu `lehrkraft_name` und `vertretung_name`, wenn das Kürzel bekannt ist). Neue Einträge kommen als Push, heutige stehen in der Tagesübersicht, alle im Kalender.
 - `sensor.schule_<kind>_krankmeldungen`: Krankheitstage (Schultage) im laufenden Schuljahr; Liste der Krankmeldungen (von, bis, Tage, Kommentar) und die letzte als Attribute
+- `sensor.schule_<kind>_hausaufgaben`: Hausaufgaben aus dem Klassenbuch: Zahl der offenen; Liste (Fach, Lehrkraft, Aufgabe, aufgegeben, fällig, Vertretung) und die für morgen als Attribute. Auch im Kalender am Fälligkeitstag.
 - `sensor.eltern_portal_manager_bavaria_letzter_abruf` (bei Übernahme aus 0.13: `sensor.schulmanager_letzter_abruf`): Diagnose, mit Fehlern und Anzahl noch ausstehender Auswertungen (`auswertung_ausstehend`) und Übersetzungen (`uebersetzung_ausstehend`)
 
 Entity-IDs richten sich nach der Sprache von Home Assistant; die Beispiele zeigen deutsche IDs.
@@ -264,7 +265,7 @@ Entity-IDs richten sich nach der Sprache von Home Assistant; die Beispiele zeige
 | `eltern_portal_schulmanager.rebuild_dashboard` | Dashboard „Schule“ neu erzeugen |
 | `eltern_portal_schulmanager.get_overview` | liefert alles als Antwort, z. B. für ein Assist-Skript „Was ist für die Schule zu tun?“ |
 
-Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder` und `eltern_portal_schulmanager_substitution` (neue Vertretungen, mit `child` und `entries`). Damit lässt sich z. B. bei einer dringenden Mitteilung das Flurlicht kurz orange blinken lassen.
+Events für eigene Automationen: `eltern_portal_schulmanager_new_item` (mit `child`, `item_uid`, `title`, `summary`, `urgency`, `tasks`), `eltern_portal_schulmanager_task_reminder`, `eltern_portal_schulmanager_substitution` (neue Vertretungen, mit `child` und `entries`) und `eltern_portal_schulmanager_new_homework` (neue Hausaufgabe im Klassenbuch, mit `child`, `uid`, `subject`, `teacher`, `text`, `given`, `due`). Damit lässt sich z. B. bei einer dringenden Mitteilung das Flurlicht kurz orange blinken lassen.
 
 ### Benachrichtigungen öffnen
 
@@ -316,7 +317,8 @@ währenddessen ausfallen.
 - **Geänderte Mitteilungen:** Ändert eine Lehrkraft eine Mitteilung im Portal, wird sie neu ausgewertet und als ungelesen angezeigt. Reine Unterschiede in Leerzeichen oder Zeilenumbrüchen zählen nicht, und sehen die meisten bekannten Mitteilungen auf einmal anders aus (z. B. nach einem Update von Portal oder Integration), werden sie still aktualisiert, statt alle wieder ungelesen zu werden.
 - **Verbindung:** Jeder Abruf nutzt je Schule eine eigene, frische Verbindung. Trennt das Portal sie („Server disconnected“), versucht die Integration es nach ein paar Sekunden noch einmal, bevor sie die zuletzt gelesenen Daten behält.
 - **Krankmeldungen** werden nur gelesen, nie abgeschickt – krankmelden wie gewohnt im Portal.
-- **Noch nicht enthalten:** „Kommunikation Eltern/Klassenleitung“ (nur Fachlehrkräfte) und das Klassenbuch.
+- **Klassenbuch:** gelesen werden nur die Hausaufgaben: die nächsten 7 Tage (manche Lehrkräfte tragen Hausaufgaben vorab ein), heute und die letzte Woche, beim ersten Abruf die letzten 30 Tage. Tage vor gestern werden nur einmal gelesen.
+- **Noch nicht enthalten:** „Kommunikation Eltern/Klassenleitung“ (nur Fachlehrkräfte).
 - Wer zusätzlich die HACS-Integration `elternportal` nutzt, sollte auf dieselbe `pyelternportal`-Version achten (hier 0.0.27).
 - Dieses Projekt steht in keiner Verbindung zum Eltern-Portal oder dessen Betreiber.
 

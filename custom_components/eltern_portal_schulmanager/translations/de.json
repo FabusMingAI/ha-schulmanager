@@ -241,6 +241,9 @@
       },
       "krankmeldungen": {
         "name": "Krankmeldungen"
+      },
+      "hausaufgaben": {
+        "name": "Hausaufgaben"
       }
     },
     "todo": {

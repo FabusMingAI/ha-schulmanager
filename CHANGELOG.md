@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Read homework from the class register (Klassenbuch, #53): new sensor `sensor.schule_<child>_hausaufgaben` with the open assignments and their due dates, homework in the child's calendar on the due date, and the event `eltern_portal_schulmanager_new_homework` for new entries. Each fetch reads the next 7 days (homework entered ahead), today and the past week, the first fetch the past 30 days; days older than yesterday only once.
+- Hausaufgaben aus dem Klassenbuch lesen (#53): neuer Sensor `sensor.schule_<kind>_hausaufgaben` mit den offenen Hausaufgaben und ihren Fälligkeiten, Hausaufgaben im Kalender des Kindes am Fälligkeitstag und das Ereignis `eltern_portal_schulmanager_new_homework` für neue Einträge. Jeder Abruf liest die nächsten 7 Tage (vorab eingetragene Hausaufgaben), heute und die letzte Woche, der erste die letzten 30 Tage; Tage vor gestern nur einmal.
+
 ## 0.15.3 – 2026-11-23
 
 - Display gaps between lessons as subtle, theme-aware green break rows with time ranges and durations in minutes in day and week views. Longer breaks get more space. Keep additional appointments visible during breaks and omit break labels on holidays or days without adjacent lessons.

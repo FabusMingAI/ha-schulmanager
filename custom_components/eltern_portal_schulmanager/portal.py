@@ -45,7 +45,16 @@ MAX_FILE_SIZE = 25 * 1024 * 1024
 # Seite mit den Stundenplankürzeln der Lehrkräfte (Abschnitt in den Schulinformationen)
 TEACHERS_PATH = "service/schulinformationen"
 # Bereiche, die nicht jede Schule anbietet: Netzwerkfehler dort brechen den Abruf nicht ab
-OPTIONAL_SECTIONS = frozenset({"lesson", "substitution", "sicknote"})
+OPTIONAL_SECTIONS = frozenset({"lesson", "substitution", "sicknote", "homework"})
+# Klassenbuch (Hausaufgaben): ein Tag pro Seite, ?cur_date=TT.MM.JJJJ
+KLASSENBUCH_PATH = "service/klassenbuch"
+# So viele Tage zurück werden gelesen; Tage vor gestern nur einmal (#53).
+# Beim ersten Abruf eines Kindes (noch nichts gespeichert) ein ganzer Monat.
+HOMEWORK_DAYS_BACK = 7
+HOMEWORK_FIRST_DAYS_BACK = 30
+# Lehrkräfte tragen Hausaufgaben teils schon für die nächsten Stunden ein: die
+# kommende Woche bei jedem Abruf vollständig neu lesen.
+HOMEWORK_DAYS_AHEAD = 7
 
 PortalAuthError = BadCredentialsException
 PortalConnectionError = (
@@ -108,6 +117,8 @@ class PortalChild:
     substitutions: dict[str, Any] | None = None
     # Krankmeldungen: None = nicht gelesen (Fehler), sonst Liste {start, end, comment}
     sicknotes: list[dict[str, Any]] | None = None
+    # Klassenbuch: None = nicht gelesen (Fehler), sonst {Datum ISO: [Einträge]} der gelesenen Tage
+    homework: dict[str, list[dict[str, Any]]] | None = None
 
 
 @dataclass
@@ -194,6 +205,10 @@ class SchulPortal(ElternPortalAPI):
         self._subst: dict[str, Any] = {"days": [], "stand": None, "available": False}
         self._extra_messages: list[PortalItem] = []
         self._blackboard_items: list[PortalItem] = []
+        self._homework: dict[str, list[dict[str, Any]]] = {}
+        # Bereits gespeicherte Klassenbuch-Tage je Schüler-ID (vom Manager gesetzt);
+        # Tage vor gestern daraus werden nicht erneut gelesen.
+        self.homework_known: dict[str, set[str]] = {}
         self._keep_session = False
 
     # ------------------------------------------------------------------
@@ -233,6 +248,43 @@ class SchulPortal(ElternPortalAPI):
     async def async_substitution_parse(self, html: str) -> None:
         self._subst = parse_substitutions(html, self._beautiful_soup_parser)
         self._student.substitutions = []
+
+    # ------------------------------------------------------------------
+    # Klassenbuch: Hausaufgaben der letzten Schultage (#53)
+    # ------------------------------------------------------------------
+    def homework_days(self, today: date | None = None) -> list[date]:
+        """Tage, deren Klassenbuch gelesen wird: HOMEWORK_DAYS_AHEAD Tage voraus,
+        heute und HOMEWORK_DAYS_BACK Tage zurück (beim ersten Abruf
+        HOMEWORK_FIRST_DAYS_BACK), ohne Sonntage; ältere Tage als gestern nur,
+        wenn sie noch nicht gespeichert sind (Einträge ändern sich danach kaum noch)."""
+        today = today or date.today()
+        known = self.homework_known.get(str(self._student.student_id), set())
+        days_back = HOMEWORK_DAYS_BACK if known else HOMEWORK_FIRST_DAYS_BACK
+        days = []
+        for back in range(-HOMEWORK_DAYS_AHEAD, days_back + 1):
+            day = today - timedelta(days=back)
+            if day.isoweekday() == 7:
+                continue
+            if back >= 2 and day.isoformat() in known:
+                continue
+            days.append(day)
+        return days
+
+    async def async_homework_online(self) -> None:
+        self._homework = {}
+        for day in self.homework_days():
+            url = parse.urljoin(self.base_url, f"{KLASSENBUCH_PATH}?cur_date={day:%d.%m.%Y}")
+            async with self._session.get(url) as resp:
+                resp.raise_for_status()
+                page = parse_klassenbuch(await resp.text(), self._beautiful_soup_parser)
+            if page["date"] is None:
+                # z. B. Anmeldeseite statt Klassenbuch: lieber Fehler als ein leerer Tag,
+                # der gespeicherte Hausaufgaben überschreibt
+                raise ValueError(f"Klassenbuch {day:%d.%m.%Y}: unerwartete Seite")
+            self._homework[page["date"]] = page["entries"]
+
+    async def async_homework_demo(self) -> None:
+        self._homework = {}
 
     # ------------------------------------------------------------------
     # Nachrichten Eltern/Fachlehrer: eigene Auswertung mit ID + Anhängen
@@ -480,6 +532,7 @@ class SchulPortal(ElternPortalAPI):
                 self._timetable = []
                 self._blackboard_items = []
                 self._subst = {"days": [], "stand": None, "available": False}
+                self._homework = {}
                 for name in (
                     "appointment",
                     "letter",
@@ -489,6 +542,7 @@ class SchulPortal(ElternPortalAPI):
                     "lesson",
                     "substitution",
                     "sicknote",
+                    "homework",
                 ):
                     method = getattr(self, f"async_{name}_{sfx}")
                     if err := await self._section(name, method):
@@ -511,6 +565,8 @@ class SchulPortal(ElternPortalAPI):
                     child.timetable = list(self._timetable)
                 if "substitution" not in failed:
                     child.substitutions = dict(self._subst)
+                if "homework" not in failed:
+                    child.homework = dict(self._homework)
                 if "sicknote" not in failed:
                     child.sicknotes = [
                         {
@@ -1049,6 +1105,77 @@ def parse_teachers(html: str, parser: str = "html.parser") -> dict[str, str] | N
     return out
 
 
+_DUE_RE = re.compile(r"Zu Erledigen bis:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})", re.I)
+_LESSON_HEAD_RE = re.compile(r"^(?P<subject>.+?)\s+-\s+Lehrkraft:\s*(?P<teacher>.*?)\s*(?:\((?P<info>[^()]*)\))?$")
+_NO_HOMEWORK = ("keine hausaufgabe",)
+
+
+def _german_date(value: str | None) -> str | None:
+    match = re.fullmatch(r"\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\s*", value or "")
+    if not match:
+        return None
+    try:
+        return date(int(match[3]), int(match[2]), int(match[1])).isoformat()
+    except ValueError:
+        return None
+
+
+def parse_klassenbuch(html: str, parser: str = "html.parser") -> dict[str, Any]:
+    """Klassenbuch eines Tages: je Stunde Fach, Lehrkraft und Hausaufgabe.
+
+    Das Portal zeigt pro Stunde eine Tabelle; Kopfzeile
+    ``"Englisch - Lehrkraft: Frau X (Doppelstunde, Vertretung)"``, darunter Zeilen
+    ``Bezeichnung | Inhalt`` (z. B. ``Hausaufgabe``). Eine Hausaufgabe endet mit
+    ``"- Zu Erledigen bis: TT.MM.JJJJ"``. Liefert ``{"date": ISO|None, "entries": [...]}``
+    mit ``homework`` = None, wenn keine eingetragen ist.
+    """
+    soup = bs4.BeautifulSoup(html, parser)
+    field_ = soup.select_one("input[name=cur_date]")
+    result: dict[str, Any] = {
+        "date": _german_date(field_.get("value") if field_ else None),
+        "entries": [],
+    }
+    for table in soup.select("table"):
+        heads = [th.get_text(" ", strip=True) for th in table.select("thead th")]
+        head = next((h for h in reversed(heads) if h), "")
+        rows = [r.find_all("td", recursive=False) for r in table.select("tbody tr")]
+        rows = [r for r in rows if len(r) >= 2]
+        if not head or not rows:
+            continue
+        match = _LESSON_HEAD_RE.match(head)
+        info = [x.strip() for x in (match["info"] or "").split(",") if x.strip()] if match else []
+        entry: dict[str, Any] = {
+            "subject": match["subject"].strip() if match else head,
+            "teacher": (match["teacher"] or None) if match else None,
+            "info": info,
+            "substitute": any(x.lower() == "vertretung" for x in info),
+            "homework": None,
+            "due": None,
+            "details": {},
+        }
+        for label_cell, value_cell in rows:
+            label = label_cell.get_text(" ", strip=True)
+            due = None
+            for tag in value_cell.find_all("i"):
+                if found := _DUE_RE.search(tag.get_text(" ", strip=True)):
+                    due = found
+                    tag.decompose()
+            lines = [ln.strip() for ln in value_cell.get_text("\n").splitlines()]
+            while lines and lines[-1] in ("", "-"):
+                lines.pop()
+            text = "\n".join(ln for ln in lines if ln) or None
+            if text and text.lower().rstrip(".").startswith(_NO_HOMEWORK):
+                text = None
+            if label.lower().startswith("hausaufgabe"):
+                entry["homework"] = text
+                if due:
+                    entry["due"] = _german_date(f"{due[1]}.{due[2]}.{due[3]}")
+            elif text:
+                entry["details"][label] = text
+        result["entries"].append(entry)
+    return result
+
+
 async def async_validate(
     session: aiohttp.ClientSession, school: str, username: str, password: str
 ) -> str:
@@ -1071,6 +1198,7 @@ __all__ = [
     "clean_appointment_title",
     "has_html_tag",
     "portal_appointment",
+    "parse_klassenbuch",
     "parse_substitutions",
     "parse_teachers",
     "parse_timetable",

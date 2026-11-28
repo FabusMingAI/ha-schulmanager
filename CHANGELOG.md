@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Merge adjacent days with identical timetable breaks, including a Monday–Thursday break when Friday lessons end earlier. Appointments and days without a break retain their own cells.
+- Benachbarte Tage mit gleichen Pausen verbinden, auch bei einer Pause von Montag bis Donnerstag und früherem Unterrichtsende am Freitag. Termine und Tage ohne Pause behalten ihre eigenen Zellen.
+
 ## 0.15.3 – 2026-11-23
 
 - Display gaps between lessons as subtle, theme-aware green break rows with time ranges and durations in minutes in day and week views. Longer breaks get more space. Keep additional appointments visible during breaks and omit break labels on holidays or days without adjacent lessons.

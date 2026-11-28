@@ -1694,10 +1694,20 @@
       rows.forEach((row,index) => {
         if (row.pause) {
           const events = additions.map(day => day.filter(e => e.time && eventRow(e) === index));
-          const shared = row.pauses.every(p => p && p.start === row.start && p.end === row.end);
           html += `<tr class="pause-row ${row.duration >= 30 ? "pause-long" : ""}"><th><div class="r">${esc(row.start)}–${esc(row.end)}</div></th>`;
-          if (shared && events.every(day => !day.length)) html += `<td colspan="5">${this._pauseLabel(row)}</td>`;
-          else html += dates.map((iso,i) => `<td>${row.pauses[i] ? (row.pauses[i].start !== row.start || row.pauses[i].end !== row.end ? `<div class="r">${esc(row.pauses[i].start)}–${esc(row.pauses[i].end)}</div>` : "") + this._pauseLabel(row.pauses[i]) : ""}${events[i].map(e => this._weekAppointment(c,e,iso)).join("")}</td>`).join("");
+          for (let i = 0; i < dates.length;) {
+            const pause = row.pauses[i];
+            let end = i + 1;
+            // Merge adjacent days with the same break, even if school has
+            // already ended on another day. Appointments keep their own cell.
+            if (pause && !events[i].length) {
+              while (end < dates.length && !events[end].length &&
+                row.pauses[end]?.start === pause.start && row.pauses[end]?.end === pause.end) end++;
+            }
+            const label = pause ? (pause.start !== row.start || pause.end !== row.end ? `<div class="r">${esc(pause.start)}–${esc(pause.end)}</div>` : "") + this._pauseLabel(pause) : "";
+            html += `<td${end - i > 1 ? ` colspan="${end - i}"` : ""}>${label}${events[i].map(e => this._weekAppointment(c,e,dates[i])).join("")}</td>`;
+            i = end;
+          }
           html += "</tr>";
           return;
         }

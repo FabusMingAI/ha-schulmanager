@@ -27,6 +27,24 @@ const path=require('node:path');
    assert.deepEqual(gaps.slice(0,6),Array(6).fill(null));
    assert.equal(gaps[6].duration,5);
    await card.getByRole('button',{name:'Zur Wochenansicht',exact:true}).click();
+   // Friday ends before the last lesson: Monday to Thursday share one cell.
+   await card.evaluate(el=>{
+    el._data.children[0].timetable = el._data.children[0].timetable.filter(l=>!(l.weekday===5 && l.lesson==='7'));
+    el._render();
+   });
+   const partial=card.locator('.pause-row').last();
+   assert.equal(await partial.locator('td').count(),2);
+   assert.equal(await partial.locator('td[colspan="4"] .pause-label').count(),1);
+   assert.equal(await partial.locator('td').last().innerText(),'');
+   // An appointment splits a shared pause without swallowing its day or label.
+   await card.evaluate(el=>{
+    el._data.children[0].schedule=[{uid:'pause-event',title:'Pausentreffen',kind:'message',date:'2026-11-25',time:'13:30',time_end:'13:35',status:'confirmed'}];
+    el._render();
+   });
+   assert.equal(await partial.locator('td[colspan="2"]').count(),1);
+   assert.equal(await partial.locator('td').count(),4);
+   assert.equal(await partial.locator('td').nth(1).locator('[data-uid="pause-event"]').count(),1);
+   assert.equal(await partial.locator('td').nth(1).locator('.pause-label').count(),1);
    await card.evaluate(el=>{
     el._data.children[0].schedule=[
      {uid:'break-meeting',title:'Treffen in der Pause',kind:'message',date:'2026-11-23',time:'09:40',time_end:'09:45',status:'confirmed'},

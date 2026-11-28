@@ -74,6 +74,9 @@ Prepare a separate, focused release change:
 1. Align the version in the integration manifest, dashboard card `VERSION` and
    bridge fixture manifest.
 2. Move release notes from `Unreleased` to a dated version section in the changelog.
+   Check both READMEs for changed controls and behavior. For visual changes,
+   update the fictional demo and regenerate/review the screenshots; the generator
+   reads its displayed version from the manifest.
 3. Merge after all checks pass, then run **Actions → Release → Run workflow** on
    `main`. It verifies the version and changelog, reruns tests, and publishes the
    tag and GitHub release.

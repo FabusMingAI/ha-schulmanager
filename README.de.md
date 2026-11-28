@@ -11,7 +11,7 @@
 
 ![Dashboard](docs/images/dashboard.png)
 
-> Die veröffentlichte Version und ihre Release Notes stehen auf der aktuellen Release-Seite. Diese README beschreibt den Entwicklungsstand einschließlich der für v0.15.0 vorbereiteten Stundenplan-Erweiterungen. Die Screenshots zeigen das mit v0.14.5 eingeführte Dashboard-Layout mit erfundenen Daten. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
+> Dokumentation und Screenshots sind auf **v0.15.5 (28. November 2026)** geprüft. Die Screenshots zeigen die enthaltenen Karten mit erfundenen Daten, ohne Verbindung zu einem echten Schulkonto. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
@@ -27,11 +27,13 @@
 **Korrektur ab v0.15.1.** Archivquellen werden ausschließlich für den Stundenplan in einer eigenen Ablage verarbeitet. Der Nachtrag verändert vorhandene Mitteilungen, Aufgaben, Lesestatus und Kommentare nicht. Eindeutig zuordenbare historische Fehlimporte aus v0.15.0 werden mit ihren unberührten erzeugten offenen Aufgaben reversibel aus dem Postfach genommen. Die Originale bleiben gesichert, Benutzerkommentare und erledigte Aufgaben bleiben erhalten. Zusätzliche Termine stehen im Wochenraster an ihrer Uhrzeit. Ab v0.15.2 zeigen kompakte Termine ein Symbol und höchstens zwei Titelzeilen; längere Titel werden mit Auslassungspunkten abgeschnitten. Ein Klick öffnet den betreffenden Tag mit vollständigen Details und Bearbeitung.
 
 
-Die Stundenplankarte zeigt Termine aus Mitteilungen und Anhängen in der Tages- und Wochenansicht mit Quellenangabe. Eindeutig belegte Termine werden übernommen. Unsichere Angaben und Wahlangebote erscheinen als Vorschläge mit **Übernehmen**. Ohne KI werden ausdrücklich datierte Veranstaltungen als Vorschläge erkannt. Wöchentliche Kurse benötigen einen belegten Beginn und ein Ende und pausieren in den hinterlegten Ferien.
+Die Stundenplankarte zeigt Termine aus Mitteilungen und Anhängen in der Tages- und Wochenansicht mit Quellenangabe. Eindeutig belegte Termine werden übernommen. Unsichere Angaben und Wahlangebote erscheinen unter **Relevanz bestätigen** außerhalb des Stundenrasters. Mit **Ja, relevant** wird ein Angebot in Stundenplan und Kalender aufgenommen; **Nein, nicht relevant** blendet es aus. Austausch- und Sprachenfahrt-Angebote benötigen diese Entscheidung auch bei eindeutigem Datum: Ein Klassenbrief belegt keine persönliche Teilnahme. Die Antworten bleiben nach Neustarts und erneuter Archivprüfung erhalten. Ohne KI werden ausdrücklich datierte Veranstaltungen als Vorschläge erkannt. Wöchentliche Kurse benötigen einen belegten Beginn und ein Ende und pausieren in den hinterlegten Ferien.
+
+<p align="left"><img src="docs/images/stundenplan-relevanz.png" width="540" alt="Relevanz-Abfrage für ein optionales Austausch-Angebot mit den Buttons Ja, relevant und Nein, nicht relevant"></p>
 
 Beim ersten Start nach dem Update wird das gesamte verfügbare Portalarchiv unabhängig vom normalen Abrufzeitraum geladen. Die Terminprüfung läuft im Hintergrund und setzt nach einem Neustart fort. Der Nachtrag erzeugt keine alten Aufgaben oder Benachrichtigungen und erhält den Lesestatus. Anschließend gilt wieder der normale Abrufzeitraum. Das Portal kann nur dort noch verfügbare Inhalte liefern.
 
-**Einträge verwalten** zeigt Vorschläge und entfernte Einträge. **Entfernen**, **Serie entfernen** und **Wiederherstellen** gelten je Kind und bleiben über Neustarts und erneute Prüfungen erhalten. Auch optionale Unterrichtseinträge lassen sich entfernen. Mitteilungstermine und Ferien lassen sich je Kind ausschalten. Tages- und Wochenwechsel machen vergangene Termine erreichbar. Zeitliche Überschneidungen werden angezeigt.
+**Einträge verwalten** zeigt entfernte Einträge und ältere Vorschläge. Anstehende Vorschläge erscheinen direkt über dem Stundenplan. **Wiederherstellen** legt einen abgelehnten Vorschlag erneut zur Relevanzprüfung vor. **Entfernen**, **Serie entfernen** und **Wiederherstellen** gelten je Kind und bleiben über Neustarts und erneute Prüfungen erhalten. Auch optionale Unterrichtseinträge lassen sich entfernen. Mitteilungstermine und Ferien lassen sich je Kind ausschalten. Tages- und Wochenwechsel machen vergangene Termine erreichbar. Zeitliche Überschneidungen werden angezeigt.
 
 Die bayerischen Ferien von Sommer 2024 bis Sommer 2030 sind offline anhand der amtlichen Ferienordnung hinterlegt. Regulärer Unterricht pausiert während eingeblendeter Ferien. Schulbezogene Abweichungen können durch Ausblenden angepasst werden. Außerhalb dieses Zeitraums ist ein Update erforderlich. [Amtliche Ferienordnung](https://www.gesetze-bayern.de/Content/Document/BayVV_2230_1_1_0_K_13479/true)
 
@@ -99,12 +101,12 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 
 <p align="left"><sub>Die Screenshots zeigen erfundene Demo-Daten (`docs/screenshots/demo.html`, [Anleitung zum Neuerzeugen](docs/screenshots/README.md)).</sub></p>
 
-- Tagesansicht mit Uhrzeit und Raum, umschaltbar auf die **Woche**. Vormittags zeigt sie den heutigen Tag, nach Schulschluss und am Wochenende den nächsten Schultag. Mit `view: week` startet die Karte in der Wochenansicht; das Dashboard „Schule“ nutzt das für alle Stundenpläne.
+- Tagesansicht mit Uhrzeit und Raum, umschaltbar auf die **Woche**. Das Wochenraster zeigt Anfangs- und Endzeiten. Pausen erscheinen in beiden Ansichten als dezente grüne Zeilen mit Zeitraum und Minuten. Benachbarte Tage mit gleicher Pause teilen sich eine Zelle, auch bei einer Pause von Montag bis Donnerstag und früherem Unterrichtsende am Freitag. Termine in einer Pause behalten ihre eigene Tageszelle. Vormittags zeigt sie den heutigen Tag, nach Schulschluss und am Wochenende den nächsten Schultag. Mit `view: week` startet die Karte in der Wochenansicht; das Dashboard „Schule“ nutzt das für alle Stundenpläne.
 - **Wochen blättern:** Mit ‹ / › eine Woche zurück oder vor und mit **Heute** zur Ausgangswoche. Die Kopfzeile zeigt Kalenderwoche und Datum von Montag bis Freitag; am Wochenende ist die folgende Woche die Ausgangswoche. Die Legende der Wochenansicht lässt sich auf- und zuklappen.
 - Die Wochenansicht passt auch in schmale Karten (halbe Spalte, Handy), ohne dass man seitlich scrollen muss: Fächer werden dort abgekürzt („Mathe“, „Engl.“, „Reli/Eth“, „SA“ für Schulaufgabe).
 - Fächer stehen **ausgeschrieben** da („Biologie“ statt „B“, „Mathematik (Intensivierung)“ statt „MInt“, „Sport“ statt „Sm/Sw“). Das Original-Kürzel erscheint, wenn man mit der Maus darauf zeigt.
 - Änderungen aus dem Vertretungsplan sind farbig markiert: rot = entfällt, orange = Vertretung oder Raumänderung. Die Zahl an den Wochentagen zeigt, wie viele Änderungen anstehen.
-- Klick oder Tipp auf eine Stunde in der Wochenansicht öffnet ihr Datum und markiert die gewählte Stunde. Die Tagesansicht zeigt verfügbare reguläre Lehrkräfte, Vertretungslehrkräfte, Räume, Status und Hinweise; **Woche** führt zurück.
+- Klick oder Tipp auf eine Stunde in der Wochenansicht öffnet ihr Datum und markiert die gewählte Stunde. Die Tagesansicht zeigt verfügbare reguläre Lehrkräfte, Vertretungslehrkräfte, Räume, Status und Hinweise. Der beim Scrollen sichtbare Button **← Zur Wochenansicht** führt zur vorherigen Woche und Scrollposition zurück; der Tastaturfokus kehrt zur gewählten Stunde oder zum Termin zurück.
 - In der Tagesansicht zeigt Antippen eines Schulaufgaben-/Test-Kastens oder einer Vertretung **📅 In Kalender eintragen** / **Google Kalender**.
 - **Schulaufgaben und Tests** aus den Portal-Terminen sind hervorgehoben: 📝 / ✏️ an den Wochentagen, ein Kasten über den Stunden des Tages und eine Markierung am passenden Fach (lila = Schulaufgabe, blau = Test). Was in den nächsten zwei Wochen ansteht, steht über dem Stundenplan.
 
@@ -119,7 +121,7 @@ Zeigt pro Kind die Reiter **Aufgaben**, **Mitteilungen** und **Erledigt**.
 ### Über HACS / Marketplace (empfohlen)
 
 1. Ab **Home Assistant 2026.11** **Einstellungen → Marketplace** öffnen; unter **2026.10 oder älter** **HACS** öffnen. Nach **Eltern Portal Manager Bavaria** suchen.
-2. Die Integration installieren und Home Assistant neu starten.
+2. Die Integration installieren. Marketplace öffnet direkt die Einrichtung. Bei HACS auf älteren Home-Assistant-Versionen zuerst neu starten und die Integration dann unter **Einstellungen → Geräte & Dienste** hinzufügen. Updates benötigen weiterhin einen Neustart.
 
 Die Integration ist im Standardkatalog enthalten; ein benutzerdefiniertes Repository ist nicht mehr nötig. Falls sie in HACS nicht erscheint, den Länderfilter prüfen: Dieses Repository ist für **Deutschland (DE)** gelistet.
 
@@ -133,7 +135,7 @@ Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-s
 
 ## Releases und Updates
 
-Die veröffentlichte Version und ihre Release Notes stehen auf der aktuellen Release-Seite. Die für v0.15.0 vorbereiteten Änderungen sind im Changelog dokumentiert. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
+**v0.15.5** aktualisiert Dokumentation und Screenshots. **v0.15.4** ergänzt die Relevanz-Abfrage für Mitteilungstermine und verbindet gleiche Pausen benachbarter Schultage. Die veröffentlichte Version steht auf der Release-Seite; Versionshistorie und noch unveröffentlichte Änderungen stehen im Changelog. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
 
 Seit v0.14.8 enthält die Integration die technische Bronze-/Silber-Selbsteinschätzung mit Verbindungsprüfung bei der Einrichtung, erneuter Anmeldung, Zugangsdatenänderung, Verfügbarkeitsanzeige, erneut zustellbaren Erinnerungen, datensparsamer Diagnose und verbindlicher Testabdeckung. Die Integration hat weiterhin die Einstufung Custom.
 

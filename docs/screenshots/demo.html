@@ -53,7 +53,7 @@
   });
 
   const TODAY = "2026-10-05"; // Montag
-  const T = [["08:00","08:45"],["08:50","09:35"],["09:55","10:40"],["10:45","11:30"],["11:45","12:30"],["12:35","13:20"],["14:00","14:45"],["14:50","15:35"]];
+  const T = [["08:00","08:45"],["08:45","09:30"],["09:50","10:35"],["10:35","11:20"],["11:45","12:30"],["12:30","13:15"],["13:20","14:05"],["14:05","14:50"]];
   const plan = (rows) => rows.flatMap(([wd, subjects]) => subjects.map((s, i) => s && ({
     weekday: wd, lesson: String(i + 1), start: T[i][0], end: T[i][1], subject: s[0], room: s[1], teacher: "AB", teacher_label: "AB (Anna Beispiel)",
   })).filter(Boolean));
@@ -62,10 +62,10 @@
     key: "anna", name: "Anna", classname: "7B", school: "Beispiel-Gymnasium", ampel: "gelb",
     tasks: [], items: [], unread: 0, overdue: 0,
     timetable: plan([
-      [1, [["D","204"],["D","204"],["M","204"],["B","BioS"],["Ev/K/Eth","112"],["E","204"]]],
-      [2, [["M","204"],["F","204"],["G","108"],["Ku","Ku1"],["Ku","Ku1"],["D","204"]]],
+      [1, [["D","204"],["D","204"],["M","204"],["B","BioS"],["Ev/K/Eth","112"],["E","204"],["G","108"]]],
+      [2, [["M","204"],["F","204"],["G","108"],["Ku","Ku1"],["Ku","Ku1"],["D","204"],["M","204"]]],
       [3, [["M","204"],["E","204"],["Ph","PhS"],["B","BioS"],["G","108"],["Sm/Sw","TH2"],["Sm/Sw","TH2"]]],
-      [4, [["F","204"],["E","204"],["Mu","Mu2"],["M","204"],["Geo","110"],["Ev/K/Eth","112"]]],
+      [4, [["F","204"],["E","204"],["Mu","Mu2"],["M","204"],["Geo","110"],["Ev/K/Eth","112"],["D","204"]]],
       [5, [["E","204"],["D","204"],["F","204"],["NuT_Inf","PC1"],["NuT_Inf","PC1"],["MInt","204"]]],
     ]),
     substitutions: {
@@ -87,9 +87,9 @@
         hover: "Unit 1 und 2: Simple past, Vokabeln S. 180–186, kurzer Brief schreiben." },
       { uid: "e2", date: "2026-10-09", category: "test", icon: "✏️", subject: "Mathematik", title: "Stegreifaufgabe Mathematik (angekündigt)",
         hover: "Bruchrechnen: Kürzen, Erweitern, Addieren." },
-      { uid: "e3", date: "2026-10-07", time: "09:55", time_end: "10:40", category: "vertretung", icon: "🔁", title: "3. Std. Physik: Vertretung",
+      { uid: "e3", date: "2026-10-07", time: "09:50", time_end: "10:35", category: "vertretung", icon: "🔁", title: "3. Std. Physik: Vertretung",
         hover: "Vertretung bei Hr. Beispiel, Raum Ph2 – Aufgaben im Buch S. 42" },
-      { uid: "e4", date: "2026-10-07", time: "10:45", time_end: "11:30", category: "entfall", icon: "❌", title: "4. Std. Biologie entfällt", hover: "" },
+      { uid: "e4", date: "2026-10-07", time: "10:35", time_end: "11:20", category: "entfall", icon: "❌", title: "4. Std. Biologie entfällt", hover: "" },
       { uid: "e5", date: "2026-10-08", until: "2026-10-12", category: "frist_zahlung", icon: "💶", title: "Wandertag: 12,50 € überweisen", task_id: "t1",
         hover: "Busfahrt und Eintritt Tierpark. Überweisung an das Schulkonto, Verwendungszweck: Wandertag 7B Anna." },
       { uid: "e6", date: "2026-10-14", time: "08:00", category: "termin", icon: "📅", title: "Wandertag Tierpark", location: "Treffpunkt Haupteingang", item_uid: "i9",
@@ -123,6 +123,15 @@
   document.documentElement.dataset.theme = theme;
   if (q.get("w")) document.documentElement.style.setProperty("--w", q.get("w") + "px");
   const children = card === "termine" || card === "dashboard" || card === "tasks" ? [anna, max] : [anna];
+
+  // Confirmed appointments are in the grid; offers await a parent's answer.
+  anna.schedule_options = {messages: true, holidays: true};
+  anna.schedule = [{uid:"evening",kind:"message",title:"Elternabend der 7. Klassen",date:"2026-10-07",time:"18:30",time_end:"20:00",status:"confirmed",sources:[{title:"Einladung zum Elternabend",url:"https://example.org/elternabend"}],details:"Treffpunkt Aula. Vorstellung des Schuljahres und Zeit für Fragen."}];
+  anna.events.push({uid:"evening",date:"2026-10-07",time:"18:30",time_end:"20:00",category:"termin",icon:"📅",title:"Elternabend der 7. Klassen",hover:"Treffpunkt Aula. Vorstellung des Schuljahres und Zeit für Fragen."});
+  if (q.get("pending") === "1") anna.schedule.push(
+    {uid:"exchange-a",kind:"message",title:"Frankreich-Austausch: Besuch der Partnerschule",date:"2026-12-09",end:"2026-12-17",status:"proposed",sources:[{title:"Austausch-Angebot",url:"https://example.org/austausch"}]},
+    {uid:"exchange-b",kind:"message",title:"Frankreich-Austausch: Gegenbesuch in Frankreich",date:"2027-03-10",end:"2027-03-18",status:"proposed",sources:[{title:"Austausch-Angebot",url:"https://example.org/austausch"}]}
+  );
 
   // Aufgabe für den Detail-Dialog (card=task)
   const TASK = {
@@ -176,10 +185,20 @@
   // Gefälschtes hass-Objekt: liefert nur die Demo-Daten
   window.hass = {
     callWS: async (msg) => msg.type === "eltern_portal_schulmanager/data" ? { children: msg.child ? children.filter(c => c.key === msg.child) : children, legend: LEGEND, today: TODAY, errors: [],
-        last_update: `${TODAY}T08:15:00+02:00`, version: "0.14.5", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
+        last_update: `${TODAY}T08:15:00+02:00`, version: window.DEMO_VERSION || "0.15.5", repo_url: "https://github.com/FabusMingAI/ha-schulmanager" }
       : msg.type === "eltern_portal_schulmanager/task" ? TASK : msg.type === "eltern_portal_schulmanager/item" ? ITEM
       : msg.type === "eltern_portal_schulmanager/event_links" ? { ics: "#ics", google: "#google" } : {},
-    callService: async () => {},
+    callService: async (domain, service, data) => {
+      const child = children.find(c => c.key === data.child);
+      if (service === "timetable_entry" && child) {
+        const entry = child.schedule?.find(e => e.uid === data.event_id);
+        if (entry) {
+          if (data.action === "confirm") entry.status = "confirmed";
+          else entry.hidden = data.action === "hide";
+        }
+      }
+      if (service === "timetable_options" && child) child.schedule_options = {messages:data.messages,holidays:data.holidays};
+    },
     user: { is_admin: true },
     connection: { subscribeMessage: () => Promise.resolve(() => {}) },
   };

@@ -2079,6 +2079,17 @@ class SchulManager:
             if entry.get("choice_key"):
                 aliases = [*aliases, entry["choice_key"]]
             entry["hidden"] = any(choices.get(uid) == "hidden" for uid in aliases)
+            # An invitation for the class does not prove this child's participation.
+            # Apply this to stored events too, without rescanning the archive.
+            participation_text = " ".join([entry.get("title") or "", *(
+                source.get("title") or "" for source in entry.get("sources", [])
+            )])
+            if entry["kind"] == "message" and entry.get("status") != "cancelled" and (
+                entry.get("optional") or re.search(
+                    r"austausch|sprachenfahrt|wahlkurs|wahlunterricht|freiwillig|optional", participation_text, re.I
+                )
+            ):
+                entry["status"] = "proposed"
             if entry.get("status") != "cancelled" and any(choices.get(uid) == "confirmed" for uid in aliases):
                 entry["status"] = "cancelled" if entry.get("cancelled") else "confirmed"
             entry.setdefault("status", "proposed")

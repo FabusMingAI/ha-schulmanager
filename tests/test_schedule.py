@@ -53,6 +53,7 @@ def test_schedule_validation_holidays_and_weekly_series():
                        "beleg": "Kurs", "optional": True, "wochentag": 1, "wiederholen_bis": "2026-01-01",
                        "uhrzeit": "99:99", "ende_uhrzeit": "15:30"}]}
     normalized = normalize(raw)["events"][0]
+    assert normalized["optional"] is True
     assert normalized["status"] == "proposed" and normalized["time"] is None
     assert normalized["repeat_until"] is None and normalized["time_end"] == "15:30"
     raw["termine"][0].update(optional=False, wochentag=9, abgesagt=True)
@@ -255,3 +256,29 @@ async def test_cancellation_proposal_and_interrupted_analysis(manager):
     with patch.object(m, "_schedule_context", side_effect=edited_context):
         await m._work_queue()
     assert m.items["letter"]["analysis"]["status"] == "fertig"
+
+
+async def test_exchange_participation_requires_user_confirmation_and_survives_reload(manager):
+    m = manager
+    m.items["letter"]["title"] = "Sprachenfahrten in Jahrgangsstufe 9"
+    rows = [event(title="Frankreich-Austausch Bayeux", end="2026-11-18"),
+            event(title="Frankreich-Austausch Clermont-Ferrand", end="2026-11-19")]
+    m._replace_events(m.items["letter"], rows, "ki")
+    entries = [e for e in m.schedule_entries("anna") if e["kind"] == "message"]
+    assert len(entries) == 2
+    assert all(e["status"] == "proposed" for e in entries)
+    assert not any(e["category"] == "termin" for e in m.child_events("anna"))
+    yes, no = entries
+    m.schedule_action("anna", yes["uid"], "confirm")
+    m.schedule_action("anna", no["uid"], "hide")
+    assert [e["title"] for e in m.child_events("anna") if e["category"] == "termin"] == [yes["title"]]
+    # Re-extraction retains the explicit answers; restoring an offer asks again.
+    m._replace_events(m.items["letter"], rows, "ki")
+    await m.store.async_save(m.data)
+    restored = SchulManager(m.hass, m.entry)
+    await restored.async_load()
+    entries = {e["uid"]: e for e in restored.schedule_entries("anna")}
+    assert entries[yes["uid"]]["status"] == "confirmed"
+    assert entries[no["uid"]]["hidden"]
+    restored.schedule_action("anna", no["uid"], "restore")
+    assert next(e for e in restored.schedule_entries("anna") if e["uid"] == no["uid"])["status"] == "proposed"

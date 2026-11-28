@@ -8,7 +8,7 @@
  *   view: week           # nur Stundenplan: mit Wochenansicht starten (Standard: Tag)
  */
 (() => {
-  const VERSION = "0.15.3";
+  const VERSION = "0.15.4";
   // Domain der Integration (bis 0.13: „schulmanager“, umbenannt wegen Namensgleichheit mit „Schulmanager Online“)
   const DOMAIN = "eltern_portal_schulmanager";
   const NAME = "Eltern Portal Manager Bavaria";
@@ -1488,8 +1488,13 @@
       const progress = this._data.schedule_progress;
       if (progress) html += `<div class="info">Archivprüfung: ${progress.total - progress.pending} / ${progress.total} Mitteilungen · ${progress.failed} fehlgeschlagen · ${progress.unreadable} Anhänge ohne auslesbaren Text <button class="pill" data-schedule-rescan>Archiv erneut prüfen</button></div>`;
       if (options.holidays && (today < "2024-07-29" || today > "2030-09-09")) html += `<div class="info">Ferien außerhalb Juli 2024 bis September 2030 sind noch nicht hinterlegt.</div>`;
+      const pending = options.messages ? (c.schedule || []).filter(e => !e.hidden && e.status === "proposed" && (e.repeat_until || e.end || e.date) >= today) : [];
+      if (pending.length) {
+        html += `<div class="day">Relevanz bestätigen · ${esc(c.name)}</div><div class="info">Mitteilungen können Angebote für die ganze Klasse enthalten. Bitte bestätige, welche Termine für ${esc(c.name)} relevant sind.</div>`;
+        for (const e of pending) html += this._scheduleEntry(c, e, null);
+      }
       if (this._manageSchedule?.[c.key]) {
-        for (const e of c.schedule || []) if (e.hidden || e.status === "proposed") html += this._scheduleEntry(c, e, null);
+        for (const e of c.schedule || []) if (e.hidden || e.status === "proposed" && !pending.includes(e)) html += this._scheduleEntry(c, e, null);
         for (const l of c.timetable || []) if (l.hidden) html += `<div class="schedule-entry">${esc(fullName(l.subject))} · ${esc(WD[l.weekday])} · Stunde ${esc(l.lesson)} ${this._scheduleButton(c, l.schedule_uid, "restore", "Wiederherstellen")}</div>`;
       }
       if (multi || this._config.show_name) html += `<div class="head"><div class="name">${esc(c.name)}</div>${c.classname ? `<div class="sub">Klasse ${esc(c.classname)}</div>` : ""}</div>`;
@@ -1535,7 +1540,7 @@
     _scheduleOn(c, iso) {
       const options = {messages:true,holidays:true,...c.schedule_options};
       return (c.schedule || []).filter(e => {
-        if (e.hidden || e.status === "cancelled" || (e.kind === "holiday" ? !options.holidays : !options.messages)) return false;
+        if (e.hidden || e.status === "cancelled" || e.status === "proposed" || (e.kind === "holiday" ? !options.holidays : !options.messages)) return false;
         if (iso < e.date || iso > (e.repeat_until || e.end || e.date)) return false;
         if (e.weekday && e.repeat_until && (c.schedule || []).some(h => h.kind === "holiday" && h.date <= iso && h.end >= iso)) return false;
         return !e.weekday || !e.repeat_until || (parseDay(iso).getDay() || 7) === e.weekday;
@@ -1548,15 +1553,19 @@
       const proposed = e.status === "proposed";
       const sources = (e.sources || []).map(s => /^https?:\/\//.test(s.url || "") ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || "Mitteilung")}</a>` : esc(s.title || "Mitteilung")).join(" · ");
       const title = `${e.kind === "holiday" ? "🌴" : "📅"} ${e.title}${proposed ? " · Vorschlag" : ""}`;
-      let html = `<div class="schedule-entry ${esc(e.kind)} ${proposed ? "proposed" : ""}"><button class="lesson-pick" data-schedule-open="${esc(key)}" aria-expanded="${open}"><b>${esc(title)}</b><div class="r">${e.time ? esc(e.time) + (e.time_end ? "–" + esc(e.time_end) : "") : "ganztägig"}</div></button>`;
+      let html = `<div class="schedule-entry ${esc(e.kind)} ${proposed ? "proposed" : ""}"><button class="lesson-pick" data-schedule-open="${esc(key)}" aria-expanded="${open}"><b>${esc(title)}</b><div class="r">${!iso ? esc(fmtDate(e.date)) + (e.end ? "–" + esc(fmtDate(e.end)) : "") + " · " : ""}${e.time ? esc(e.time) + (e.time_end ? "–" + esc(e.time_end) : "") : "ganztägig"}</div></button>`;
       if (open) {
         if (iso && !proposed && e.time && c.timetable.some(l => !l.hidden && l.weekday === (parseDay(iso).getDay() || 7) && l.start && l.end && e.time < l.end && (!e.time_end || e.time_end > l.start))) html += `<div class="info">Überschneidung mit Unterricht</div>`;
         html += `<div class="schedule-source">${sources || (e.kind === "holiday" ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">Amtliche Ferienordnung Bayern</a>` : "")}${e.location ? `<br>${esc(e.location)}` : ""}${e.details ? `<br>${esc(e.details)}` : ""}${!iso ? `<br>${esc(fmtDate(e.date))}` : ""}</div>`;
         if (e.hidden) html += this._scheduleButton(c,e.uid,"restore","Wiederherstellen");
         else {
-          if (proposed) html += this._scheduleButton(c,e.uid,"confirm",e.cancelled ? "Absage übernehmen" : "Übernehmen");
-          html += this._scheduleButton(c,e.uid,"hide",e.weekday && e.repeat_until ? "Serie entfernen" : "Entfernen");
+          if (!proposed) html += this._scheduleButton(c,e.uid,"hide",e.weekday && e.repeat_until ? "Serie entfernen" : "Entfernen");
         }
+      }
+      if (proposed && !e.hidden) {
+        html += `<div class="info">Ist dieser Termin für ${esc(c.name)} relevant?</div>`;
+        html += this._scheduleButton(c,e.uid,"confirm",e.cancelled ? "Absage übernehmen" : "Ja, relevant");
+        html += this._scheduleButton(c,e.uid,"hide","Nein, nicht relevant");
       }
       return html + "</div>";
     }
@@ -1694,10 +1703,20 @@
       rows.forEach((row,index) => {
         if (row.pause) {
           const events = additions.map(day => day.filter(e => e.time && eventRow(e) === index));
-          const shared = row.pauses.every(p => p && p.start === row.start && p.end === row.end);
           html += `<tr class="pause-row ${row.duration >= 30 ? "pause-long" : ""}"><th><div class="r">${esc(row.start)}–${esc(row.end)}</div></th>`;
-          if (shared && events.every(day => !day.length)) html += `<td colspan="5">${this._pauseLabel(row)}</td>`;
-          else html += dates.map((iso,i) => `<td>${row.pauses[i] ? (row.pauses[i].start !== row.start || row.pauses[i].end !== row.end ? `<div class="r">${esc(row.pauses[i].start)}–${esc(row.pauses[i].end)}</div>` : "") + this._pauseLabel(row.pauses[i]) : ""}${events[i].map(e => this._weekAppointment(c,e,iso)).join("")}</td>`).join("");
+          for (let i = 0; i < dates.length;) {
+            const pause = row.pauses[i];
+            let end = i + 1;
+            // Merge adjacent days with the same break, even if school has
+            // already ended on another day. Appointments keep their own cell.
+            if (pause && !events[i].length) {
+              while (end < dates.length && !events[end].length &&
+                row.pauses[end]?.start === pause.start && row.pauses[end]?.end === pause.end) end++;
+            }
+            const label = pause ? (pause.start !== row.start || pause.end !== row.end ? `<div class="r">${esc(pause.start)}–${esc(pause.end)}</div>` : "") + this._pauseLabel(pause) : "";
+            html += `<td${end - i > 1 ? ` colspan="${end - i}"` : ""}>${label}${events[i].map(e => this._weekAppointment(c,e,dates[i])).join("")}</td>`;
+            i = end;
+          }
           html += "</tr>";
           return;
         }

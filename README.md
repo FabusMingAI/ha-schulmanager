@@ -13,7 +13,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
-> The published version and its release notes are available on the latest release page. This README describes the development branch, including the timetable additions prepared for v0.15.0. Screenshots use fictional data and show the dashboard layout introduced in v0.14.5. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
+> Documentation and screenshots checked against **v0.15.4 (28 November 2026)**. The screenshots render the included cards with fictional data; they do not show a live school account. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
@@ -29,11 +29,13 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 **Correction from v0.15.1.** Archive sources use a separate store exclusively for timetable extraction. Backfilling preserves existing messages, tasks, read state and comments. Identifiable historical imports from v0.15.0 and their untouched generated open tasks are reversibly quarantined. Original records are retained, along with user comments and completed tasks. Additional appointments appear at their time inside the week grid. From v0.15.2, compact appointments show an icon and at most two title lines, with longer titles truncated with an ellipsis. Selecting it opens the corresponding day with full details and editing actions.
 
 
-The timetable card shows appointments from messages and attachments in day and week views with source links. Clearly evidenced appointments are included automatically. Uncertain dates and elective offers appear as proposals requiring **Übernehmen**. Without AI, explicitly dated events become proposals. Weekly courses require an evidenced start and end and pause during the bundled holidays.
+The timetable card shows appointments from messages and attachments in day and week views with source links. Clearly evidenced appointments are included automatically. Uncertain dates and elective offers appear under **Relevanz bestätigen**, outside the timetable grid. Choose **Ja, relevant** to include an offer in the timetable and calendar, or **Nein, nicht relevant** to hide it. Exchange and language trip invitations require this answer even when their dates are certain: a class letter does not establish personal participation. These answers survive restarts and rescans. Without AI, explicitly dated events become proposals. Weekly courses require an evidenced start and end and pause during the bundled holidays.
+
+<p align="left"><img src="docs/images/stundenplan-relevanz.png" width="540" alt="Relevance confirmation for an optional exchange offer, with Ja, relevant and Nein, nicht relevant buttons"></p>
 
 The first start after upgrading fetches the entire available portal archive independently of the normal lookback setting. Appointment extraction runs in the background and resumes after restarts. Backfilling preserves tasks and read state and does not send old notifications. Normal lookback resumes afterwards. Only content still available from the portal can be fetched.
 
-**Einträge verwalten** lists proposals and hidden entries. **Entfernen**, **Serie entfernen** and **Wiederherstellen** apply per child and survive restarts and rescans. Optional timetable lessons can also be hidden. Message appointments and holidays can be switched off per child. Day and week navigation provide access to past dates. Time overlaps are indicated.
+**Einträge verwalten** lists hidden entries and older proposals. Upcoming proposals are shown directly above the timetable. **Wiederherstellen** brings a declined proposal back for another relevance check. **Entfernen**, **Serie entfernen** and **Wiederherstellen** apply per child and survive restarts and rescans. Optional timetable lessons can also be hidden. Message appointments and holidays can be switched off per child. Day and week navigation provide access to past dates. Time overlaps are indicated.
 
 Bavarian school holidays from summer 2024 through summer 2030 are bundled offline from the official holiday order. Regular lessons pause during displayed holidays. School-specific exceptions can be accommodated by hiding entries. Dates outside this range require an update. [Official holiday order](https://www.gesetze-bayern.de/Content/Document/BayVV_2230_1_1_0_K_13479/true)
 
@@ -103,7 +105,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 
 <p align="left"><sub>Screenshots show made-up demo data (`docs/screenshots/demo.html`, [regeneration instructions](docs/screenshots/README.md)).</sub></p>
 
-- Day view with times and rooms, switchable to the whole **week**. The week grid shows both start and end times. Gaps between lessons appear as subtle green break rows with their time range and duration in minutes, in both day and week views. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
+- Day view with times and rooms, switchable to the whole **week**. The week grid shows both start and end times. Gaps between lessons appear as subtle green break rows with their time range and duration in minutes, in both day and week views. Adjacent days with the same break share one cell, including a Monday–Thursday break when Friday lessons end earlier. Appointments during a break retain their own day cell. In the morning it shows today; after the last lesson and at weekends it shows the next school day. With `view: week` the card starts in the week view; the "Schule" dashboard uses this for all timetables.
 - **Week navigation:** use ‹ / › to go back or forward one week and **Heute** to return to the starting week. The heading shows the calendar week and Monday–Friday dates; at weekends the starting week is the following week. The week-view legend can be expanded or collapsed.
 - The week view fits narrow cards (e.g. half a column or a phone) without horizontal scrolling: subjects are shortened there ("Mathe", "Engl.", "Reli/Eth", "SA" for exam).
 - Subjects are **written out** ("Biologie" instead of "B", "Mathematik (Intensivierung)" instead of "MInt", "Sport" instead of "Sm/Sw"); hover a subject to see the original abbreviation.
@@ -123,7 +125,7 @@ Shows the tabs **Aufgaben** (tasks), **Mitteilungen** (messages) and **Erledigt*
 ### HACS / Marketplace (recommended)
 
 1. On **Home Assistant 2026.11 or newer**, open **Settings → Marketplace**. On **2026.10 or older**, open **HACS**. Search for **Eltern Portal Manager Bavaria**.
-2. Install the integration and restart Home Assistant.
+2. Install the integration. Marketplace opens its setup flow directly; with HACS on older Home Assistant versions, restart and then add the integration under **Settings → Devices & services**. Updates still require a restart.
 
 The integration is included in the default catalog; adding a custom repository is no longer necessary. In HACS, check the country filter if the integration does not appear: this repository is listed for **Germany (DE)**.
 
@@ -137,7 +139,7 @@ Download the source archive of the [latest release](https://github.com/FabusMing
 
 ## Releases and updates
 
-See the latest release page for the published version and release notes. Changes prepared for v0.15.0 are documented in the changelog. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
+**v0.15.4** adds relevance confirmation for message appointments and merges identical breaks across adjacent school days. See the latest release page for the published version and the changelog for release history and unreleased changes. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
 
 Since v0.14.8, the integration includes the Bronze/Silver technical self-assessment with live setup validation, reauthentication, credential changes, availability reporting, retryable reminders, privacy-preserving diagnostics and enforced test coverage. The integration retains its Custom classification.
 

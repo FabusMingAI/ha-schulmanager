@@ -135,11 +135,13 @@ as a routine shutdown action. Logs and `.env` stay outside Git.
 
 ## Verification status
 
-For v0.14.9 on 11 November 2026, all **191 tests** passed on the isolated
-HA 2026.10.1 / Python 3.14 image and on GitHub CI / Python 3.13. Python line
-coverage was **97.92%**, with every module above 95% and config flow,
-diagnostics and the WebUntis parser at 100%. Desktop/mobile browser checks
-also cover timed WebUntis changes without a portal timetable.
+For **v0.15.4 on 28 November 2026**, all **215 tests** passed on the isolated
+HA 2026.10.1 / Python 3.14 image and on GitHub CI / Python 3.13 (HA 2026.2.3).
+CI Python line coverage is **98.01%**, with every module above 95% and config
+flow, diagnostics and the WebUntis parser at 100%. The
+[CI run and coverage artifact](https://github.com/FabusMingAI/ha-schulmanager/actions/runs/46122198504)
+record this release's results. Desktop/mobile browser checks also cover timed
+WebUntis changes without a portal timetable.
 
 The suite exercises optional configuration, real HA calendar services,
 per-child assignments, combined events, source failures and recovery, removal

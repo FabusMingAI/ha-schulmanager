@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Refresh English/German documentation and fictional screenshots for v0.15.4, including relevance confirmation, shared breaks, return navigation and current verification results. Clarify Marketplace first installation versus updates.
+- Deutsche und englische Dokumentation sowie Demo-Screenshots auf v0.15.4 aktualisieren: Relevanz-Abfrage, verbundene Pausen, Rücknavigation und aktuelle Prüfergebnisse. Marketplace-Erstinstallation und Updates unterscheiden.
+
 ## 0.15.4 – 2026-11-28
 
 - Ask parents whether proposed message appointments are relevant before putting them in the timetable. Exchange and language trip invitations, including already stored entries, require an explicit answer. Keep confirmations and dismissals across rescans and restarts.

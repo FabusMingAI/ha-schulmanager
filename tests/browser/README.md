@@ -15,3 +15,8 @@ Outage checks retain timetable/agenda content while showing connection, partial-
 Timetable navigation checks cover start/end times and missing end times, returning from lessons and appointments in a different week, restored keyboard focus and scroll position, sticky return-button visibility, and no horizontal overflow at desktop/mobile widths. Scroll restoration is checked for both document scrolling and a simulated Home Assistant dashboard scroll container inside a shadow root.
 
 Break checks cover 5/15/45-minute gaps, missing/invalid/overlapping/adjacent times, holidays, hidden lessons, appointments during breaks and after school, theme adaptation, and no horizontal overflow on desktop and mobile.
+
+Schedule checks cover relevance confirmation: unconfirmed offers stay outside the
+week grid, yes/no answers call the appropriate service, and hiding one offer does
+not confirm another. Break checks also cover Monday–Thursday shared cells when
+Friday school ends earlier and appointments splitting a shared range.

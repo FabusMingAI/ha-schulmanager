@@ -11,7 +11,7 @@
 
 ![Dashboard](docs/images/dashboard.png)
 
-> Dokumentation und Screenshots sind auf **v0.15.4 (28. November 2026)** geprüft. Die Screenshots zeigen die enthaltenen Karten mit erfundenen Daten, ohne Verbindung zu einem echten Schulkonto. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
+> Dokumentation und Screenshots sind auf **v0.15.5 (28. November 2026)** geprüft. Die Screenshots zeigen die enthaltenen Karten mit erfundenen Daten, ohne Verbindung zu einem echten Schulkonto. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria ist ein privates Hobbyprojekt und steht in keiner Verbindung zum Anbieter des Eltern-Portals. Die Integration liest die Webseiten des Portals aus, weil es keine offizielle Schnittstelle gibt; Änderungen am Portal können einzelne Funktionen jederzeit stören. Nutzung auf eigene Verantwortung, ohne Gewähr. Fehler und Wünsche gerne als [Issue](https://github.com/FabusMingAI/ha-schulmanager/issues) – Antworten kommen, wenn Zeit ist.
@@ -135,7 +135,7 @@ Das Quellcode-Archiv des [neuesten Releases](https://github.com/FabusMingAI/ha-s
 
 ## Releases und Updates
 
-**v0.15.4** ergänzt die Relevanz-Abfrage für Mitteilungstermine und verbindet gleiche Pausen benachbarter Schultage. Die veröffentlichte Version steht auf der Release-Seite; Versionshistorie und noch unveröffentlichte Änderungen stehen im Changelog. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
+**v0.15.5** aktualisiert Dokumentation und Screenshots. **v0.15.4** ergänzt die Relevanz-Abfrage für Mitteilungstermine und verbindet gleiche Pausen benachbarter Schultage. Die veröffentlichte Version steht auf der Release-Seite; Versionshistorie und noch unveröffentlichte Änderungen stehen im Changelog. [Aktuelles Release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
 
 Seit v0.14.8 enthält die Integration die technische Bronze-/Silber-Selbsteinschätzung mit Verbindungsprüfung bei der Einrichtung, erneuter Anmeldung, Zugangsdatenänderung, Verfügbarkeitsanzeige, erneut zustellbaren Erinnerungen, datensparsamer Diagnose und verbindlicher Testabdeckung. Die Integration hat weiterhin die Einstufung Custom.
 

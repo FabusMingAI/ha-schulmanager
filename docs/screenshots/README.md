@@ -37,7 +37,7 @@ interactive demo has a fallback version that should track releases.
 Screenshots describe the checked-out code; the READMEs distinguish unreleased
 features from the published release.
 
-The v0.15.4 examples show 20/25-minute shared breaks and a 5-minute break
+The v0.15.5 examples show 20/25-minute shared breaks and a 5-minute break
 shared by Monday–Thursday, an evening appointment in the week grid, and a
 separate relevance-confirmation image (`stundenplan-relevanz.png`). Use
 `demo.html?card=stundenplan&pending=1&theme=dark` to try the yes/no controls

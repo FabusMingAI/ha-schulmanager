@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-- Refresh English/German documentation and fictional screenshots for v0.15.4, including relevance confirmation, shared breaks, return navigation and current verification results. Clarify Marketplace first installation versus updates.
-- Deutsche und englische Dokumentation sowie Demo-Screenshots auf v0.15.4 aktualisieren: Relevanz-Abfrage, verbundene Pausen, Rücknavigation und aktuelle Prüfergebnisse. Marketplace-Erstinstallation und Updates unterscheiden.
+## 0.15.5 – 2026-11-28
+
+- Refresh English/German documentation and fictional screenshots for v0.15.5, including relevance confirmation, shared breaks, return navigation and current verification results. Clarify Marketplace first installation versus updates.
+- Deutsche und englische Dokumentation sowie Demo-Screenshots auf v0.15.5 aktualisieren: Relevanz-Abfrage, verbundene Pausen, Rücknavigation und aktuelle Prüfergebnisse. Marketplace-Erstinstallation und Updates unterscheiden.
 
 ## 0.15.4 – 2026-11-28
 

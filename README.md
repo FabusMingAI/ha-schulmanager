@@ -13,7 +13,7 @@ It signs in to the portal itself, stores parent letters and attachments per chil
 
 ![Dashboard](docs/images/dashboard.png)
 
-> Documentation and screenshots checked against **v0.15.4 (28 November 2026)**. The screenshots render the included cards with fictional data; they do not show a live school account. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
+> Documentation and screenshots checked against **v0.15.5 (28 November 2026)**. The screenshots render the included cards with fictional data; they do not show a live school account. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest)
 
 > [!NOTE]
 > Eltern Portal Manager Bavaria is a private hobby project and is not affiliated with the provider of Eltern-Portal. It reads the portal's web pages because there is no official API, so changes to the portal can break single features at any time. Use at your own risk, without warranty. Bug reports and ideas are welcome as [issues](https://github.com/FabusMingAI/ha-schulmanager/issues) – answers come when time allows.
@@ -139,7 +139,7 @@ Download the source archive of the [latest release](https://github.com/FabusMing
 
 ## Releases and updates
 
-**v0.15.4** adds relevance confirmation for message appointments and merges identical breaks across adjacent school days. See the latest release page for the published version and the changelog for release history and unreleased changes. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
+**v0.15.5** refreshes documentation and screenshots. **v0.15.4** adds relevance confirmation for message appointments and merges identical breaks across adjacent school days. See the latest release page for the published version and the changelog for release history and unreleased changes. [Latest release](https://github.com/FabusMingAI/ha-schulmanager/releases/latest), [Changelog](CHANGELOG.md)
 
 Since v0.14.8, the integration includes the Bronze/Silver technical self-assessment with live setup validation, reauthentication, credential changes, availability reporting, retryable reminders, privacy-preserving diagnostics and enforced test coverage. The integration retains its Custom classification.
 

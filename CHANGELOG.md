@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Ask parents whether proposed message appointments are relevant before putting them in the timetable. Exchange and language trip invitations, including already stored entries, require an explicit answer. Keep confirmations and dismissals across rescans and restarts.
+- Bei Terminvorschlägen aus Mitteilungen mit „Ja, relevant“ / „Nein, nicht relevant“ nachfragen, bevor sie im Stundenplan erscheinen. Austausch- und Sprachenfahrt-Angebote benötigen auch bei bereits gespeicherten Terminen eine ausdrückliche Entscheidung. Antworten bleiben nach erneuter Archivprüfung und Neustart erhalten.
+
 - Merge adjacent days with identical timetable breaks, including a Monday–Thursday break when Friday lessons end earlier. Appointments and days without a break retain their own cells.
 - Benachbarte Tage mit gleichen Pausen verbinden, auch bei einer Pause von Montag bis Donnerstag und früherem Unterrichtsende am Freitag. Termine und Tage ohne Pause behalten ihre eigenen Zellen.
 

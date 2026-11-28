@@ -67,6 +67,8 @@ anmelden, antworten, etwas besorgen/mitgeben). Reine Informationen erzeugen kein
 - Relative Datumsangaben anhand des Datums der Mitteilung auflösen, auch im Archiv.
 - "sicher" nur true bei eindeutigem Datum UND eindeutiger Teilnahme dieses Kindes.
   Wahlangebote und ungeklärte Kurszugehörigkeit brauchen immer Bestätigung.
+  Austausch und Sprachenfahrten immer als optional erfassen: Ein Klassenbrief,
+  eine Einladung oder ein Anmeldeformular belegt keine persönliche Anmeldung.
 - Wöchentliche Kurse mit wochentag 1 (Montag) bis 7 und wiederholen_bis YYYY-MM-DD
   erfassen, nur wenn Beginn und Ende ausdrücklich belegt sind. Sonst Vorschlag.
 - Absagen als abgesagt true erfassen. Bei Verschiebung nur den neuen Termin nennen.
@@ -188,6 +190,7 @@ def normalize(raw: dict[str, Any], languages: list[str] | None = None) -> dict[s
                 "location": e.get("ort") or None,
                 "time_end": schedule_clock(e.get("ende_uhrzeit")),
                 "audience": str(e.get("zielgruppe") or "")[:200],
+                "optional": bool(e.get("optional")),
                 "status": ("cancelled" if e.get("abgesagt") is True else "confirmed") if certain else "proposed",
                 "cancelled": e.get("abgesagt") is True,
                 "weekday": weekday,

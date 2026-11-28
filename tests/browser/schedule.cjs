@@ -40,10 +40,13 @@ const path = require('node:path');
       const card = page.locator('eltern-portal-schulmanager-stundenplan');
       assert.match(await card.locator('ha-card').innerText(),/17 \/ 20 Mitteilungen/);
       assert.match(await card.locator('ha-card').innerText(),/Vorschlag/);
-      assert.equal(await card.getByRole('button',{name:'Übernehmen',exact:true}).count(),0);
+      assert.equal(await card.locator('.schedule-entry.proposed').count(),1);
+      assert.equal(await card.locator('.wk [data-uid="course"]').count(),0);
+      assert.equal(await card.getByRole('button',{name:'Ja, relevant',exact:true}).count(),1);
       await card.locator('[data-schedule-open]').filter({hasText:'Robotikkurs'}).click();
       assert.equal(await card.getByRole('link',{name:'Kursangebot'}).getAttribute('href'),'https://example.org/course');
-      await card.getByRole('button',{name:'Übernehmen',exact:true}).click();
+      await card.getByRole('button',{name:'Ja, relevant',exact:true}).click();
+      await card.locator('[data-schedule-open]').filter({hasText:'Robotikkurs'}).click();
       assert.match(await card.locator('ha-card').innerText(),/Überschneidung mit Unterricht/);
       await card.getByRole('button',{name:'Serie entfernen',exact:true}).click();
       assert.doesNotMatch(await card.locator('ha-card').innerText(),/Robotikkurs/);
@@ -85,6 +88,24 @@ const path = require('node:path');
       assert.equal(await card.getByRole('button',{name:/Archiv-Ausflug.*Tagesansicht öffnen/}).count(),1);
       await card.getByRole('button',{name:'Archiv erneut prüfen'}).click();
       assert.equal(await page.evaluate(()=>calls.at(-1).service),'rescan_schedule');
+      await card.evaluate(el=>{
+        el._data.children[0].schedule=[
+          {uid:'bayeux',title:'Frankreich-Austausch Bayeux',kind:'message',date:'2026-12-21',end:'2026-12-23',status:'proposed'},
+          {uid:'clermont',title:'Frankreich-Austausch Clermont-Ferrand',kind:'message',date:'2026-12-21',end:'2026-12-24',status:'proposed'}
+        ];el._wkOff={anna:0};el._render();
+      });
+      assert.equal(await card.locator('.wk .week-appointment').count(),0);
+      assert.equal(await card.locator('.schedule-entry.proposed').count(),2);
+      assert.match(await card.locator('.schedule-entry').first().innerText(),/21.12.2026–23.12.2026/);
+      const bayeux=card.locator('.schedule-entry').filter({hasText:'Frankreich-Austausch Bayeux'});
+      await bayeux.getByRole('button',{name:'Nein, nicht relevant',exact:true}).click();
+      assert.equal(await card.locator('.wk .week-appointment').count(),0);
+      const clermont=card.locator('.schedule-entry').filter({hasText:'Frankreich-Austausch Clermont-Ferrand'});
+      await clermont.getByRole('button',{name:'Ja, relevant',exact:true}).click();
+      assert.equal(await card.locator('.wk .week-appointment').count(),4);
+      assert.equal(await card.getByRole('button',{name:'Ja, relevant',exact:true}).count(),0);
+      assert.equal(await page.evaluate(()=>calls.filter(c=>c.service==='timetable_entry').slice(-2).map(c=>c.data.action).join(',')),'hide,confirm');
+
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth > innerWidth),false);
       assert.deepEqual(errors,[]);
       await page.close();

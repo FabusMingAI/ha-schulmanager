@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.15.4 – 2026-11-28
+
 - Ask parents whether proposed message appointments are relevant before putting them in the timetable. Exchange and language trip invitations, including already stored entries, require an explicit answer. Keep confirmations and dismissals across rescans and restarts.
 - Bei Terminvorschlägen aus Mitteilungen mit „Ja, relevant“ / „Nein, nicht relevant“ nachfragen, bevor sie im Stundenplan erscheinen. Austausch- und Sprachenfahrt-Angebote benötigen auch bei bereits gespeicherten Terminen eine ausdrückliche Entscheidung. Antworten bleiben nach erneuter Archivprüfung und Neustart erhalten.
 
